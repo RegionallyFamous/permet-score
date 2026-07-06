@@ -81,6 +81,7 @@ try {
       timeout: 15000,
     });
     await page.screenshot({
+      caret: "initial",
       path: join(outputDir, `permet-${viewport.name}.png`),
       fullPage: false,
     });

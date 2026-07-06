@@ -91,12 +91,12 @@ textarea {
   background:
     linear-gradient(90deg, transparent, rgba(139, 220, 255, 0.08), transparent),
     linear-gradient(180deg, transparent 0 56%, rgba(139, 220, 255, 0.04) 56% 57%, transparent 57%);
-  opacity: 0.38;
+  opacity: 0.22;
   mix-blend-mode: screen;
 }
 
 .virtual-card {
-  content-visibility: auto;
+  contain: layout paint style;
   contain-intrinsic-size: 290px 430px;
 }
 
@@ -126,16 +126,19 @@ textarea {
     rgba(139, 220, 255, 0.26),
     transparent
   );
-  height: 34%;
+  height: 28%;
   animation: scan-frame-sweep 3.6s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 .permet-sweep {
   animation: permet-sweep 2.8s ease-in-out infinite;
+  will-change: transform;
 }
 
 .permet-scanline {
   animation: scan-frame-sweep 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 @keyframes permet-sweep {
@@ -174,6 +177,24 @@ textarea {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .gcg-panel::after {
+    opacity: 0.14;
+    mix-blend-mode: normal;
+  }
+
+  .scan-frame::after,
+  .permet-sweep,
+  .permet-scanline {
+    animation: none;
+  }
+
+  .scan-frame::after {
+    opacity: 0.26;
+    transform: translateY(210%);
   }
 }
 

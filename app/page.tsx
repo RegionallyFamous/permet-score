@@ -23,6 +23,7 @@ import {
   RotateCcw,
   Search,
   Share2,
+  ShoppingCart,
   ShieldCheck,
   Sparkles,
   Shuffle,
@@ -127,8 +128,9 @@ const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
   string,
   readonly CardArtVariant[]
 >;
-const HERO_IMAGE = "/assets/mecha-deck-hangar.png";
-const HUD_TEXTURE_IMAGE = "/assets/permet-hud-texture.png";
+const HERO_IMAGE = "/assets/permet-launch-cockpit-v2.webp";
+const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
+const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
 
 const starterDeck: DeckState = {
   name: "Heroic Beginnings Shell",
@@ -417,6 +419,21 @@ function formatMoney(value: number) {
     minimumFractionDigits: value >= 100 ? 0 : 2,
     maximumFractionDigits: value >= 100 ? 0 : 2,
   });
+}
+
+function formatEstimatedMoney(value: number) {
+  return `Est. ${formatMoney(value)}`;
+}
+
+function tcgplayerSearchUrl(card: GundamCard, variant?: CardArtVariant) {
+  const params = new URLSearchParams({
+    page: "1",
+    productLineName: "gundam-card-game",
+    q: `${variant?.officialId ?? card.number} ${card.name} Gundam Card Game`,
+    view: "grid",
+  });
+
+  return `${TCGPLAYER_SEARCH_URL}?${params.toString()}`;
 }
 
 function colorAccentClass(color: CardColor) {
@@ -1325,7 +1342,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     context.fillStyle = "#f7f7f2";
     context.font = "700 24px Arial";
     context.fillText(
-      `${mainTotal}/${MAIN_TARGET} main · ${resourceTotal}/${RESOURCE_TARGET} resource · ${formatMoney(costSummary.artTotal)} art cost`,
+      `${mainTotal}/${MAIN_TARGET} main · ${resourceTotal}/${RESOURCE_TARGET} resource · ${formatEstimatedMoney(costSummary.artTotal)} art`,
       42,
       116,
     );
@@ -1435,13 +1452,13 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       <div
         className="fixed inset-0 -z-10 bg-[#05060a]"
         style={{
-          backgroundImage: `linear-gradient(180deg, rgba(5,6,10,0.34), rgba(5,6,10,0.96) 430px), linear-gradient(112deg, rgba(227,27,35,0.22) 0%, transparent 26%, transparent 70%, rgba(17,103,216,0.25) 100%), url(${HERO_IMAGE})`,
+          backgroundImage: `linear-gradient(180deg, rgba(5,6,10,0.08), rgba(5,6,10,0.58) 470px, rgba(5,6,10,0.96) 980px), linear-gradient(112deg, rgba(227,27,35,0.16) 0%, transparent 28%, transparent 68%, rgba(17,103,216,0.2) 100%), url(${HERO_IMAGE})`,
           backgroundPosition: "top center",
           backgroundSize: "cover",
         }}
       />
       <div
-        className="pointer-events-none fixed inset-0 -z-10 opacity-40 mix-blend-screen"
+        className="pointer-events-none fixed inset-0 -z-10 opacity-30 mix-blend-screen"
         style={{
           backgroundImage: `linear-gradient(180deg, rgba(5,6,10,0.1), rgba(5,6,10,0.82)), url(${HUD_TEXTURE_IMAGE})`,
           backgroundPosition: "top center",
@@ -1547,8 +1564,8 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
             <Metric label="Colors" value={deckColors.length ? deckColors.join(" / ") : "-"} />
             <Metric label="Cards" value={`${CARD_POOL.length} loaded`} />
             <Metric label="Alt Ready" value={`${altReadyTotal}`} />
-            <Metric label="Art Cost" value={formatMoney(costSummary.artTotal)} />
-            <Metric label="Missing" value={formatMoney(costSummary.missingCost)} />
+            <Metric label="Est. Art" value={formatMoney(costSummary.artTotal)} />
+            <Metric label="Est. Missing" value={formatMoney(costSummary.missingCost)} />
             <Metric label="Showing" value={`${filteredCards.length}`} />
           </div>
           <HudStrip
@@ -1842,7 +1859,7 @@ function HudStrip({
             Scan {selectedCard.number}
           </span>
           <span className="rounded-sm border border-[#f6c542]/30 bg-black/24 px-2 py-1 text-[#fff2bd]">
-            Missing {formatMoney(missingCost)}
+            Est. Missing {formatMoney(missingCost)}
           </span>
         </div>
       </div>
@@ -1905,7 +1922,7 @@ function SharedDeckBanner({
               {deckColors.length ? deckColors.join(" / ") : "No Colors"}
             </span>
             <span className="rounded-sm border border-[#28d17c]/30 bg-[#28d17c]/12 px-2 py-1 text-[#d9ffe9]">
-              {formatMoney(artTotal)} Art
+              {formatEstimatedMoney(artTotal)} Art
             </span>
           </div>
         </div>
@@ -1971,10 +1988,10 @@ function CockpitSummary({
   return (
     <section className={panelClass("overflow-hidden")}>
       <div
-        className="relative grid gap-4 p-4 lg:grid-cols-[1.25fr_0.8fr_auto]"
+        className="relative grid min-h-[260px] gap-4 p-4 lg:grid-cols-[1.25fr_0.8fr_auto]"
         style={{
-          backgroundImage: `linear-gradient(90deg, rgba(5,6,10,0.93), rgba(5,6,10,0.78) 48%, rgba(5,6,10,0.92)), url(${HUD_TEXTURE_IMAGE})`,
-          backgroundPosition: "center",
+          backgroundImage: `linear-gradient(90deg, rgba(5,6,10,0.9), rgba(5,6,10,0.54) 48%, rgba(5,6,10,0.88)), url(${HERO_IMAGE})`,
+          backgroundPosition: "center 46%",
           backgroundSize: "cover",
         }}
       >
@@ -1991,8 +2008,8 @@ function CockpitSummary({
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Spec label="Ready" value={`${readiness}%`} />
             <Spec label="Main" value={`${mainTotal}/${MAIN_TARGET}`} />
-            <Spec label="Art" value={formatMoney(artTotal)} />
-            <Spec label="Miss" value={formatMoney(missingCost)} />
+            <Spec label="Est. Art" value={formatMoney(artTotal)} />
+            <Spec label="Est. Miss" value={formatMoney(missingCost)} />
           </div>
         </div>
 
@@ -2179,8 +2196,11 @@ function CostPanel({
 }) {
   return (
     <section className={panelClass()}>
-      <PanelTitle icon={<BadgeDollarSign size={18} />} title="Deck Cost" />
+      <PanelTitle icon={<BadgeDollarSign size={18} />} title="Est. Deck Cost" />
       <div className="grid gap-2 p-3">
+        <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-xs font-bold leading-5 text-[#d9ecff]/78">
+          Local estimate. TCGplayer links open marketplace search results.
+        </div>
         <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
         <CostRow label="Alt premium" value={formatMoney(summary.altPremium)} />
         <CostRow label="Owned value" value={formatMoney(summary.ownedValue)} />
@@ -2495,7 +2515,7 @@ function DeckPanel({
                         {card.name}
                       </h3>
                       <p className="truncate text-xs font-bold text-[#f7f7f2]/45">
-                        {card.number} · {formatMoney(estimatePrintCost(card, artVariant))}
+                        {card.number} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {printEntries.map((entry) => (
@@ -2509,7 +2529,13 @@ function DeckPanel({
                       </div>
                     </div>
                   </div>
-                  <div className="grid shrink-0 grid-cols-3 gap-1">
+                  <div className="grid shrink-0 grid-cols-4 gap-1">
+                    <IconLink
+                      label={`Search ${card.name} on TCGplayer`}
+                      href={tcgplayerSearchUrl(card, artVariant)}
+                    >
+                      <ShoppingCart size={14} />
+                    </IconLink>
                     <IconButton
                       label="Remove one"
                       onClick={() => onAdjust(zone, card.number, -1)}
@@ -2612,7 +2638,7 @@ function LibraryCard({
                 {card.name}
               </h3>
               <p className="mt-0.5 text-xs font-bold text-[#f7f7f2]/55">
-                {card.type} · {formatMoney(estimatePrintCost(card, artVariant))}
+                {card.type} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
               </p>
             </div>
             {quantity > 0 && (
@@ -2635,7 +2661,7 @@ function LibraryCard({
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 border-t border-[#a7b5c9]/20 bg-[#080a0f] p-2">
+      <div className="grid grid-cols-3 gap-2 border-t border-[#a7b5c9]/20 bg-[#080a0f] p-2">
         <button
           type="button"
           className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border font-display text-base font-black uppercase ${
@@ -2670,6 +2696,17 @@ function LibraryCard({
           <Plus size={15} />
           Res
         </button>
+        <a
+          href={tcgplayerSearchUrl(card, artVariant)}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+          onClick={(event) => event.stopPropagation()}
+          title={`Search ${card.name} on TCGplayer`}
+        >
+          <ShoppingCart size={15} />
+          Buy
+        </a>
       </div>
     </article>
   );
@@ -2761,10 +2798,10 @@ function InspectorPanel({
               </span>
             </div>
             <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/58">
-              {artVariant.officialId} · {formatMoney(artCost)}
+              {artVariant.officialId} · {formatEstimatedMoney(artCost)}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               className={`inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
@@ -2793,6 +2830,16 @@ function InspectorPanel({
               <ChevronUp size={15} />
               Up
             </button>
+            <a
+              href={tcgplayerSearchUrl(card, artVariant)}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+              title={`Search ${card.name} on TCGplayer`}
+            >
+              <ShoppingCart size={15} />
+              Buy
+            </a>
           </div>
         </div>
         <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] gap-1.5">
@@ -2802,7 +2849,7 @@ function InspectorPanel({
               className={`h-1.5 rounded-full ${
                 variant.id === artVariant.id ? "bg-[#f6c542]" : "bg-[#f7f7f2]/16"
               }`}
-              title={`${variant.label} ${formatMoney(estimatePrintCost(card, variant))}`}
+              title={`${variant.label} ${formatEstimatedMoney(estimatePrintCost(card, variant))}`}
             />
           ))}
         </div>
@@ -2919,6 +2966,29 @@ function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+function IconLink({
+  label,
+  children,
+  href,
+}: {
+  label: string;
+  children: React.ReactNode;
+  href: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      className="inline-flex size-8 items-center justify-center rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 text-[#fff2bd] hover:bg-[#f6c542]/16"
+      title={label}
+      aria-label={label}
+    >
+      {children}
+    </a>
   );
 }
 
