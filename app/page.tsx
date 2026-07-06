@@ -1649,28 +1649,32 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
           >
             <div className="sticky top-0 z-10 border-b border-[#a7b5c9]/20 bg-[#080a0f]/94 p-3 backdrop-blur">
               <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <Search size={18} className="text-[#f6c542]" />
-                  <h2 className="font-display text-2xl font-black uppercase text-[#f7f7f2]">
+                  <h2 className="whitespace-nowrap font-display text-2xl font-black uppercase text-[#f7f7f2]">
                     Card Library
                   </h2>
                   <span className="rounded-sm border border-[#f6c542]/25 bg-[#f6c542]/12 px-2.5 py-1 text-sm font-black text-[#fff2bd]">
                     {filteredCards.length}
                   </span>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-[minmax(240px,1fr)_120px_130px_190px_140px_130px_110px]">
-                  <label className="relative block">
-                    <span className="sr-only">Search cards</span>
-                    <Search
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#f7f7f2]/35"
-                      size={16}
-                    />
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search name, number, text"
-                      className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/38 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
-                    />
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-[minmax(260px,1.35fr)_repeat(6,minmax(104px,0.75fr))]">
+                  <label className="filter-cell relative col-span-2 block md:col-span-3 xl:col-span-1">
+                    <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+                      Search
+                    </span>
+                    <div className="relative mt-1">
+                      <Search
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#f7f7f2]/42"
+                        size={16}
+                      />
+                      <input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Name, number, rules text"
+                        className="control-field h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/42 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                      />
+                    </div>
                   </label>
                   <SelectFilter
                     label="Color"
@@ -1684,12 +1688,14 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                     values={typeFilters}
                     onChange={setTypeFilter}
                   />
-                  <label className="block">
-                    <span className="sr-only">Set</span>
+                  <label className="filter-cell block">
+                    <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+                      Set
+                    </span>
                     <select
                       value={setFilter}
                       onChange={(event) => setSetFilter(event.target.value)}
-                      className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                      className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                     >
                       {setOptions.map((set) => (
                         <option key={set} value={set}>
@@ -1710,8 +1716,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                     values={collectionFilters}
                     onChange={setCollectionFilter}
                   />
-                  <label className="block">
-                    <span className="sr-only">Budget limit</span>
+                  <label className="filter-cell block">
+                    <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+                      Budget
+                    </span>
                     <input
                       type="number"
                       min="0"
@@ -1720,7 +1728,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                       onChange={(event) =>
                         setBudgetLimit(Math.max(0, Number(event.target.value) || 0))
                       }
-                      className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                      className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                     />
                   </label>
                 </div>
@@ -2486,12 +2494,14 @@ function SelectFilter<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <label className="block">
-      <span className="sr-only">{label}</span>
+    <label className="filter-cell block">
+      <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+        {label}
+      </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+        className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
       >
         {values.map((option) => (
           <option key={option} value={option}>

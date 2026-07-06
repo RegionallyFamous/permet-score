@@ -187,7 +187,6 @@ textarea {
 .virtual-card {
   contain: layout paint style;
   contain-intrinsic-size: 290px 430px;
-  content-visibility: auto;
   transform: translateZ(0);
   transition:
     border-color 180ms ease,
@@ -350,6 +349,31 @@ textarea {
 .control-field:hover {
   border-color: rgba(139, 220, 255, 0.36);
   background-color: rgba(247, 247, 242, 0.12);
+}
+
+.filter-cell {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.5rem;
+  border: 1px solid rgba(167, 181, 201, 0.18);
+  background:
+    linear-gradient(135deg, rgba(139, 220, 255, 0.08), transparent 34%),
+    rgba(5, 7, 11, 0.48);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+.filter-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: rgba(139, 220, 255, 0.58);
+  opacity: 0.62;
+}
+
+.filter-cell:focus-within {
+  border-color: rgba(246, 197, 66, 0.38);
 }
 
 .metric-tile {
