@@ -1,0 +1,179 @@
+import {
+  CARD_ART_VARIANTS,
+  type CardArtVariant,
+} from "./card-art-data";
+import {
+  CARD_POOL,
+  type GundamCard,
+} from "./card-data";
+
+export type QuantityMap = Record<string, number>;
+export type ArtChoiceMap = Record<string, string>;
+export type PrintChoiceMap = Record<string, QuantityMap>;
+export type DeckPrints = Record<"main" | "resource", PrintChoiceMap>;
+
+export type SharedDeckState = {
+  name: string;
+  main: QuantityMap;
+  resource: QuantityMap;
+  art: ArtChoiceMap;
+  prints: DeckPrints;
+};
+
+const CARD_BY_NUMBER = new Map(CARD_POOL.map((card) => [card.number, card]));
+const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
+  string,
+  readonly CardArtVariant[]
+>;
+
+function clampQuantity(value: unknown) {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity)) return 0;
+  return Math.max(0, Math.floor(quantity));
+}
+
+function totalCards(quantities: QuantityMap) {
+  return Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0);
+}
+
+function cleanQuantityMap(map: QuantityMap) {
+  return Object.fromEntries(
+    Object.entries(map).filter(([, quantity]) => quantity > 0),
+  );
+}
+
+function cardArtVariants(card: GundamCard) {
+  return (
+    CARD_ARTS_BY_NUMBER[card.number] ?? [
+      {
+        id: "standard",
+        label: "Standard",
+        image: `/card-images/${card.number}.webp`,
+        tier: 0,
+        officialId: card.number,
+      },
+    ]
+  );
+}
+
+function validArtId(card: GundamCard, artId: string) {
+  return cardArtVariants(card).some((variant) => variant.id === artId);
+}
+
+function sanitizeQuantities(value: unknown): QuantityMap {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([number, quantity]) => [number, clampQuantity(quantity)] as const)
+      .filter(([number, quantity]) => quantity > 0 && CARD_BY_NUMBER.has(number)),
+  );
+}
+
+function sanitizeArtChoices(value: unknown): ArtChoiceMap {
+  if (!value || typeof value !== "object") return {};
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([number, artId]) => {
+        if (typeof artId !== "string") return false;
+        const card = CARD_BY_NUMBER.get(number);
+        return Boolean(card && validArtId(card, artId));
+      })
+      .map(([number, artId]) => [number, artId as string]),
+  );
+}
+
+function normalizePrintQuantities(
+  number: string,
+  targetQuantity: number,
+  rawValue: unknown,
+  preferredArtId: string | undefined,
+) {
+  const card = CARD_BY_NUMBER.get(number);
+  if (!card || targetQuantity <= 0) return {};
+
+  const variants = cardArtVariants(card);
+  const preferred =
+    preferredArtId && validArtId(card, preferredArtId) ? preferredArtId : "standard";
+  const next: QuantityMap = {};
+
+  if (rawValue && typeof rawValue === "object") {
+    Object.entries(rawValue as Record<string, unknown>).forEach(([artId, value]) => {
+      if (!validArtId(card, artId)) return;
+      const quantity = clampQuantity(value);
+      if (quantity > 0) next[artId] = quantity;
+    });
+  }
+
+  const total = totalCards(next);
+  if (total === 0) {
+    next[preferred] = targetQuantity;
+    return next;
+  }
+
+  if (total < targetQuantity) {
+    next[preferred] = (next[preferred] ?? 0) + targetQuantity - total;
+    return cleanQuantityMap(next);
+  }
+
+  if (total > targetQuantity) {
+    let overflow = total - targetQuantity;
+    [...variants].reverse().forEach((variant) => {
+      if (overflow <= 0) return;
+      const quantity = next[variant.id] ?? 0;
+      const removed = Math.min(quantity, overflow);
+      next[variant.id] = quantity - removed;
+      overflow -= removed;
+    });
+  }
+
+  return cleanQuantityMap(next);
+}
+
+function sanitizeZonePrints(
+  value: unknown,
+  zoneQuantities: QuantityMap,
+  artChoices: ArtChoiceMap,
+) {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return Object.fromEntries(
+    Object.entries(zoneQuantities).map(([number, quantity]) => [
+      number,
+      normalizePrintQuantities(number, quantity, raw[number], artChoices[number]),
+    ]),
+  );
+}
+
+function sanitizePrints(
+  value: unknown,
+  main: QuantityMap,
+  resource: QuantityMap,
+  artChoices: ArtChoiceMap,
+): DeckPrints {
+  const raw = value && typeof value === "object" ? (value as Partial<DeckPrints>) : {};
+  return {
+    main: sanitizeZonePrints(raw.main, main, artChoices),
+    resource: sanitizeZonePrints(raw.resource, resource, artChoices),
+  };
+}
+
+export function sanitizeSharedDeck(value: unknown): SharedDeckState | null {
+  if (!value || typeof value !== "object") return null;
+  const maybeDeck = value as Partial<SharedDeckState>;
+  const main = sanitizeQuantities(maybeDeck.main);
+  const resource = sanitizeQuantities(maybeDeck.resource);
+  const art = sanitizeArtChoices(maybeDeck.art);
+
+  if (totalCards(main) === 0 && totalCards(resource) === 0) return null;
+
+  return {
+    name:
+      typeof maybeDeck.name === "string" && maybeDeck.name.trim()
+        ? maybeDeck.name.trim().slice(0, 80)
+        : "Shared Deck",
+    main,
+    resource,
+    art,
+    prints: sanitizePrints(maybeDeck.prints, main, resource, art),
+  };
+}
