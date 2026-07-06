@@ -1448,7 +1448,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   }
 
   return (
-    <main className="min-h-screen bg-[#05060a] text-[#f7f7f2]">
+    <main className="app-shell min-h-screen bg-[#05060a] text-[#f7f7f2]">
       <div
         className="fixed inset-0 -z-10 bg-[#05060a]"
         style={{
@@ -1458,14 +1458,14 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         }}
       />
       <div
-        className="pointer-events-none fixed inset-0 -z-10 opacity-30 mix-blend-screen"
+        className="ambient-field pointer-events-none fixed inset-0 -z-10 opacity-30 mix-blend-screen"
         style={{
           backgroundImage: `linear-gradient(180deg, rgba(5,6,10,0.1), rgba(5,6,10,0.82)), url(${HUD_TEXTURE_IMAGE})`,
           backgroundPosition: "top center",
           backgroundSize: "cover",
         }}
       />
-      <div className="fixed inset-0 -z-10 bg-[linear-gradient(rgba(247,247,242,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(167,181,201,0.045)_1px,transparent_1px)] bg-[size:44px_44px]" />
+      <div className="cockpit-grid fixed inset-0 -z-10" />
 
       <header className="border-b border-[#a7b5c9]/25 bg-[#05060a]/74 shadow-xl shadow-black/40 backdrop-blur-xl">
         <div className="mx-auto max-w-[1800px] px-3 py-3 sm:px-5">
@@ -1479,7 +1479,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                 />
               </div>
               <div className="min-w-0">
-                <p className="font-display text-sm font-black uppercase text-[#f6c542]">
+                <p className="font-display text-base font-black uppercase text-[#f6c542]">
                   Gundam Card Game
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -1499,7 +1499,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   onChange={(event) =>
                     setDeck((current) => ({ ...current, name: event.target.value }))
                   }
-                  className="h-10 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-sm font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                  className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                 />
               </label>
               <ToolbarButton label="Sample" title="Load sample deck" onClick={() => setDeck(starterDeck)}>
@@ -1622,7 +1622,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   <h2 className="font-display text-2xl font-black uppercase text-[#f7f7f2]">
                     Card Library
                   </h2>
-                  <span className="rounded-sm border border-[#f6c542]/25 bg-[#f6c542]/12 px-2 py-1 text-xs font-black text-[#fff2bd]">
+                  <span className="rounded-sm border border-[#f6c542]/25 bg-[#f6c542]/12 px-2.5 py-1 text-sm font-black text-[#fff2bd]">
                     {filteredCards.length}
                   </span>
                 </div>
@@ -1637,7 +1637,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Search name, number, text"
-                      className="h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-sm font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/38 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                      className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/38 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                     />
                   </label>
                   <SelectFilter
@@ -1657,7 +1657,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                     <select
                       value={setFilter}
                       onChange={(event) => setSetFilter(event.target.value)}
-                      className="h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-sm font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                      className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                     >
                       {setOptions.map((set) => (
                         <option key={set} value={set}>
@@ -1688,14 +1688,14 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                       onChange={(event) =>
                         setBudgetLimit(Math.max(0, Number(event.target.value) || 0))
                       }
-                      className="h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-sm font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                      className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                     />
                   </label>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(162px,1fr))] gap-3 p-3 sm:grid-cols-[repeat(auto-fill,minmax(184px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(196px,1fr))]">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3 p-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
               {filteredCards.map((card) => (
                 <LibraryCard
                   key={card.number}
@@ -1832,14 +1832,14 @@ function HudStrip({
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-2">
         <div className="flex items-center gap-2 text-[#8bdcff]">
           <Radar size={16} />
-          <span className="font-display text-sm font-black uppercase">
+          <span className="font-display text-base font-black uppercase">
             Permet Link
           </span>
         </div>
         <div className="relative h-1 overflow-hidden rounded-full bg-[#f7f7f2]/10">
           <div className="permet-sweep absolute inset-y-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-[#8bdcff] to-transparent" />
         </div>
-        <div className="flex flex-wrap justify-end gap-2 text-xs font-black uppercase">
+        <div className="flex flex-wrap justify-end gap-2 text-sm font-black uppercase">
           <span className="rounded-sm border border-[#2e8cff]/30 bg-[#1167d8]/14 px-2 py-1 text-[#d9ecff]">
             {statusLabel}
           </span>
@@ -1896,7 +1896,7 @@ function SharedDeckBanner({
   return (
     <section className={panelClass("overflow-hidden")}>
       <div
-        className="relative grid gap-4 p-4 sm:grid-cols-[1fr_auto]"
+        className="hero-surface relative grid gap-4 p-4 sm:grid-cols-[1fr_auto]"
         style={{
           backgroundImage: `linear-gradient(90deg, rgba(5,6,10,0.9), rgba(5,6,10,0.7)), url(${HUD_TEXTURE_IMAGE})`,
           backgroundPosition: "center",
@@ -1911,7 +1911,7 @@ function SharedDeckBanner({
           <h2 className="mt-2 truncate font-display text-3xl font-black uppercase text-[#f7f7f2] sm:text-4xl">
             {deckName}
           </h2>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs font-black uppercase">
+          <div className="mt-3 flex flex-wrap gap-2 text-sm font-black uppercase">
             <span className="rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/12 px-2 py-1 text-[#fff2bd]">
               {mainTotal}/{MAIN_TARGET} Main
             </span>
@@ -1933,13 +1933,13 @@ function SharedDeckBanner({
                 key={card.number}
                 src={cardImagePath(card)}
                 alt=""
-                className="h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
+                className="preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
               />
             ))}
           </div>
           <button
             type="button"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/14 px-4 font-display text-lg font-black uppercase text-[#fff2bd] shadow-lg shadow-[#f6c542]/10 hover:bg-[#f6c542]/20"
+            className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/14 px-4 font-display text-lg font-black uppercase text-[#fff2bd] shadow-lg shadow-[#f6c542]/10 hover:bg-[#f6c542]/20"
             onClick={onClone}
             disabled={sharedStatus === "loading" || sharedStatus === "missing"}
           >
@@ -1988,7 +1988,7 @@ function CockpitSummary({
   return (
     <section className={panelClass("overflow-hidden")}>
       <div
-        className="relative grid min-h-[260px] gap-4 p-4 lg:grid-cols-[1.25fr_0.8fr_auto]"
+        className="hero-surface relative grid min-h-[260px] gap-4 p-4 lg:grid-cols-[1.25fr_0.8fr_auto]"
         style={{
           backgroundImage: `linear-gradient(90deg, rgba(5,6,10,0.9), rgba(5,6,10,0.54) 48%, rgba(5,6,10,0.88)), url(${HERO_IMAGE})`,
           backgroundPosition: "center 46%",
@@ -2013,18 +2013,18 @@ function CockpitSummary({
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-sm border border-[#2e8cff]/20 bg-black/28 p-3">
+        <div className="active-scan-card grid gap-3 rounded-sm border border-[#2e8cff]/20 bg-black/28 p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="font-display text-sm font-black uppercase text-[#8bdcff]">
+              <div className="font-display text-base font-black uppercase text-[#8bdcff]">
                 Active Scan
               </div>
-              <div className="truncate text-sm font-black text-[#f7f7f2]">
+              <div className="truncate text-base font-black text-[#f7f7f2]">
                 {selectedCard.name}
               </div>
             </div>
             <span
-              className={`rounded-sm border px-2 py-1 text-xs font-black uppercase ${
+              className={`rounded-sm border px-2 py-1 text-sm font-black uppercase ${
                 isLegal
                   ? "border-[#28d17c]/35 bg-[#28d17c]/12 text-[#d9ffe9]"
                   : "border-[#e31b23]/40 bg-[#e31b23]/14 text-[#ffe3e3]"
@@ -2041,7 +2041,7 @@ function CockpitSummary({
                 className="h-full w-full object-cover object-top"
               />
             </div>
-            <div className="grid min-w-0 gap-1 text-xs font-bold text-[#f7f7f2]/62">
+            <div className="grid min-w-0 gap-1 text-sm font-bold text-[#f7f7f2]/68">
               <span>{selectedCard.number}</span>
               <span>{selectedCard.type} · {selectedCard.color}</span>
               <span>{selectedArtVariant.label}</span>
@@ -2057,14 +2057,14 @@ function CockpitSummary({
                 key={card.number}
                 src={cardImagePath(card)}
                 alt=""
-                className="h-24 w-16 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
+                className="preview-card h-24 w-16 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
               />
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
             <button
               type="button"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/35 bg-[#1167d8]/16 px-3 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/24"
+              className="interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/35 bg-[#1167d8]/16 px-3 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/24"
               onClick={onDraw}
             >
               <Shuffle size={16} />
@@ -2072,7 +2072,7 @@ function CockpitSummary({
             </button>
             <button
               type="button"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+              className="interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
               onClick={onShare}
             >
               <Share2 size={16} />
@@ -2093,11 +2093,11 @@ function LegalityPanel({ notices }: { notices: Notice[] }) {
         {notices.map((notice) => (
           <div
             key={`${notice.label}-${notice.detail}`}
-            className={`rounded-sm border p-3 ${noticeClass(notice.tone)}`}
+            className={`interactive-row rounded-sm border p-3 ${noticeClass(notice.tone)}`}
           >
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-black">{notice.label}</span>
-              <span className="text-right text-sm font-bold">{notice.detail}</span>
+              <span className="text-base font-black">{notice.label}</span>
+              <span className="text-right text-base font-bold">{notice.detail}</span>
             </div>
           </div>
         ))}
@@ -2131,7 +2131,7 @@ function CompositionPanel({
           />
         ))}
         <div className="pt-1">
-          <div className="mb-2 flex items-center gap-2 text-sm font-black text-[#f7f7f2]">
+          <div className="mb-2 flex items-center gap-2 text-base font-black text-[#f7f7f2]">
             <Filter size={16} className="text-[#f6c542]" />
             Cost Curve
           </div>
@@ -2139,13 +2139,13 @@ function CompositionPanel({
             {costCurve.map((bucket) => (
               <div key={bucket.cost} className="flex h-24 flex-col justify-end gap-1">
                 <div
-                  className="rounded-sm bg-gradient-to-t from-[#e31b23] via-[#f6c542] to-[#f7f7f2] shadow-lg shadow-[#650b10]/30"
+                  className="meter-fill rounded-sm bg-gradient-to-t from-[#e31b23] via-[#f6c542] to-[#f7f7f2] shadow-lg shadow-[#650b10]/30"
                   style={{
                     height: `${Math.max(8, (bucket.count / max) * 84)}px`,
                   }}
                   title={`${bucket.count} cards`}
                 />
-                <div className="text-center text-xs font-black text-[#f7f7f2]/55">
+                <div className="text-center text-sm font-black text-[#f7f7f2]/65">
                   {bucket.cost === 8 ? "8+" : bucket.cost}
                 </div>
               </div>
@@ -2171,9 +2171,9 @@ function MobileCockpitNav({
           <button
             key={view.id}
             type="button"
-            className={`grid h-14 place-items-center rounded-sm border font-display text-sm font-black uppercase ${
+            className={`cockpit-tab grid h-16 place-items-center rounded-sm border font-display text-base font-black uppercase ${
               activeView === view.id
-                ? "border-[#8bdcff]/45 bg-[#1167d8]/22 text-[#d9ecff] shadow-lg shadow-[#1167d8]/20"
+                ? "cockpit-tab-active border-[#8bdcff]/45 bg-[#1167d8]/22 text-[#d9ecff] shadow-lg shadow-[#1167d8]/20"
                 : "border-[#a7b5c9]/18 bg-[#f7f7f2]/7 text-[#f7f7f2]/55"
             }`}
             onClick={() => onChange(view.id)}
@@ -2198,7 +2198,7 @@ function CostPanel({
     <section className={panelClass()}>
       <PanelTitle icon={<BadgeDollarSign size={18} />} title="Est. Deck Cost" />
       <div className="grid gap-2 p-3">
-        <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-xs font-bold leading-5 text-[#d9ecff]/78">
+        <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-sm font-bold leading-6 text-[#d9ecff]/82">
           Local estimate. TCGplayer links open marketplace search results.
         </div>
         <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
@@ -2212,7 +2212,7 @@ function CostPanel({
         </div>
         <button
           type="button"
-          className="mt-1 inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#28d17c]/35 bg-[#28d17c]/12 font-display text-base font-black uppercase text-[#d9ffe9] hover:bg-[#28d17c]/18"
+          className="interactive-control mt-1 inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#28d17c]/35 bg-[#28d17c]/12 font-display text-base font-black uppercase text-[#d9ffe9] hover:bg-[#28d17c]/18"
           onClick={onMarkOwned}
         >
           <WalletCards size={16} />
@@ -2234,14 +2234,14 @@ function CostRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-3 rounded-sm border p-2 ${
+      className={`interactive-row flex items-center justify-between gap-3 rounded-sm border p-2 ${
         hot
           ? "border-[#f6c542]/32 bg-[#f6c542]/10 text-[#fff2bd]"
           : "border-[#a7b5c9]/16 bg-black/24 text-[#f7f7f2]"
       }`}
     >
-      <span className="text-sm font-black">{label}</span>
-      <span className="text-sm font-black">{value}</span>
+      <span className="text-base font-black">{label}</span>
+      <span className="text-base font-black">{value}</span>
     </div>
   );
 }
@@ -2252,18 +2252,18 @@ function SynergyPanel({ notices }: { notices: SynergyNotice[] }) {
       <PanelTitle icon={<Radar size={18} />} title="Synergy" />
       <div className="grid gap-2 p-3">
         {notices.length === 0 ? (
-          <div className="rounded-sm border border-[#a7b5c9]/16 bg-black/24 p-3 text-sm font-bold text-[#f7f7f2]/55">
+          <div className="rounded-sm border border-[#a7b5c9]/16 bg-black/24 p-3 text-base font-bold text-[#f7f7f2]/65">
             Add pilots and linked units to activate checks.
           </div>
         ) : (
           notices.map((notice) => (
             <div
               key={`${notice.label}-${notice.detail}`}
-              className={`rounded-sm border p-2 ${noticeClass(notice.tone)}`}
+              className={`interactive-row rounded-sm border p-2 ${noticeClass(notice.tone)}`}
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="truncate text-sm font-black">{notice.label}</span>
-                <span className="shrink-0 text-right text-xs font-bold">
+                <span className="truncate text-base font-black">{notice.label}</span>
+                <span className="shrink-0 text-right text-sm font-bold">
                   {notice.detail}
                 </span>
               </div>
@@ -2296,7 +2296,7 @@ function HandSimulatorPanel({
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+            className="interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
             onClick={onDraw}
           >
             <Shuffle size={16} />
@@ -2304,7 +2304,7 @@ function HandSimulatorPanel({
           </button>
           <button
             type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/8 font-display text-base font-black uppercase text-[#f7f7f2] hover:bg-[#f7f7f2]/12"
+            className="interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/8 font-display text-base font-black uppercase text-[#f7f7f2] hover:bg-[#f7f7f2]/12"
             onClick={onClear}
           >
             Clear
@@ -2319,16 +2319,16 @@ function HandSimulatorPanel({
             cards.map((card, index) => (
               <div
                 key={`${card.number}-${index}`}
-                className={`flex items-center gap-2 rounded-sm border bg-black/24 p-2 ${colorAccentClass(
+                className={`interactive-row flex items-center gap-2 rounded-sm border bg-black/24 p-2 ${colorAccentClass(
                   card.color,
                 )}`}
               >
                 <CardThumb card={card} />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-black text-[#f7f7f2]">
+                  <div className="truncate text-base font-black text-[#f7f7f2]">
                     {card.name}
                   </div>
-                  <div className="text-xs font-bold text-[#f7f7f2]/45">
+                  <div className="text-sm font-bold text-[#f7f7f2]/55">
                     {card.type} · Lv {card.level} · C {card.cost}
                   </div>
                 </div>
@@ -2341,7 +2341,7 @@ function HandSimulatorPanel({
             {typeSummary.map((item) => (
               <span
                 key={item.type}
-                className="rounded border border-[#a7b5c9]/18 bg-[#f7f7f2]/8 px-2 py-1 text-xs font-black text-[#f7f7f2]/70"
+                className="rounded border border-[#a7b5c9]/18 bg-[#f7f7f2]/8 px-2 py-1 text-sm font-black text-[#f7f7f2]/75"
               >
                 {item.type} {item.count}
               </span>
@@ -2356,14 +2356,14 @@ function HandSimulatorPanel({
 function StatusBadge({ isLegal }: { isLegal: boolean }) {
   return (
     <span
-      className={`inline-flex h-8 w-fit items-center gap-2 rounded-sm border px-2.5 font-display text-base font-black uppercase ${
+      className={`status-badge inline-flex h-8 w-fit items-center gap-2 rounded-sm border px-2.5 font-display text-base font-black uppercase ${
         isLegal
           ? "border-[#2e8cff]/45 bg-[#1167d8]/18 text-[#d9ecff]"
           : "border-[#e31b23]/50 bg-[#e31b23]/18 text-[#ffe3e3]"
       }`}
     >
       {isLegal ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-      {isLegal ? "Legal" : "Needs work"}
+      <span>{isLegal ? "Legal" : "Needs work"}</span>
     </span>
   );
 }
@@ -2382,7 +2382,7 @@ function ToolbarButton({
   return (
     <button
       type="button"
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/25 bg-[linear-gradient(90deg,rgba(145,145,145,0.22),rgba(62,112,124,0.28))] px-0 font-display text-base font-black uppercase text-[#f7f7f2] shadow-sm hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12 2xl:px-3"
+      className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/25 bg-[linear-gradient(90deg,rgba(145,145,145,0.22),rgba(62,112,124,0.28))] px-0 font-display text-lg font-black uppercase text-[#f7f7f2] shadow-sm hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12 2xl:px-3"
       onClick={onClick}
       title={title}
     >
@@ -2403,11 +2403,11 @@ function PanelTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid h-11 min-w-0 content-center gap-0.5 rounded-sm border border-[#a7b5c9]/22 bg-black/32 px-3 backdrop-blur">
-      <span className="truncate font-display text-xs font-black uppercase text-[#f7f7f2]/48">
+    <div className="metric-tile grid h-14 min-w-0 content-center gap-1 rounded-sm border border-[#a7b5c9]/22 bg-black/32 px-3 backdrop-blur">
+      <span className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/58">
         {label}
       </span>
-      <span className="truncate text-sm font-black leading-none text-[#f7f7f2]">{value}</span>
+      <span className="truncate text-base font-black leading-none text-[#f7f7f2]">{value}</span>
     </div>
   );
 }
@@ -2429,7 +2429,7 @@ function SelectFilter<T extends string>({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-sm font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+        className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
       >
         {values.map((option) => (
           <option key={option} value={option}>
@@ -2490,7 +2490,7 @@ function DeckPanel({
             return (
               <div
                 key={card.number}
-                className={`rounded-sm border bg-[#f7f7f2]/[0.055] p-2 shadow-lg shadow-black/10 ${colorAccentClass(
+                className={`interactive-row rounded-sm border bg-[#f7f7f2]/[0.055] p-2 shadow-lg shadow-black/10 ${colorAccentClass(
                   card.color,
                 )}`}
               >
@@ -2502,26 +2502,26 @@ function DeckPanel({
                         <span className="rounded-sm bg-[#f6c542] px-1.5 py-0.5 text-sm font-black leading-none text-black">
                           {quantity}
                         </span>
-                        <span className={`rounded border px-1.5 py-0.5 text-[10px] font-black ${colorChipClass(card.color)}`}>
+                        <span className={`rounded border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
                           {card.color}
                         </span>
                         {artVariant.id !== "standard" && (
-                          <span className="rounded border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 text-[10px] font-black text-[#fff2bd]">
+                          <span className="rounded border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
                             {artVariant.label}
                           </span>
                         )}
                       </div>
-                      <h3 className="mt-1 truncate text-sm font-black text-[#f7f7f2]">
+                      <h3 className="mt-1 truncate text-base font-black text-[#f7f7f2]">
                         {card.name}
                       </h3>
-                      <p className="truncate text-xs font-bold text-[#f7f7f2]/45">
+                      <p className="truncate text-sm font-bold text-[#f7f7f2]/55">
                         {card.number} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {printEntries.map((entry) => (
                           <span
                             key={entry.variant.id}
-                            className="rounded border border-[#a7b5c9]/20 bg-black/26 px-1.5 py-0.5 text-[10px] font-black text-[#f7f7f2]/65"
+                            className="rounded border border-[#a7b5c9]/20 bg-black/26 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/72"
                           >
                             {entry.quantity} {entry.variant.label}
                           </span>
@@ -2622,22 +2622,22 @@ function LibraryCard({
           <div className="flex items-end justify-between gap-2">
             <div className="min-w-0">
               <div className="flex flex-wrap gap-1">
-                <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-[10px] font-black text-black">
+                <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black text-black">
                   {card.number}
                 </span>
-                <span className={`rounded border px-1.5 py-0.5 text-[10px] font-black ${colorChipClass(card.color)}`}>
+                <span className={`rounded border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
                   {card.color}
                 </span>
                 {artVariants.length > 1 && (
-                  <span className="rounded border border-[#f6c542]/35 bg-[#f6c542]/14 px-1.5 py-0.5 text-[10px] font-black text-[#fff2bd]">
+                  <span className="rounded border border-[#f6c542]/35 bg-[#f6c542]/14 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
                     {artVariant.label}
                   </span>
                 )}
               </div>
-              <h3 className="mt-1 line-clamp-2 font-display text-lg font-black uppercase leading-tight text-[#f7f7f2]">
+              <h3 className="mt-1 line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                 {card.name}
               </h3>
-              <p className="mt-0.5 text-xs font-bold text-[#f7f7f2]/55">
+              <p className="mt-0.5 text-sm font-bold text-[#f7f7f2]/65">
                 {card.type} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
               </p>
             </div>
@@ -2647,12 +2647,12 @@ function LibraryCard({
                   {quantity}
                 </span>
                 {ownedQuantity > 0 && (
-                  <span className="rounded-full border border-[#28d17c]/35 bg-[#28d17c]/16 px-2 py-0.5 text-center text-[10px] font-black text-[#d9ffe9]">
+                  <span className="rounded-full border border-[#28d17c]/35 bg-[#28d17c]/16 px-2 py-0.5 text-center text-xs font-black text-[#d9ffe9]">
                     O {ownedQuantity}
                   </span>
                 )}
                 {missingQuantity > 0 && (
-                  <span className="rounded-full border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-0.5 text-center text-[10px] font-black text-[#fff2bd]">
+                  <span className="rounded-full border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-0.5 text-center text-xs font-black text-[#fff2bd]">
                     M {missingQuantity}
                   </span>
                 )}
@@ -2664,7 +2664,7 @@ function LibraryCard({
       <div className="grid grid-cols-3 gap-2 border-t border-[#a7b5c9]/20 bg-[#080a0f] p-2">
         <button
           type="button"
-          className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border font-display text-base font-black uppercase ${
+          className={`interactive-control inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border font-display text-lg font-black uppercase ${
             canAddMain
               ? "border-[#f7f7f2]/15 bg-[#f7f7f2]/10 text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
               : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -2681,7 +2681,7 @@ function LibraryCard({
         </button>
         <button
           type="button"
-          className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border font-display text-base font-black uppercase ${
+          className={`interactive-control inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border font-display text-lg font-black uppercase ${
             canAddResource
               ? "border-[#f7f7f2]/15 bg-[#f7f7f2]/10 text-[#f7f7f2] hover:border-[#2e8cff]/45 hover:bg-[#1167d8]/18"
               : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -2700,7 +2700,7 @@ function LibraryCard({
           href={tcgplayerSearchUrl(card, artVariant)}
           target="_blank"
           rel="noopener noreferrer nofollow"
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+          className="interactive-control inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-lg font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
           onClick={(event) => event.stopPropagation()}
           title={`Search ${card.name} on TCGplayer`}
         >
@@ -2762,23 +2762,23 @@ function InspectorPanel({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-xs font-black text-black">
-              {card.number}
-            </span>
-              <span className={`rounded-sm border px-2 py-1 text-xs font-black ${colorChipClass(card.color)}`}>
+              <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
+                {card.number}
+              </span>
+              <span className={`rounded-sm border px-2 py-1 text-sm font-black ${colorChipClass(card.color)}`}>
                 {card.color}
               </span>
-              <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/10 px-2 py-1 text-xs font-black text-[#f7f7f2]">
+              <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/10 px-2 py-1 text-sm font-black text-[#f7f7f2]">
                 {card.type}
               </span>
-              <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-xs font-black text-[#fff2bd]">
+              <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
                 {artVariant.label}
               </span>
             </div>
             <h2 className="mt-3 font-display text-3xl font-black uppercase leading-none text-[#f7f7f2]">
               {card.name}
             </h2>
-            <p className="mt-1 text-sm font-bold text-[#f7f7f2]/55">{card.set}</p>
+            <p className="mt-1 text-base font-bold text-[#f7f7f2]/65">{card.set}</p>
           </div>
         </div>
       </div>
@@ -2797,14 +2797,14 @@ function InspectorPanel({
                 Art Print
               </span>
             </div>
-            <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/58">
+            <p className="mt-1 truncate text-base font-bold text-[#f7f7f2]/68">
               {artVariant.officialId} · {formatEstimatedMoney(artCost)}
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              className={`inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
+              className={`interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
                 canDowngradeArt
                   ? "border-[#a7b5c9]/25 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
                   : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -2818,7 +2818,7 @@ function InspectorPanel({
             </button>
             <button
               type="button"
-              className={`inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
+              className={`interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
                 canUpgradeArt
                   ? "border-[#f6c542]/40 bg-[#f6c542]/12 text-[#fff2bd] hover:bg-[#f6c542]/18"
                   : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -2834,7 +2834,7 @@ function InspectorPanel({
               href={tcgplayerSearchUrl(card, artVariant)}
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+              className="interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
               title={`Search ${card.name} on TCGplayer`}
             >
               <ShoppingCart size={15} />
@@ -2855,10 +2855,10 @@ function InspectorPanel({
         </div>
         <div className="mt-3 grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-sm border border-[#a7b5c9]/16 bg-black/28 p-2">
           <div className="min-w-0">
-            <div className="font-display text-sm font-black uppercase text-[#f7f7f2]/55">
+            <div className="font-display text-base font-black uppercase text-[#f7f7f2]/65">
               Collection
             </div>
-            <div className="text-sm font-black text-[#f7f7f2]">
+            <div className="text-base font-black text-[#f7f7f2]">
               Owned {ownedQuantity} / Needed {neededQuantity}
             </div>
           </div>
@@ -2871,8 +2871,8 @@ function InspectorPanel({
         </div>
       </div>
       <div className="border-t border-[#a7b5c9]/20 p-3">
-        <p className="text-sm font-medium leading-5 text-[#f7f7f2]/78">{card.text}</p>
-        <div className="mt-3 grid gap-1 text-xs font-bold text-[#f7f7f2]/45">
+        <p className="text-base font-medium leading-6 text-[#f7f7f2]/84">{card.text}</p>
+        <div className="mt-3 grid gap-1 text-sm font-bold text-[#f7f7f2]/55">
           <span className="truncate">{card.trait}</span>
           <span className="truncate">{card.link}</span>
           <span className="truncate">{card.source}</span>
@@ -2880,7 +2880,7 @@ function InspectorPanel({
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             type="button"
-            className={`inline-flex h-10 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
+            className={`interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
               canAddMain
                 ? "border-[#e31b23]/50 bg-[#e31b23]/18 text-[#ffe3e3] hover:bg-[#e31b23]/28"
                 : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -2893,7 +2893,7 @@ function InspectorPanel({
           </button>
           <button
             type="button"
-            className={`inline-flex h-10 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
+            className={`interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
               canAddResource
                 ? "border-[#2e8cff]/50 bg-[#1167d8]/18 text-[#d9ecff] hover:bg-[#1167d8]/28"
                 : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -2913,10 +2913,10 @@ function InspectorPanel({
 function Spec({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/[0.055] p-2 text-center">
-      <div className="font-display text-sm font-black uppercase text-[#f7f7f2]/38">
+      <div className="font-display text-sm font-black uppercase text-[#f7f7f2]/58">
         {label}
       </div>
-      <div className="mt-1 text-sm font-black text-[#f7f7f2]">{value}</div>
+      <div className="mt-1 text-base font-black text-[#f7f7f2]">{value}</div>
     </div>
   );
 }
@@ -2954,7 +2954,7 @@ function IconButton({
   return (
     <button
       type="button"
-      className={`inline-flex size-8 items-center justify-center rounded-sm border ${
+      className={`interactive-control inline-flex size-8 items-center justify-center rounded-sm border ${
         disabled
           ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
           : "border-[#f7f7f2]/12 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#f6c542]/35 hover:bg-[#f6c542]/12"
@@ -2983,7 +2983,7 @@ function IconLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="inline-flex size-8 items-center justify-center rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 text-[#fff2bd] hover:bg-[#f6c542]/16"
+      className="interactive-control inline-flex size-8 items-center justify-center rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 text-[#fff2bd] hover:bg-[#f6c542]/16"
       title={label}
       aria-label={label}
     >
@@ -3007,15 +3007,15 @@ function TypeMeter({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+      <div className="mb-2 flex items-center justify-between gap-3 text-base">
         <span className="font-display text-lg font-black uppercase text-[#f7f7f2]">{type}</span>
-        <span className="font-bold text-[#f7f7f2]/45">
+        <span className="font-bold text-[#f7f7f2]/62">
           {count} / {target}
         </span>
       </div>
       <div className="h-3 overflow-hidden rounded-full bg-[#f7f7f2]/8">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#e31b23] via-[#f6c542] to-[#f7f7f2]"
+          className="type-meter-fill h-full rounded-full bg-gradient-to-r from-[#e31b23] via-[#f6c542] to-[#f7f7f2]"
           style={{ width: `${width}%` }}
         />
       </div>

@@ -1,10 +1,10 @@
-@import url("https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap");
 @import "tailwindcss";
 
 :root {
   --background: #090909;
   --foreground: #f5f5f4;
-  --font-gundam-display: "Big Shoulders Display";
+  --font-gundam-display: "Rajdhani";
   --font-gundam-ui: "Zen Kaku Gothic New";
   --armor-white: #f7f7f2;
   --signal-red: #e31b23;
@@ -36,6 +36,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-gundam-ui), Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
   min-width: 320px;
   overflow-x: hidden;
 }
@@ -58,9 +60,33 @@ textarea {
   box-sizing: border-box;
 }
 
+@property --pulse-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 ::selection {
   background: #fca5a5;
   color: #111827;
+}
+
+.app-shell {
+  isolation: isolate;
+}
+
+.cockpit-grid {
+  background-image:
+    linear-gradient(rgba(247, 247, 242, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(167, 181, 201, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: cockpit-grid-drift 38s linear infinite;
+  will-change: background-position;
+}
+
+.ambient-field {
+  animation: ambient-field 18s ease-in-out infinite alternate;
+  will-change: opacity, filter;
 }
 
 .gcg-panel {
@@ -69,6 +95,12 @@ textarea {
   background:
     linear-gradient(135deg, rgba(247, 247, 242, 0.1), rgba(247, 247, 242, 0) 34%),
     linear-gradient(180deg, rgba(8, 10, 15, 0.94), rgba(3, 4, 8, 0.9));
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+  transform: translateZ(0);
 }
 
 .gcg-panel::before {
@@ -80,7 +112,9 @@ textarea {
   border-top: 2px solid rgba(167, 181, 201, 0.42);
   background:
     linear-gradient(90deg, rgba(227, 27, 35, 0.9) 0 72px, transparent 72px 84px, rgba(66, 99, 111, 0.85) 84px 156px, transparent 156px);
+  background-size: 260px 100%;
   opacity: 0.72;
+  animation: panel-track 7s linear infinite;
 }
 
 .gcg-panel::after {
@@ -93,11 +127,114 @@ textarea {
     linear-gradient(180deg, transparent 0 56%, rgba(139, 220, 255, 0.04) 56% 57%, transparent 57%);
   opacity: 0.22;
   mix-blend-mode: screen;
+  transition: opacity 180ms ease;
+}
+
+.gcg-panel:hover {
+  border-color: rgba(139, 220, 255, 0.34);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.34),
+    0 0 34px rgba(17, 103, 216, 0.12);
+}
+
+.gcg-panel:hover::after {
+  opacity: 0.34;
+}
+
+.hero-surface {
+  overflow: hidden;
+}
+
+.hero-surface::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(110deg, transparent 0 42%, rgba(139, 220, 255, 0.14) 48%, transparent 54%),
+    radial-gradient(circle at 78% 28%, rgba(246, 197, 66, 0.16), transparent 22%);
+  opacity: 0.38;
+  mix-blend-mode: screen;
+  transform: translateX(-34%);
+  animation: hero-energy-sweep 9s ease-in-out infinite;
+}
+
+.active-scan-card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 28px rgba(17, 103, 216, 0.12);
+}
+
+.active-scan-card::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, transparent, rgba(139, 220, 255, 0.08), transparent),
+    linear-gradient(90deg, rgba(139, 220, 255, 0.08), transparent 34% 66%, rgba(246, 197, 66, 0.07));
+  opacity: 0.58;
+  animation: scan-card-pulse 4.4s ease-in-out infinite;
 }
 
 .virtual-card {
   contain: layout paint style;
   contain-intrinsic-size: 290px 430px;
+  transform: translateZ(0);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.virtual-card::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 0 34%, rgba(139, 220, 255, 0.2) 46%, transparent 58%),
+    linear-gradient(180deg, rgba(247, 247, 242, 0.06), transparent 24%);
+  opacity: 0;
+  transform: translateX(-42%);
+  transition:
+    opacity 180ms ease,
+    transform 320ms ease;
+  mix-blend-mode: screen;
+}
+
+.virtual-card:hover {
+  border-color: rgba(139, 220, 255, 0.5);
+  filter: saturate(1.08) contrast(1.04);
+  transform: perspective(900px) translateY(-5px) rotateX(1.4deg);
+  box-shadow:
+    0 22px 45px rgba(0, 0, 0, 0.42),
+    0 0 28px rgba(17, 103, 216, 0.18);
+}
+
+.virtual-card:hover::after {
+  opacity: 0.92;
+  transform: translateX(42%);
+}
+
+.virtual-card:active {
+  transform: perspective(900px) translateY(-2px) scale(0.992);
+}
+
+.preview-card {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.preview-card:hover {
+  border-color: rgba(246, 197, 66, 0.6);
+  transform: translateY(-6px) rotate(1.5deg) scale(1.04);
+  box-shadow:
+    0 18px 30px rgba(0, 0, 0, 0.4),
+    0 0 24px rgba(246, 197, 66, 0.16);
 }
 
 .scan-frame {
@@ -117,6 +254,7 @@ textarea {
   box-shadow:
     inset 0 0 20px rgba(17, 103, 216, 0.24),
     0 0 20px rgba(17, 103, 216, 0.12);
+  animation: scan-frame-glow 3.8s ease-in-out infinite;
 }
 
 .scan-frame::after {
@@ -139,6 +277,185 @@ textarea {
 .permet-scanline {
   animation: scan-frame-sweep 2.4s ease-in-out infinite;
   will-change: transform, opacity;
+}
+
+.interactive-control {
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0);
+  transition:
+    border-color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease,
+    color 170ms ease,
+    filter 170ms ease,
+    transform 170ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.interactive-control::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(110deg, transparent 20%, rgba(247, 247, 242, 0.22), transparent 80%);
+  opacity: 0;
+  transform: translateX(-120%);
+  transition:
+    opacity 160ms ease,
+    transform 360ms ease;
+}
+
+.interactive-control:not(:disabled):hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.24),
+    0 0 18px rgba(139, 220, 255, 0.1);
+}
+
+.interactive-control:not(:disabled):hover::after {
+  opacity: 1;
+  transform: translateX(120%);
+}
+
+.interactive-control:not(:disabled):active {
+  transform: translateY(0) scale(0.985);
+}
+
+.interactive-control:focus-visible,
+.control-field:focus-visible {
+  outline: 2px solid rgba(246, 197, 66, 0.78);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 5px rgba(246, 197, 66, 0.12),
+    0 0 24px rgba(246, 197, 66, 0.16);
+}
+
+.control-field {
+  transition:
+    border-color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease,
+    filter 170ms ease;
+}
+
+.control-field:hover {
+  border-color: rgba(139, 220, 255, 0.36);
+  background-color: rgba(247, 247, 242, 0.12);
+}
+
+.metric-tile {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.metric-tile::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(139, 220, 255, 0.12), transparent 48%, rgba(246, 197, 66, 0.08));
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.metric-tile:hover {
+  border-color: rgba(246, 197, 66, 0.36);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.metric-tile:hover::after {
+  opacity: 1;
+}
+
+.status-badge {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.status-badge::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -2px;
+  background: conic-gradient(from var(--pulse-angle), transparent, rgba(139, 220, 255, 0.45), transparent 32%);
+  opacity: 0.26;
+  z-index: 0;
+  animation: badge-scan 4.6s linear infinite;
+}
+
+.status-badge > * {
+  position: relative;
+  z-index: 1;
+}
+
+.cockpit-tab {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease,
+    transform 170ms ease;
+}
+
+.cockpit-tab::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: auto 18% 0;
+  height: 2px;
+  background: rgba(139, 220, 255, 0.9);
+  opacity: 0;
+  transform: scaleX(0);
+  transition:
+    opacity 170ms ease,
+    transform 170ms ease;
+}
+
+.cockpit-tab:hover,
+.cockpit-tab-active {
+  transform: translateY(-2px);
+}
+
+.cockpit-tab-active::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.interactive-row {
+  transition:
+    border-color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease,
+    transform 170ms ease;
+}
+
+.interactive-row:hover {
+  border-color: rgba(139, 220, 255, 0.34);
+  background-color: rgba(247, 247, 242, 0.08);
+  transform: translateX(2px);
+}
+
+.meter-fill {
+  transform-origin: bottom;
+  animation: meter-rise 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.type-meter-fill {
+  transition:
+    width 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 180ms ease;
+}
+
+.type-meter-fill:hover {
+  filter: brightness(1.18);
 }
 
 @keyframes permet-sweep {
@@ -170,6 +487,87 @@ textarea {
   }
 }
 
+@keyframes cockpit-grid-drift {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 44px 44px, 44px 44px;
+  }
+}
+
+@keyframes ambient-field {
+  0% {
+    filter: saturate(0.96) brightness(0.92);
+    opacity: 0.24;
+  }
+  100% {
+    filter: saturate(1.12) brightness(1.08);
+    opacity: 0.36;
+  }
+}
+
+@keyframes panel-track {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 260px 0;
+  }
+}
+
+@keyframes hero-energy-sweep {
+  0%,
+  58% {
+    transform: translateX(-42%);
+    opacity: 0;
+  }
+  70% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translateX(42%);
+    opacity: 0;
+  }
+}
+
+@keyframes scan-card-pulse {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes scan-frame-glow {
+  0%,
+  100% {
+    opacity: 0.68;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes badge-scan {
+  to {
+    --pulse-angle: 360deg;
+  }
+}
+
+@keyframes meter-rise {
+  from {
+    transform: scaleY(0.18);
+    opacity: 0.45;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -177,6 +575,19 @@ textarea {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .cockpit-tab:hover,
+  .cockpit-tab-active,
+  .gcg-panel:hover,
+  .interactive-control:not(:disabled):hover,
+  .interactive-row:hover,
+  .metric-tile:hover,
+  .preview-card:hover,
+  .virtual-card:hover,
+  .virtual-card:active {
+    transform: none;
   }
 }
 
