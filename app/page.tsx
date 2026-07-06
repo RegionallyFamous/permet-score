@@ -128,8 +128,8 @@ const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
   string,
   readonly CardArtVariant[]
 >;
-const HERO_IMAGE = "/assets/permet-launch-cockpit-v2.webp";
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
+const LAUNCH_TABLE_IMAGE = "/assets/mecha-deck-hangar.png";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
 
 const starterDeck: DeckState = {
@@ -887,9 +887,11 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     useState<(typeof collectionFilters)[number]>("All");
   const [budgetLimit, setBudgetLimit] = useState(DEFAULT_BUDGET_LIMIT);
   const [openingHand, setOpeningHand] = useState<string[]>([]);
+  const [drawCount, setDrawCount] = useState(0);
   const [selectedNumber, setSelectedNumber] = useState("ST01-001");
   const [copyState, setCopyState] = useState("Copy");
   const [shareState, setShareState] = useState("Share");
+  const [lastShareUrl, setLastShareUrl] = useState("");
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const deferredQuery = useDeferredValue(query);
 
@@ -1299,7 +1301,31 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
 
   function drawHand() {
     setOpeningHand(drawOpeningHandNumbers(deck.main));
+    setDrawCount((current) => current + 1);
     setMobileView("stats");
+  }
+
+  async function writeClipboardText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      try {
+        return document.execCommand("copy");
+      } catch {
+        return false;
+      } finally {
+        textarea.remove();
+      }
+    }
   }
 
   function cloneSharedDeck() {
@@ -1399,6 +1425,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   async function copyShareUrl() {
     if (shareState === "Saving") return;
     setShareState("Saving");
+    setLastShareUrl("");
 
     try {
       const response = await fetch("/api/decks", {
@@ -1417,9 +1444,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       }
 
       const shareUrl = new URL(result.shareUrl, window.location.origin).toString();
-      await navigator.clipboard.writeText(shareUrl);
-      setShareState("Copied");
-      window.setTimeout(() => setShareState("Share"), 1200);
+      setLastShareUrl(shareUrl);
+      const copied = await writeClipboardText(shareUrl);
+      setShareState(copied ? "Copied" : "Link Ready");
+      window.setTimeout(() => setShareState("Share"), copied ? 1400 : 2600);
     } catch {
       setShareState("Failed");
       window.setTimeout(() => setShareState("Share"), 1800);
@@ -1452,7 +1480,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       <div
         className="fixed inset-0 -z-10 bg-[#05060a]"
         style={{
-          backgroundImage: `linear-gradient(180deg, rgba(5,6,10,0.08), rgba(5,6,10,0.58) 470px, rgba(5,6,10,0.96) 980px), linear-gradient(112deg, rgba(227,27,35,0.16) 0%, transparent 28%, transparent 68%, rgba(17,103,216,0.2) 100%), url(${HERO_IMAGE})`,
+          backgroundImage: `linear-gradient(180deg, rgba(5,6,10,0.62), rgba(5,6,10,0.92) 620px, rgba(5,6,10,0.98) 1000px), linear-gradient(112deg, rgba(227,27,35,0.1) 0%, transparent 28%, transparent 68%, rgba(17,103,216,0.14) 100%), url(${HUD_TEXTURE_IMAGE})`,
           backgroundPosition: "top center",
           backgroundSize: "cover",
         }}
@@ -1470,12 +1498,12 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       <header className="border-b border-[#a7b5c9]/25 bg-[#05060a]/74 shadow-xl shadow-black/40 backdrop-blur-xl">
         <div className="mx-auto max-w-[1800px] px-3 py-3 sm:px-5">
           <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="hidden h-14 w-10 shrink-0 rotate-[-6deg] overflow-hidden rounded-sm border border-[#f7f7f2]/20 bg-[#f7f7f2]/10 shadow-xl shadow-black/40 sm:block">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <div className="flex w-56 shrink-0 items-center sm:w-64 lg:w-72">
                 <img
-                  src={cardImagePath(CARD_POOL[0])}
-                  alt=""
-                  className="h-full w-full object-cover object-top"
+                  src="/permet-score-logo.png"
+                  alt="Permet Score"
+                  className="h-auto w-full object-contain object-left"
                 />
               </div>
               <div className="min-w-0">
@@ -1483,7 +1511,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   Gundam Card Game
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <h1 className="font-display text-3xl font-black uppercase text-[#f7f7f2] sm:text-4xl">
+                  <h1 className="sr-only">
                     Permet Score
                   </h1>
                   <StatusBadge isLegal={isLegal} />
@@ -1603,6 +1631,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
           missingCost={costSummary.missingCost}
           deckColors={deckColors}
           previewCards={mainEntries.slice(0, 6).map((entry) => entry.card)}
+          openingHandCards={openingHandEntries}
+          drawCount={drawCount}
+          shareState={shareState}
+          lastShareUrl={lastShareUrl}
           onDraw={drawHand}
           onShare={() => void copyShareUrl()}
         />
@@ -1695,7 +1727,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
               </div>
             </div>
 
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3 p-3 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 p-3 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(204px,1fr))]">
               {filteredCards.map((card) => (
                 <LibraryCard
                   key={card.number}
@@ -1963,6 +1995,10 @@ function CockpitSummary({
   missingCost,
   deckColors,
   previewCards,
+  openingHandCards,
+  drawCount,
+  shareState,
+  lastShareUrl,
   onDraw,
   onShare,
 }: {
@@ -1976,6 +2012,10 @@ function CockpitSummary({
   missingCost: number;
   deckColors: CardColor[];
   previewCards: GundamCard[];
+  openingHandCards: GundamCard[];
+  drawCount: number;
+  shareState: string;
+  lastShareUrl: string;
   onDraw: () => void;
   onShare: () => void;
 }) {
@@ -1984,14 +2024,16 @@ function CockpitSummary({
       (MAIN_TARGET + RESOURCE_TARGET)) *
       100,
   );
+  const displayCards = openingHandCards.length ? openingHandCards : previewCards;
+  const displayLabel = openingHandCards.length ? "Opening Hand" : "Deck Preview";
 
   return (
     <section className={panelClass("overflow-hidden")}>
       <div
-        className="hero-surface relative grid min-h-[260px] gap-4 p-4 lg:grid-cols-[1.25fr_0.8fr_auto]"
+        className="hero-surface launch-terminal relative grid min-h-[230px] gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)_minmax(250px,320px)]"
         style={{
-          backgroundImage: `linear-gradient(90deg, rgba(5,6,10,0.9), rgba(5,6,10,0.54) 48%, rgba(5,6,10,0.88)), url(${HERO_IMAGE})`,
-          backgroundPosition: "center 46%",
+          backgroundImage: `linear-gradient(90deg, rgba(5,6,10,0.94), rgba(5,6,10,0.76) 50%, rgba(5,6,10,0.94)), linear-gradient(180deg, rgba(5,6,10,0.38), rgba(5,6,10,0.88)), url(${LAUNCH_TABLE_IMAGE})`,
+          backgroundPosition: "center 58%",
           backgroundSize: "cover",
         }}
       >
@@ -2013,7 +2055,7 @@ function CockpitSummary({
           </div>
         </div>
 
-        <div className="active-scan-card grid gap-3 rounded-sm border border-[#2e8cff]/20 bg-black/28 p-3">
+        <div className="active-scan-card grid gap-3 rounded-sm border border-[#2e8cff]/24 bg-black/40 p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="font-display text-base font-black uppercase text-[#8bdcff]">
@@ -2051,15 +2093,35 @@ function CockpitSummary({
         </div>
 
         <div className="grid content-between gap-3">
-          <div className="hidden -space-x-3 lg:flex">
-            {previewCards.map((card) => (
-              <img
-                key={card.number}
-                src={cardImagePath(card)}
-                alt=""
-                className="preview-card h-24 w-16 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
-              />
-            ))}
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="font-display text-base font-black uppercase text-[#8bdcff]">
+                {displayLabel}
+              </span>
+              {lastShareUrl && (
+                <a
+                  href={lastShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="interactive-control rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-2 py-1 font-display text-sm font-black uppercase text-[#fff2bd]"
+                >
+                  Link Ready
+                </a>
+              )}
+            </div>
+            <div
+              key={drawCount}
+              className="hand-strip grid grid-cols-5 gap-2"
+            >
+              {displayCards.slice(0, 5).map((card) => (
+                <img
+                  key={card.number}
+                  src={cardImagePath(card)}
+                  alt=""
+                  className="preview-card h-24 w-full rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/35"
+                />
+              ))}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
             <button
@@ -2076,7 +2138,7 @@ function CockpitSummary({
               onClick={onShare}
             >
               <Share2 size={16} />
-              Share
+              {shareState}
             </button>
           </div>
         </div>
@@ -2618,48 +2680,44 @@ function LibraryCard({
             <div className="absolute bottom-2 right-2 h-5 w-5 border-b-2 border-r-2 border-[#f6c542]" />
           </div>
         )}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/82 to-transparent p-2 pt-12">
-          <div className="flex items-end justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex flex-wrap gap-1">
-                <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black text-black">
-                  {card.number}
-                </span>
-                <span className={`rounded border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
-                  {card.color}
-                </span>
-                {artVariants.length > 1 && (
-                  <span className="rounded border border-[#f6c542]/35 bg-[#f6c542]/14 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
-                    {artVariant.label}
-                  </span>
-                )}
-              </div>
-              <h3 className="mt-1 line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
-                {card.name}
-              </h3>
-              <p className="mt-0.5 text-sm font-bold text-[#f7f7f2]/65">
-                {card.type} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
-              </p>
-            </div>
-            {quantity > 0 && (
-              <div className="grid gap-1">
-                <span className="shrink-0 rounded-full border border-[#f6c542]/50 bg-[#e31b23] px-2 py-1 text-center text-xs font-black text-white">
-                  {quantity}
-                </span>
-                {ownedQuantity > 0 && (
-                  <span className="rounded-full border border-[#28d17c]/35 bg-[#28d17c]/16 px-2 py-0.5 text-center text-xs font-black text-[#d9ffe9]">
-                    O {ownedQuantity}
-                  </span>
-                )}
-                {missingQuantity > 0 && (
-                  <span className="rounded-full border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-0.5 text-center text-xs font-black text-[#fff2bd]">
-                    M {missingQuantity}
-                  </span>
-                )}
-              </div>
+        <div className="absolute left-2 top-2 flex max-w-[calc(100%-4rem)] flex-wrap gap-1">
+          <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black text-black">
+            {card.number}
+          </span>
+          <span className={`rounded border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
+            {card.color}
+          </span>
+          {artVariants.length > 1 && (
+            <span className="rounded border border-[#f6c542]/35 bg-black/70 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
+              {artVariant.label}
+            </span>
+          )}
+        </div>
+        {quantity > 0 && (
+          <div className="absolute right-2 top-2 grid gap-1">
+            <span className="shrink-0 rounded-sm border border-[#f6c542]/55 bg-[#e31b23] px-2 py-1 text-center text-xs font-black text-white shadow-lg shadow-black/30">
+              {quantity}
+            </span>
+            {ownedQuantity > 0 && (
+              <span className="rounded-sm border border-[#28d17c]/35 bg-black/70 px-2 py-0.5 text-center text-xs font-black text-[#d9ffe9]">
+                O {ownedQuantity}
+              </span>
+            )}
+            {missingQuantity > 0 && (
+              <span className="rounded-sm border border-[#f6c542]/35 bg-black/70 px-2 py-0.5 text-center text-xs font-black text-[#fff2bd]">
+                M {missingQuantity}
+              </span>
             )}
           </div>
-        </div>
+        )}
+      </div>
+      <div className="border-t border-[#a7b5c9]/20 bg-[#07090d] p-2">
+        <h3 className="line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
+          {card.name}
+        </h3>
+        <p className="mt-0.5 text-sm font-bold text-[#f7f7f2]/65">
+          {card.type} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
+        </p>
       </div>
       <div className="grid grid-cols-3 gap-2 border-t border-[#a7b5c9]/20 bg-[#080a0f] p-2">
         <button

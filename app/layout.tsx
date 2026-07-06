@@ -24,8 +24,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="preload" as="image" href="/assets/permet-launch-cockpit-v2.webp" />
         <link rel="preload" as="image" href="/assets/permet-armor-ui-v2.webp" />
+        <link rel="preload" as="image" href="/assets/mecha-deck-hangar.png" />
+        <link rel="preload" as="image" href="/permet-score-logo.png" />
       </head>
       <body
         className={`${geistMono.variable} antialiased`}
