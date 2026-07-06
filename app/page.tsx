@@ -1491,8 +1491,8 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
               </div>
             </div>
 
-            <div className="grid grid-cols-[minmax(0,1fr)_repeat(3,2.5rem)] gap-2 md:grid-cols-[minmax(220px,1fr)_repeat(9,2.75rem)] 2xl:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto_auto_auto_auto_auto_auto]">
-              <label className="block min-w-0">
+            <div className="grid grid-cols-5 gap-2 md:grid-cols-[minmax(220px,1fr)_repeat(9,2.75rem)] 2xl:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto_auto_auto_auto_auto_auto]">
+              <label className="col-span-5 block min-w-0 md:col-span-1">
                 <span className="sr-only">Deck name</span>
                 <input
                   value={deck.name}
@@ -2403,11 +2403,11 @@ function PanelTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex h-11 items-center justify-between gap-3 rounded-sm border border-[#a7b5c9]/22 bg-black/32 px-3 backdrop-blur">
-      <span className="font-display text-sm font-black uppercase text-[#f7f7f2]/48">
+    <div className="grid h-11 min-w-0 content-center gap-0.5 rounded-sm border border-[#a7b5c9]/22 bg-black/32 px-3 backdrop-blur">
+      <span className="truncate font-display text-xs font-black uppercase text-[#f7f7f2]/48">
         {label}
       </span>
-      <span className="truncate text-sm font-black text-[#f7f7f2]">{value}</span>
+      <span className="truncate text-sm font-black leading-none text-[#f7f7f2]">{value}</span>
     </div>
   );
 }
