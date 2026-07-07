@@ -6706,6 +6706,7 @@ function MiniQuantityControl({
   onIncrement,
   onDecrement,
   pulseId,
+  className = "",
 }: {
   label: string;
   quantity: number;
@@ -6718,6 +6719,7 @@ function MiniQuantityControl({
   onIncrement: () => void;
   onDecrement: () => void;
   pulseId?: number;
+  className?: string;
 }) {
   const decrementRepeat = usePressRepeat(onDecrement, decrementDisabled);
   const incrementRepeat = usePressRepeat(onIncrement, incrementDisabled);
@@ -6743,7 +6745,7 @@ function MiniQuantityControl({
         dense
           ? "grid-cols-[2.75rem_minmax(2rem,1fr)_2.75rem]"
           : "grid-cols-[2.75rem_minmax(2.2rem,1fr)_2.75rem]"
-      } overflow-hidden rounded-sm border ${toneClass}`}
+      } overflow-hidden rounded-sm border ${toneClass} ${className}`}
       title={incrementDisabled ? incrementReason : `${label}: ${quantity}`}
     >
       <button
@@ -7168,66 +7170,69 @@ function LibraryCard({
           </div>
         </div>
 
-        <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_2.75rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.75rem_2.75rem_3.25rem] min-[420px]:col-span-1 min-[420px]:col-start-2 min-[420px]:grid-cols-[minmax(6.5rem,1fr)_2.75rem_2.75rem_3.25rem] sm:grid-cols-[minmax(7rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
-        {primaryZone && onAdjustPrimary ? (
-          <MiniQuantityControl
-            label={`${cardActionLabel} ${zoneLabel(primaryZone).toLowerCase()} copy`}
-            quantity={primaryQuantity}
-            tone={primaryZone}
-            dense
-            incrementDisabled={readOnly || Boolean(primaryConstraint)}
-            decrementDisabled={readOnly || primaryQuantity <= 0}
-            incrementReason={readOnly ? "Clone to edit" : primaryConstraint}
-            decrementReason={readOnly ? "Clone to edit" : `No ${zoneLabel(primaryZone).toLowerCase()} copies`}
-            pulseId={pulseId}
-            onIncrement={() => onAdjustPrimary(1)}
-            onDecrement={() => onAdjustPrimary(-1)}
-          />
-        ) : (
-          <div className="grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2">
-            <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/58">
-              {rulesPending ? "Rules" : "Locked"}
+        <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_2.75rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.75rem_2.75rem_3.25rem] min-[420px]:col-span-1 min-[420px]:col-start-2 min-[420px]:grid-cols-3 sm:gap-1.5">
+          {primaryZone && onAdjustPrimary ? (
+            <MiniQuantityControl
+              label={`${cardActionLabel} ${zoneLabel(primaryZone).toLowerCase()} copy`}
+              quantity={primaryQuantity}
+              tone={primaryZone}
+              dense
+              incrementDisabled={readOnly || Boolean(primaryConstraint)}
+              decrementDisabled={readOnly || primaryQuantity <= 0}
+              incrementReason={readOnly ? "Clone to edit" : primaryConstraint}
+              decrementReason={
+                readOnly ? "Clone to edit" : `No ${zoneLabel(primaryZone).toLowerCase()} copies`
+              }
+              pulseId={pulseId}
+              onIncrement={() => onAdjustPrimary(1)}
+              onDecrement={() => onAdjustPrimary(-1)}
+              className="min-[420px]:col-span-3"
+            />
+          ) : (
+            <div className="grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2 min-[420px]:col-span-3">
+              <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/58">
+                {rulesPending ? "Rules" : "Locked"}
+              </div>
             </div>
-          </div>
-        )}
-        <button
-          type="button"
-          className={`interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border ${
-            selected
-              ? "border-[#f6c542]/55 bg-[#f6c542]/16 text-[#fff2bd]"
-              : "border-[#a7b5c9]/24 bg-[#f7f7f2]/8 text-[#f7f7f2]/75 hover:border-[#f6c542]/35 hover:bg-[#f6c542]/10"
-          }`}
-          onClick={onSelect}
-          aria-pressed={selected}
-          title={`Select ${cardActionLabel}`}
-          aria-label={`Select ${cardActionLabel}`}
-        >
-          <CheckCircle2 size={15} />
-        </button>
-        <button
-          type="button"
-          className="library-open-action interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#8bdcff]/10 text-[#d9ecff] hover:bg-[#8bdcff]/16"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenCard();
-          }}
-          title={`Open ${cardActionLabel} from action row`}
-          aria-label={`Open ${cardActionLabel} details from action row`}
-        >
-          <Maximize2 size={15} />
-        </button>
-        <a
-          href={tcgplayerUrl(card, artVariant)}
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-          className="interactive-control inline-flex h-11 min-h-11 items-center justify-center gap-0.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-xs font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 sm:gap-1 sm:text-sm"
-          onClick={(event) => event.stopPropagation()}
-          title={`${tcgplayerLabel} for ${cardActionLabel}`}
-          aria-label={`${tcgplayerLabel} for ${cardActionLabel}`}
-        >
-          <ShoppingCart size={15} />
-          <span className="hidden min-[380px]:inline sm:inline">TCG</span>
-        </a>
+          )}
+          <button
+            type="button"
+            className={`interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border ${
+              selected
+                ? "border-[#f6c542]/55 bg-[#f6c542]/16 text-[#fff2bd]"
+                : "border-[#a7b5c9]/24 bg-[#f7f7f2]/8 text-[#f7f7f2]/75 hover:border-[#f6c542]/35 hover:bg-[#f6c542]/10"
+            }`}
+            onClick={onSelect}
+            aria-pressed={selected}
+            title={`Select ${cardActionLabel}`}
+            aria-label={`Select ${cardActionLabel}`}
+          >
+            <CheckCircle2 size={15} />
+          </button>
+          <button
+            type="button"
+            className="library-open-action interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#8bdcff]/10 text-[#d9ecff] hover:bg-[#8bdcff]/16"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenCard();
+            }}
+            title={`Open ${cardActionLabel} from action row`}
+            aria-label={`Open ${cardActionLabel} details from action row`}
+          >
+            <Maximize2 size={15} />
+          </button>
+          <a
+            href={tcgplayerUrl(card, artVariant)}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="interactive-control inline-flex h-11 min-h-11 items-center justify-center gap-0.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-xs font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 sm:gap-1 sm:text-sm"
+            onClick={(event) => event.stopPropagation()}
+            title={`${tcgplayerLabel} for ${cardActionLabel}`}
+            aria-label={`${tcgplayerLabel} for ${cardActionLabel}`}
+          >
+            <ShoppingCart size={15} />
+            <span className="hidden min-[380px]:inline min-[420px]:hidden">TCG</span>
+          </a>
         </div>
       </div>
     </article>

@@ -1923,7 +1923,6 @@ textarea {
   }
 
   .library-card-actions {
-    grid-template-columns: minmax(7.5rem, 1fr) 2.75rem 2.75rem 2.75rem;
     scroll-margin-bottom: calc(env(safe-area-inset-bottom) + 7.5rem);
   }
 
@@ -2451,6 +2450,12 @@ textarea {
   .library-card-actions > a {
     height: 2.75rem;
     min-height: 2.75rem;
+  }
+}
+
+@media (min-width: 420px) and (max-width: 1279px) {
+  .library-card-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
