@@ -3502,7 +3502,7 @@ export function DeckBuilder({
                     ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
                     missingQuantity={getMissingCopiesForCard(deck, card)}
                     readOnly={sharedPreviewLocked}
-                    eagerImage={index === 0}
+                    eagerImage={index < 3}
                     onSelect={() => setSelectedNumber(card.number)}
                     onOpenCard={() => {
                       setSelectedNumber(card.number);

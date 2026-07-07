@@ -38,10 +38,12 @@ async function waitForVisibleCardImages(page) {
           return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
         },
       );
+      const eagerImages = images.filter((image) => image.loading === "eager");
+      const loadedImages = images.filter((image) => image.complete && image.naturalWidth > 0);
 
       return (
-        images.length > 0 &&
-        images.every((image) => image.complete && image.naturalWidth > 0)
+        loadedImages.length > 0 &&
+        eagerImages.every((image) => image.complete && image.naturalWidth > 0)
       );
     },
     null,
