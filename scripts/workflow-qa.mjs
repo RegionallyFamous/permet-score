@@ -239,6 +239,56 @@ async function assertMobileLibraryLayout(page) {
   await page.locator(".lightbox-close").click();
 }
 
+async function assertShortMobileControlsClearNav(page) {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+
+  const libraryOverlap = await page.evaluate(() => {
+    const actions = document.querySelector(".library-card-actions");
+    const nav = document.querySelector("nav");
+    if (!actions || !nav) return 0;
+    return Math.max(0, actions.getBoundingClientRect().bottom - nav.getBoundingClientRect().top);
+  });
+  if (libraryOverlap > 1) {
+    throw new Error(`320x568 library actions overlap bottom nav by ${libraryOverlap}px`);
+  }
+
+  await page.getByRole("button", { name: /Filters/i }).click();
+  await page.locator(".library-filters-popover").waitFor({ timeout: 15000 });
+  await page.locator(".library-filters-popover").evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  const budgetOverlap = await page.locator('input[type="number"]').evaluate((input) => {
+    const nav = document.querySelector("nav");
+    if (!nav) return 0;
+    return Math.max(0, input.getBoundingClientRect().bottom - nav.getBoundingClientRect().top);
+  });
+  if (budgetOverlap > 1) {
+    throw new Error(`320x568 filter budget control overlaps bottom nav by ${budgetOverlap}px`);
+  }
+  await page.getByRole("button", { name: /Filters/i }).click();
+
+  await page.getByRole("tab", { name: "Show Deck" }).click();
+  const deckOverlap = await page.evaluate(() => {
+    const actions = document.querySelector(".deck-card-actions");
+    const nav = document.querySelector("nav");
+    if (!actions || !nav) return 0;
+    return Math.max(0, actions.getBoundingClientRect().bottom - nav.getBoundingClientRect().top);
+  });
+  if (deckOverlap > 1) {
+    throw new Error(`320x568 deck actions overlap bottom nav by ${deckOverlap}px`);
+  }
+
+  await page.setViewportSize({ width: 667, height: 375 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /Filters/i }).click();
+  const filterOpen = await page.locator(".library-filters-popover").isVisible();
+  if (!filterOpen) {
+    throw new Error("667x375 landscape filters did not open from the Library view");
+  }
+}
+
 async function main() {
   await assertSharePreservesPrints();
 
@@ -266,6 +316,7 @@ async function main() {
     await assertMobileActionSheetFocusTrap(page);
 
     await assertMobileLibraryLayout(page);
+    await assertShortMobileControlsClearNav(page);
 
     await page.setViewportSize({ width: 320, height: 680 });
     await page.goto(baseUrl, { waitUntil: "networkidle" });

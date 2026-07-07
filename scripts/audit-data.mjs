@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { CARD_POOL as CURATED_CARD_POOL } from "../app/card-data.ts";
+import { CARD_ART_VARIANTS } from "../app/card-art-data.ts";
 import { TCGPLAYER_CARD_POOL } from "../app/tcgplayer-card-data.ts";
 import {
   TCGPLAYER_CARD_PRINTS,
@@ -49,6 +50,32 @@ const missingProductIds = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
 const missingMarketPrices = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
   (sum, prints) => sum + prints.filter((print) => !print.marketPrice).length,
   0,
+);
+const directProductsMissingMarketPrices = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
+  (sum, prints) =>
+    sum +
+    prints.filter(
+      (print) =>
+        print.productId &&
+        /tcgplayer\.com\/product\/\d+/i.test(print.url) &&
+        !print.marketPrice,
+    ).length,
+  0,
+);
+const localArtWithoutMarketPrints = Object.entries(CARD_ART_VARIANTS).flatMap(
+  ([number, variants]) => {
+    const marketPrints = TCGPLAYER_CARD_PRINTS[number] ?? [];
+    return variants
+      .filter(
+        (variant) =>
+          !marketPrints.some(
+            (print) =>
+              print.variantId === variant.id ||
+              print.officialId === variant.officialId,
+          ),
+      )
+      .map((variant) => `${number}:${variant.id}`);
+  },
 );
 const cardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
 const syncAgeHours = TCGPLAYER_LAST_SYNC
@@ -105,6 +132,18 @@ if (missingMarketPrices) {
   );
 }
 
+if (directProductsMissingMarketPrices) {
+  warnings.push(
+    `${directProductsMissingMarketPrices} direct TCGplayer product records are missing market prices.`,
+  );
+}
+
+if (localArtWithoutMarketPrints.length) {
+  warnings.push(
+    `${localArtWithoutMarketPrints.length} local art variants do not have matching TCGplayer print records: ${localArtWithoutMarketPrints.slice(0, 8).join(", ")}.`,
+  );
+}
+
 const summary = {
   strict,
   curatedCards: CURATED_CARD_POOL.length,
@@ -114,6 +153,8 @@ const summary = {
   directProductPrints,
   missingProductIds,
   missingMarketPrices,
+  directProductsMissingMarketPrices,
+  localArtWithoutMarketPrints: localArtWithoutMarketPrints.length,
   sourceOnlyProductIds: sourceOnlyProductIds.length,
   marketCardsWithPrints: cardsWithPrints,
   marketLastSync: TCGPLAYER_LAST_SYNC,

@@ -48,6 +48,27 @@ async function waitForVisibleCardImages(page) {
   );
 }
 
+async function assertLocalCardImagesStayLocal(page, viewportName) {
+  const remoteLocalImages = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('img[src^="/card-images/"]'))
+      .filter((image) => /product-images\.tcgplayer\.com/i.test(image.getAttribute("srcset") ?? ""))
+      .map((image) => ({
+        alt: image.getAttribute("alt") ?? "",
+        src: image.getAttribute("src") ?? "",
+        srcset: image.getAttribute("srcset") ?? "",
+      }))
+      .slice(0, 3),
+  );
+
+  if (remoteLocalImages.length) {
+    throw new Error(
+      `${viewportName}: local card images include remote TCGplayer srcset ${JSON.stringify(
+        remoteLocalImages,
+      )}`,
+    );
+  }
+}
+
 async function readAudit(page) {
   try {
     return await page.evaluate(() => {
@@ -152,6 +173,7 @@ try {
       timeout: 15000,
     });
     await waitForVisibleCardImages(page);
+    await assertLocalCardImagesStayLocal(page, viewport.name);
     await page.screenshot({
       caret: "initial",
       path: join(outputDir, `permet-${viewport.name}.png`),
@@ -176,6 +198,31 @@ try {
     }
     if (audit.visibleButtons < 4) {
       throw new Error(`${viewport.name}: expected visible controls`);
+    }
+
+    if (viewport.width <= 360) {
+      const compactActionAudit = await page.evaluate(() => {
+        const actions = document.querySelector(".library-card-actions");
+        const nav = document.querySelector("nav");
+        if (!actions || !nav) return null;
+        const actionsRect = actions.getBoundingClientRect();
+        const navRect = nav.getBoundingClientRect();
+        return {
+          actionsBottom: Math.round(actionsRect.bottom),
+          navTop: Math.round(navRect.top),
+          overlap: Math.max(0, Math.round(actionsRect.bottom - navRect.top)),
+        };
+      });
+
+      if (!compactActionAudit) {
+        throw new Error(`${viewport.name}: missing compact library action controls`);
+      }
+
+      if (compactActionAudit.overlap > 1) {
+        throw new Error(
+          `${viewport.name}: first library card actions overlap bottom nav by ${compactActionAudit.overlap}px`,
+        );
+      }
     }
 
     if (viewport.width < 1280) {

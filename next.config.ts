@@ -61,6 +61,30 @@ const nextConfig: NextConfig = {
         source: "/permet-link-logo.png",
         headers: staticAssetHeaders,
       },
+      {
+        source: "/favicon.ico",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/favicon.png",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/favicon-16x16.png",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/favicon-32x32.png",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/apple-touch-icon.png",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/manifest.webmanifest",
+        headers: staticAssetHeaders,
+      },
     ];
   },
 };

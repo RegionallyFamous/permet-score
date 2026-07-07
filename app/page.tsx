@@ -520,13 +520,18 @@ function cardImageSrcSet(
   sizes: readonly number[] = [640, 1000, 1500],
 ) {
   const selectedVariant = variant ?? cardArtVariants(card)[0];
+  if (selectedVariant.image.startsWith("/")) {
+    return undefined;
+  }
+
   const print = tcgplayerImagePrint(card, selectedVariant);
   if (!print?.productId || print.imageUrl || !hasDirectTcgplayerProduct(print)) {
     return undefined;
   }
   const productId = print.productId;
+  const candidateSizes = [...new Set(sizes.map((size) => Math.max(size, 640)))];
 
-  return sizes
+  return candidateSizes
     .map((size) => `${tcgplayerProductImageUrl(productId, size)} ${size}w`)
     .join(", ");
 }
@@ -653,6 +658,10 @@ function formatEstimatedMoney(value: number) {
   return `Local est. ${formatMoney(value)}`;
 }
 
+function hasDirectMarketProduct(print: TcgplayerPrint | null | undefined) {
+  return Boolean(print?.productId && hasDirectTcgplayerProduct(print));
+}
+
 function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
   const print = tcgplayerPrint(card, variant);
   const price =
@@ -661,6 +670,9 @@ function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
     print.marketPrice > 0
       ? print.marketPrice
       : null;
+  if (price === null && hasDirectMarketProduct(print)) {
+    return `TCGplayer pending · est. ${formatMoney(estimatePrintCost(card, variant))}`;
+  }
   return price === null
     ? formatEstimatedMoney(estimatePrintCost(card, variant))
     : `${print?.priceSource ?? "TCGplayer market"} ${formatMoney(price)}`;
@@ -672,6 +684,8 @@ function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
     Number.isFinite(print.marketPrice) &&
     print.marketPrice > 0
     ? (print.priceSource ?? "TCGplayer market")
+    : hasDirectMarketProduct(print)
+      ? "TCGplayer pending price"
     : "local estimate";
 }
 
@@ -713,17 +727,17 @@ function tcgplayerUrl(card: GundamCard, variant?: CardArtVariant) {
 function colorAccentClass(color: CardColor) {
   switch (color) {
     case "Blue":
-      return "border-[#2e8cff] text-[#d9ecff] shadow-[#0e3a80]/30";
+      return "border-[#2e8cff] text-[#d9ecff]";
     case "Green":
-      return "border-[#28d17c] text-[#d9ffe9] shadow-[#063b22]/30";
+      return "border-[#28d17c] text-[#d9ffe9]";
     case "Red":
-      return "border-[#e31b23] text-[#ffe3e3] shadow-[#650b10]/30";
+      return "border-[#e31b23] text-[#ffe3e3]";
     case "White":
-      return "border-[#f7f7f2] text-[#f7f7f2] shadow-black/30";
+      return "border-[#f7f7f2] text-[#f7f7f2]";
     case "Purple":
-      return "border-[#8f7bff] text-[#eeeaff] shadow-[#24135f]/30";
+      return "border-[#8f7bff] text-[#eeeaff]";
     default:
-      return "border-[#8b8f99] text-[#f7f7f2] shadow-black/30";
+      return "border-[#8b8f99] text-[#f7f7f2]";
   }
 }
 
@@ -2440,7 +2454,11 @@ export function DeckBuilder({
     }.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    showToast("good", "Deck exported", "JSON download started.");
+    showToast(
+      "good",
+      "Backup exported",
+      "JSON backup downloaded; collection ownership may be included.",
+    );
   }
 
   async function importJson(file: File | undefined) {
@@ -2472,8 +2490,7 @@ export function DeckBuilder({
     setMobileActionsOpen(false);
     setMobileView(view);
     window.requestAnimationFrame(() => {
-      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+      window.scrollTo({ top: 0, behavior: "auto" });
     });
   }
 
@@ -2536,10 +2553,10 @@ export function DeckBuilder({
                   onChange={(event) =>
                     setDeck((current) => ({ ...current, name: event.target.value }))
                   }
-                  className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                  className="control-field short-cockpit-deck-name h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                 />
               </label>
-              <div className="relative">
+              <div className="relative short-cockpit-actions">
                 <div className="grid grid-cols-4 gap-2 xl:flex xl:justify-end">
                   <ToolbarButton
                     label={`Draw ${OPENING_HAND_SIZE}`}
@@ -2613,7 +2630,11 @@ export function DeckBuilder({
                     <ToolbarButton label={copyState} title="Copy deck list" onClick={copyDeckList}>
                       <Clipboard size={16} />
                     </ToolbarButton>
-                    <ToolbarButton label="Export" title="Export JSON" onClick={exportJson}>
+                    <ToolbarButton
+                      label="Backup"
+                      title="Export backup JSON"
+                      onClick={exportJson}
+                    >
                       <Download size={16} />
                     </ToolbarButton>
                     <ToolbarButton
@@ -2706,10 +2727,10 @@ export function DeckBuilder({
                 <div className="grid gap-2">
                   <div className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,auto)] gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
                     <label className="filter-cell relative block">
-                      <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+                      <span className="hidden font-display text-xs font-black uppercase text-[#8bdcff] sm:block">
                         Search
                       </span>
-                      <div className="relative mt-1">
+                      <div className="relative sm:mt-1">
                         <Search
                           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#f7f7f2]/58"
                           size={16}
@@ -2749,9 +2770,10 @@ export function DeckBuilder({
                     </div>
                     <button
                       type="button"
-                      className="interactive-control inline-flex h-full min-h-11 items-center justify-center gap-1.5 rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-2.5 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:min-h-16 md:px-3"
+                      className="interactive-control inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-2.5 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:min-h-16 md:px-3"
                       onClick={() => setAdvancedFiltersOpen((open) => !open)}
                       aria-expanded={advancedFiltersOpen}
+                      aria-controls="library-advanced-filters"
                     >
                       <Filter size={16} />
                       Filters
@@ -2784,7 +2806,7 @@ export function DeckBuilder({
                   )}
 
                   {advancedFiltersOpen && (
-                    <div className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4">
+                    <div id="library-advanced-filters" className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4">
                       <div className="md:hidden">
                         <SelectFilter
                           label="Color"
@@ -2866,7 +2888,7 @@ export function DeckBuilder({
               </div>
             </div>
 
-            <div className="library-pager border-b border-[#a7b5c9]/14 bg-[#0d1118]/86 px-2.5 py-2 sm:px-3">
+            <div className="library-pager border-b border-[#a7b5c9]/14 bg-[#0d1118]/86 px-2.5 py-1.5 sm:px-3 sm:py-2">
               <div className="flex items-center justify-between gap-2">
                 <div aria-live="polite">
                   <p className="hidden font-display text-xs font-black uppercase text-[#8bdcff] sm:block">
@@ -3518,7 +3540,7 @@ function MobileActionSheet({
       <ToolbarButton label={copyState} title="Copy deck list" onClick={onCopy} className="w-full">
         <Clipboard size={16} />
       </ToolbarButton>
-      <ToolbarButton label="Export" title="Export JSON" onClick={onExport} className="w-full">
+      <ToolbarButton label="Backup" title="Export backup JSON" onClick={onExport} className="w-full">
         <Download size={16} />
       </ToolbarButton>
       <ToolbarButton label="Sheet" title="Export deck image" onClick={onSheet} className="w-full">
@@ -4373,6 +4395,7 @@ function QuantityStepper({
             compact ? "h-8 text-base" : "h-9 text-xl"
           }`}
           aria-live="polite"
+          aria-label={`${label} quantity`}
         >
           {quantity}
         </output>
@@ -4579,7 +4602,7 @@ function DeckPanel({
                         </span>
                       ))}
                     </div>
-                    <div className="grid grid-cols-1 gap-1.5 min-[380px]:grid-cols-[minmax(3.75rem,1fr)_7.75rem_2.75rem]">
+                    <div className="deck-card-actions grid grid-cols-1 gap-1.5 min-[380px]:grid-cols-[minmax(3.75rem,1fr)_7.75rem_2.75rem]">
                       <a
                         href={tcgplayerUrl(card, artVariant)}
                         target="_blank"
@@ -4673,11 +4696,11 @@ function LibraryCard({
 
   return (
     <article
-      className={`library-result interactive-row group overflow-hidden rounded-sm border bg-[#080b11]/96 p-2.5 shadow-lg shadow-black/18 transition duration-200 hover:-translate-y-0.5 hover:border-[#8bdcff]/45 hover:bg-[#0d131d] ${colorAccentClass(
+      className={`library-result interactive-row group overflow-hidden rounded-sm border bg-[#080b11]/96 p-2.5 shadow-sm shadow-black/12 transition duration-150 hover:border-[#8bdcff]/45 hover:bg-[#0d131d] ${colorAccentClass(
         card.color,
       )} ${selected ? "active-scan-card ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
     >
-      <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2.5 sm:grid-cols-[8rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-[7.25rem_minmax(0,1fr)] gap-2.5 min-[380px]:grid-cols-[8rem_minmax(0,1fr)] sm:grid-cols-[8.75rem_minmax(0,1fr)] xl:grid-cols-[8rem_minmax(0,1fr)] 2xl:grid-cols-[8.75rem_minmax(0,1fr)]">
         <button
           type="button"
           className="scan-frame interactive-control relative aspect-[5/7] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-black text-left shadow-lg shadow-black/35"
@@ -4691,7 +4714,7 @@ function LibraryCard({
           <img
             src={cardImagePath(card, artVariant, 1000)}
             srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
-            sizes="(min-width: 1280px) 8rem, 7rem"
+            sizes="(min-width: 1536px) 8.75rem, (min-width: 1280px) 8rem, (min-width: 640px) 8.75rem, (min-width: 380px) 8rem, 7.25rem"
             alt={`${card.name} card`}
             className="h-full w-full bg-black object-contain object-top transition duration-200 group-hover:scale-[1.035]"
             loading="lazy"
@@ -4772,24 +4795,22 @@ function LibraryCard({
           </div>
         </div>
 
-        <div className="col-span-2 grid grid-cols-3 gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.5rem_2.5rem_3.25rem] sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
+        <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.5rem_2.5rem_2.5rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.5rem_2.5rem_3.25rem] sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
         {primaryZone && onAdjustPrimary ? (
-          <div className="col-span-3 min-[380px]:col-span-1">
-            <MiniQuantityControl
-              label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
-              quantity={primaryQuantity}
-              tone={primaryZone}
-              dense
-              incrementDisabled={Boolean(primaryConstraint)}
-              decrementDisabled={primaryQuantity <= 0}
-              incrementReason={primaryConstraint}
-              decrementReason={`No ${zoneLabel(primaryZone).toLowerCase()} copies`}
-              onIncrement={() => onAdjustPrimary(1)}
-              onDecrement={() => onAdjustPrimary(-1)}
-            />
-          </div>
+          <MiniQuantityControl
+            label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
+            quantity={primaryQuantity}
+            tone={primaryZone}
+            dense
+            incrementDisabled={Boolean(primaryConstraint)}
+            decrementDisabled={primaryQuantity <= 0}
+            incrementReason={primaryConstraint}
+            decrementReason={`No ${zoneLabel(primaryZone).toLowerCase()} copies`}
+            onIncrement={() => onAdjustPrimary(1)}
+            onDecrement={() => onAdjustPrimary(-1)}
+          />
         ) : (
-          <div className="col-span-3 grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2 min-[380px]:col-span-1">
+          <div className="grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2">
             <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/58">
               Locked
             </div>
@@ -4816,8 +4837,8 @@ function LibraryCard({
             event.stopPropagation();
             onOpenCard();
           }}
-          title={`Open large view of ${card.name}`}
-          aria-label={`Open large view of ${card.name}`}
+          title={`Open ${card.name} from action row`}
+          aria-label={`Open ${card.name} details from action row`}
         >
           <Maximize2 size={15} />
         </button>
@@ -4831,7 +4852,7 @@ function LibraryCard({
           aria-label={`Search TCGplayer for ${card.name}`}
         >
           <ShoppingCart size={15} />
-          TCG
+          <span className="hidden min-[380px]:inline sm:inline">TCG</span>
         </a>
         </div>
       </div>
@@ -4996,6 +5017,7 @@ function InspectorPanel({
               disabled={!canDowngradeArt}
               onClick={() => onStepArt(-1)}
               title="Downgrade art cost"
+              aria-label="Downgrade art cost"
             >
               <ChevronDown size={15} />
               Down
@@ -5010,6 +5032,7 @@ function InspectorPanel({
               disabled={!canUpgradeArt}
               onClick={() => onStepArt(1)}
               title="Upgrade art cost"
+              aria-label="Upgrade art cost"
             >
               <ChevronUp size={15} />
               Up
