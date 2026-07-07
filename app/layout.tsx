@@ -3,6 +3,8 @@ import type {
   Viewport,
 } from "next";
 import { Rajdhani } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const siteUrl = "https://permetlink.com";
@@ -153,6 +155,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
