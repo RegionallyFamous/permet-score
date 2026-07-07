@@ -1,6 +1,9 @@
 import { chromium } from "@playwright/test";
+import { access } from "node:fs/promises";
 
 const baseUrl = process.env.PERMET_BASE_URL ?? "http://localhost:3000";
+const baseHost = new URL(baseUrl).hostname;
+const isLocalBase = ["localhost", "127.0.0.1", "::1"].includes(baseHost);
 
 async function launchBrowser() {
   try {
@@ -16,6 +19,11 @@ async function launchBrowser() {
 
 function absoluteUrl(path) {
   return new URL(path, baseUrl);
+}
+
+async function assertLocalShareFileExists(id) {
+  if (!isLocalBase) return;
+  await access(`.local/shared-decks/${id}.json`);
 }
 
 const legalMain = {
@@ -69,6 +77,7 @@ async function assertSharePreservesPrints() {
   }
 
   const saved = await saveResponse.json();
+  await assertLocalShareFileExists(saved.id);
   const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
   if (!loadResponse.ok) {
     throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
@@ -103,6 +112,7 @@ async function assertShareDropsPendingRulesCards() {
   }
 
   const saved = await saveResponse.json();
+  await assertLocalShareFileExists(saved.id);
   const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
   if (!loadResponse.ok) {
     throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
@@ -151,6 +161,7 @@ async function assertSharePrunesOrphanArt() {
   }
 
   const saved = await saveResponse.json();
+  await assertLocalShareFileExists(saved.id);
   const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
   if (!loadResponse.ok) {
     throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
@@ -229,6 +240,21 @@ async function assertShareRejectsIncompleteDecksAndMalformedQuantities() {
   }
 }
 
+async function assertShareRejectsOversizedPayloads() {
+  const oversizedResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...legalDeck({ name: "Workflow QA Oversized" }),
+      extra: "x".repeat(70_000),
+    }),
+  });
+
+  if (oversizedResponse.status !== 413) {
+    throw new Error(`Expected oversized share to return 413, got ${oversizedResponse.status}`);
+  }
+}
+
 async function assertSharePreservesPreferredAltWhenTrimmingPrints() {
   const deck = legalDeck({
     name: "Workflow QA Alt Trim",
@@ -249,6 +275,7 @@ async function assertSharePreservesPreferredAltWhenTrimmingPrints() {
   }
 
   const saved = await saveResponse.json();
+  await assertLocalShareFileExists(saved.id);
   const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
   if (!loadResponse.ok) {
     throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
@@ -402,7 +429,15 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   }
 
   const saved = await saveResponse.json();
+  await assertLocalShareFileExists(saved.id);
   await page.goto(absoluteUrl(`/decks/${saved.id}`).toString(), { waitUntil: "networkidle" });
+  const canonical = await page
+    .locator('link[rel="canonical"]')
+    .getAttribute("href");
+  const expectedCanonical = `https://permetlink.com/decks/${saved.id}`;
+  if (canonical !== expectedCanonical) {
+    throw new Error(`Shared deck canonical was ${canonical}, expected ${expectedCanonical}`);
+  }
   await page.getByRole("button", { name: "Start a new deck" }).click();
   await page.getByText("Clone to edit").waitFor({ timeout: 15000 });
   const name = await page.locator("input").first().inputValue();
@@ -781,6 +816,7 @@ async function main() {
   await assertSharePrunesOrphanArt();
   await assertShareRejectsNonJsonContentType();
   await assertShareRejectsIncompleteDecksAndMalformedQuantities();
+  await assertShareRejectsOversizedPayloads();
   await assertSharePreservesPreferredAltWhenTrimmingPrints();
 
   const browser = await launchBrowser();

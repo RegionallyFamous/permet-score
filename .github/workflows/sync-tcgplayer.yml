@@ -41,4 +41,4 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v6
         with:
           commit_message: "Sync TCGplayer Gundam card data"
-          file_pattern: "app/tcgplayer-data.ts app/tcgplayer-card-data.ts data/tcgplayer-gundam-sync.json"
+          file_pattern: "app/tcgplayer-data.ts app/tcgplayer-card-data.ts app/deck-validation-data.ts data/tcgplayer-gundam-sync.json"

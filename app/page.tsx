@@ -1091,7 +1091,24 @@ function zoneLabel(zone: Zone) {
   return zone === "main" ? "Main" : "Resource";
 }
 
-function zoneAddConstraint(zone: Zone, card: GundamCard, quantity: number) {
+function mainColorsForQuantities(quantities: QuantityMap) {
+  return Array.from(
+    new Set(
+      deckEntries(quantities)
+        .filter(
+          (entry) => MAIN_TYPES.includes(entry.card.type) && entry.card.color !== "-",
+        )
+        .map((entry) => entry.card.color),
+    ),
+  );
+}
+
+function zoneAddConstraint(
+  zone: Zone,
+  card: GundamCard,
+  quantity: number,
+  deck?: DeckState,
+) {
   if (!canCardEnterZone(zone, card)) {
     if (zone === "main" && MAIN_TYPES.includes(card.type) && !hasDeckRulesData(card)) {
       return "Official rules data pending";
@@ -1104,6 +1121,25 @@ function zoneAddConstraint(zone: Zone, card: GundamCard, quantity: number) {
 
   if (zone === "main" && quantity >= MAX_MAIN_COPIES) {
     return `Max ${MAX_MAIN_COPIES} copies in main`;
+  }
+
+  if (deck) {
+    const zoneTotal = totalCards(deck[zone]);
+    if (zone === "main" && zoneTotal >= MAIN_TARGET) {
+      return `Main deck max ${MAIN_TARGET}`;
+    }
+
+    if (zone === "resource" && zoneTotal >= RESOURCE_TARGET) {
+      return `Resource max ${RESOURCE_TARGET}`;
+    }
+
+    if (zone === "main" && card.color !== "-") {
+      const nextMain = { ...deck.main, [card.number]: quantity + 1 };
+      const nextColors = mainColorsForQuantities(nextMain);
+      if (nextColors.length > MAX_MAIN_COLORS) {
+        return `Max ${MAX_MAIN_COLORS} colors`;
+      }
+    }
   }
 
   return "";
@@ -1264,9 +1300,16 @@ function shiftOnePrint(
   printMap: PrintChoiceMap,
   card: GundamCard,
   delta: number,
+  targetQuantity: number,
+  preferredArtId: string | undefined,
 ) {
   const variants = cardArtVariants(card);
-  const quantities = { ...(printMap[card.number] ?? {}) };
+  const quantities = normalizePrintQuantities(
+    card.number,
+    targetQuantity,
+    printMap[card.number],
+    preferredArtId,
+  );
   const indexes =
     delta > 0
       ? variants.slice(0, -1).map((_, index) => index)
@@ -1284,6 +1327,40 @@ function shiftOnePrint(
   }
 
   return null;
+}
+
+function canShiftPrints(
+  printMap: PrintChoiceMap,
+  card: GundamCard,
+  delta: number,
+  targetQuantity: number,
+  preferredArtId: string | undefined,
+) {
+  const variants = cardArtVariants(card);
+  if (variants.length <= 1 || targetQuantity <= 0) return false;
+  const quantities = normalizePrintQuantities(
+    card.number,
+    targetQuantity,
+    printMap[card.number],
+    preferredArtId,
+  );
+
+  return variants.some((variant, index) => {
+    if ((quantities[variant.id] ?? 0) <= 0) return false;
+    const nextIndex = Math.max(0, Math.min(variants.length - 1, index + delta));
+    return nextIndex !== index;
+  });
+}
+
+function canShiftDeckArt(deck: DeckState, delta: number) {
+  return (["main", "resource"] as const).some((zone) =>
+    Object.entries(deck[zone]).some(([number, quantity]) => {
+      const card = CARD_BY_NUMBER.get(number);
+      return card
+        ? canShiftPrints(deck.prints[zone], card, delta, quantity, deck.art[number])
+        : false;
+    }),
+  );
 }
 
 function shiftAllPrints(
@@ -1385,6 +1462,10 @@ type DeckBuilderProps = {
 
 type MobileView = "library" | "card" | "deck" | "stats";
 
+type MobileViewChangeOptions = {
+  focusPanel?: boolean;
+};
+
 type SharedStatus = "local" | "loading" | "ready" | "missing" | "cloned";
 
 const mobileViews: Array<{
@@ -1462,6 +1543,11 @@ export function DeckBuilder({
 
   const isDialogOpen = Boolean(fallbackPanel || lightbox || mobileActionsOpen);
   const sharedPreviewLocked = Boolean(sharedDeckId && sharedStatus === "ready");
+  const renderAllPanels = !mobileTabsEnabled;
+  const renderLibraryPanel = renderAllPanels || mobileView === "library";
+  const renderCardPanel = renderAllPanels || mobileView === "card";
+  const renderStatsPanel = renderAllPanels || mobileView === "stats";
+  const renderDeckPanel = renderAllPanels || mobileView === "deck";
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
@@ -1611,10 +1697,6 @@ export function DeckBuilder({
   const dataStatus = useMemo(
     () => databaseStatus(statusTimestamp ?? undefined),
     [statusTimestamp],
-  );
-  const missingPrintCount = useMemo(
-    () => missingPrints.reduce((sum, entry) => sum + entry.missing, 0),
-    [missingPrints],
   );
   const missingPrintCost = useMemo(
     () => missingPrints.reduce((sum, entry) => sum + entry.totalCost, 0),
@@ -1778,17 +1860,7 @@ export function DeckBuilder({
   );
   const typeCounts = useMemo(() => countByType(mainEntries), [mainEntries]);
 
-  const deckColors = useMemo(() => {
-    return Array.from(
-      new Set(
-        mainEntries
-          .filter(
-            (entry) => MAIN_TYPES.includes(entry.card.type) && entry.card.color !== "-",
-          )
-          .map((entry) => entry.card.color),
-      ),
-    );
-  }, [mainEntries]);
+  const deckColors = useMemo(() => mainColorsForQuantities(deck.main), [deck.main]);
 
   const costCurve = useMemo(() => {
     const buckets = Array.from({ length: 8 }, (_, index) => ({
@@ -2081,7 +2153,13 @@ export function DeckBuilder({
 
       zones.forEach((zone) => {
         if (shiftedArtId) return;
-        shiftedArtId = shiftOnePrint(nextPrints[zone], card, delta);
+        shiftedArtId = shiftOnePrint(
+          nextPrints[zone],
+          card,
+          delta,
+          current[zone][number] ?? 0,
+          current.art[number],
+        );
       });
 
       if (shiftedArtId) {
@@ -2125,6 +2203,17 @@ export function DeckBuilder({
       return;
     }
 
+    if (!canShiftDeckArt(deck, delta)) {
+      showToast(
+        "warn",
+        delta > 0 ? "Highest prints selected" : "Base prints selected",
+        delta > 0
+          ? "Every selected print is already at the highest available art tier."
+          : "Every selected print is already at standard or the lowest available tier.",
+      );
+      return;
+    }
+
     setDeck((current) => {
       const cardNumbers = new Set([
         ...Object.keys(current.main),
@@ -2160,8 +2249,7 @@ export function DeckBuilder({
       const target = current[zone];
       const currentQuantity = target[number] ?? 0;
       if (delta > 0) {
-        if (!canCardEnterZone(zone, card)) return current;
-        if (zone === "main" && currentQuantity >= 4) return current;
+        if (zoneAddConstraint(zone, card, currentQuantity, current)) return current;
       }
 
       const nextQuantity =
@@ -2177,11 +2265,23 @@ export function DeckBuilder({
         delete nextPrints[zone][number];
       } else {
         nextTarget[number] = nextQuantity;
+        nextPrints[zone][number] = normalizePrintQuantities(
+          number,
+          currentQuantity,
+          nextPrints[zone][number],
+          preferredArtId,
+        );
         if (delta > 0) {
           addPrintCopies(nextPrints[zone], card, preferredArtId, delta);
         } else if (delta < 0) {
           removePrintCopies(nextPrints[zone], card, preferredArtId, Math.abs(delta));
         }
+        nextPrints[zone][number] = normalizePrintQuantities(
+          number,
+          nextQuantity,
+          nextPrints[zone][number],
+          preferredArtId,
+        );
       }
 
       return {
@@ -2217,6 +2317,11 @@ export function DeckBuilder({
 
   function adjustCollection(number: string, artId: string, delta: number) {
     if (blockSharedPreviewEdit()) return;
+    if (delta < 0 && (deck.collection[number]?.[artId] ?? 0) <= 0) {
+      showToast("warn", "No owned print", "There are no owned copies to remove.");
+      return;
+    }
+
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card || !validArtId(card, artId)) return current;
@@ -2235,6 +2340,11 @@ export function DeckBuilder({
 
   function markDeckOwned() {
     if (blockSharedPreviewEdit()) return;
+    if (costSummary.neededCopies <= 0) {
+      showToast("warn", "No prints to mark", "Add cards before marking deck prints owned.");
+      return;
+    }
+
     undoDeckRef.current = cloneDeckState(deck);
     setCanUndo(true);
     setDeck((current) => {
@@ -2609,20 +2719,36 @@ export function DeckBuilder({
     setFallbackReturnFocusElement(null);
   }
 
-  function changeMobileView(view: MobileView) {
+  function focusWorkspacePanel(view: MobileView) {
+    const panel = document.getElementById(`${view}-panel`);
+    if (!(panel instanceof HTMLElement)) return;
+    panel.focus({ preventScroll: true });
+    panel.scrollIntoView({ block: "start", behavior: "auto" });
+  }
+
+  function changeMobileView(
+    view: MobileView,
+    options: MobileViewChangeOptions = {},
+  ) {
     setMobileActionsOpen(false);
     setMobileView(view);
     window.requestAnimationFrame(() => {
+      if (options.focusPanel) {
+        focusWorkspacePanel(view);
+        return;
+      }
       window.scrollTo({ top: 0, behavior: "auto" });
     });
   }
 
   function handleSkipLink(event: React.MouseEvent<HTMLAnchorElement>, view: MobileView) {
-    if (!mobileTabsEnabled) return;
     event.preventDefault();
-    changeMobileView(view);
+    if (mobileTabsEnabled) {
+      setMobileActionsOpen(false);
+      setMobileView(view);
+    }
     window.requestAnimationFrame(() => {
-      document.getElementById(`${view}-panel`)?.scrollIntoView({ block: "start" });
+      focusWorkspacePanel(view);
     });
   }
 
@@ -2762,7 +2888,7 @@ export function DeckBuilder({
                     <ToolbarButton label="New" title="Start a new deck" onClick={startNewDeck}>
                       <RotateCcw size={16} />
                     </ToolbarButton>
-                    <ToolbarButton
+                  <ToolbarButton
                       label="Art -"
                       title="Downgrade deck art budget"
                       onClick={() => stepDeckArt(-1)}
@@ -2856,12 +2982,15 @@ export function DeckBuilder({
             role={mobileTabsEnabled ? "tabpanel" : "region"}
             aria-labelledby={mobileTabsEnabled ? "library-tab" : undefined}
             aria-label={mobileTabsEnabled ? undefined : "Card library"}
+            tabIndex={-1}
             className={panelClass(
               `library-panel min-w-0 ${
                 mobileView === "library" ? "block" : "hidden xl:block"
               }`,
             )}
           >
+            {renderLibraryPanel && (
+              <>
             <div className="sticky top-0 z-10 border-b border-[#a7b5c9]/20 bg-[#080a0f]/94 p-2 backdrop-blur sm:p-3">
               <div className="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="flex shrink-0 items-center gap-2">
@@ -3116,6 +3245,7 @@ export function DeckBuilder({
                   <LibraryCard
                     key={card.number}
                     card={card}
+                    deck={deck}
                     artVariant={getArtVariant(card, deck.art)}
                     artVariants={cardArtVariants(card)}
                     selected={selectedCard?.number === card.number}
@@ -3153,27 +3283,25 @@ export function DeckBuilder({
                 </div>
               )}
             </div>
+              </>
+            )}
           </section>
 
           <aside className="contents xl:grid xl:gap-4">
-            <div className="hidden xl:block">
-              <MissingPrintsSummary
-                missingCount={missingPrintCount}
-                missingCost={missingPrintCost}
-                onOpen={openBuyList}
-              />
-            </div>
-
             <div
               id="card-panel"
               role={mobileTabsEnabled ? "tabpanel" : "region"}
               aria-labelledby={mobileTabsEnabled ? "card-tab" : undefined}
               aria-label={mobileTabsEnabled ? undefined : "Card inspector"}
+              tabIndex={-1}
               className={mobileView === "card" ? "block min-w-0" : "hidden min-w-0 xl:block"}
             >
+              {renderCardPanel && (
+                <>
               {selectedCard && selectedArtVariant ? (
                 <InspectorPanel
                   card={selectedCard}
+                  deck={deck}
                   artVariant={selectedArtVariant}
                   artVariants={selectedArtVariants}
                   neededQuantity={selectedNeededCount}
@@ -3195,6 +3323,8 @@ export function DeckBuilder({
               ) : (
                 <EmptyInspectorPanel />
               )}
+                </>
+              )}
             </div>
 
             <div
@@ -3202,12 +3332,15 @@ export function DeckBuilder({
               role={mobileTabsEnabled ? "tabpanel" : "region"}
               aria-labelledby={mobileTabsEnabled ? "stats-tab" : undefined}
               aria-label={mobileTabsEnabled ? undefined : "Deck stats"}
+              tabIndex={-1}
               className={
                 mobileView === "stats"
                   ? "grid min-w-0 max-w-full gap-4"
                   : "hidden min-w-0 max-w-full xl:grid xl:gap-4"
               }
             >
+              {renderStatsPanel && (
+                <>
               <DataIntegrityPanel status={dataStatus} />
 
               <CostPanel summary={costSummary} onMarkOwned={markDeckOwned} />
@@ -3237,6 +3370,8 @@ export function DeckBuilder({
                   mainTotal={mainTotal}
                 />
               </div>
+                </>
+              )}
             </div>
           </aside>
 
@@ -3245,10 +3380,13 @@ export function DeckBuilder({
             role={mobileTabsEnabled ? "tabpanel" : "region"}
             aria-labelledby={mobileTabsEnabled ? "deck-tab" : undefined}
             aria-label={mobileTabsEnabled ? undefined : "Deck list"}
+            tabIndex={-1}
             className={`min-w-0 max-w-full gap-4 xl:grid ${
               mobileView === "deck" ? "grid" : "hidden"
             }`}
           >
+            {renderDeckPanel && (
+              <>
             <DeckPanel
               title="Main Deck"
               total={mainTotal}
@@ -3280,6 +3418,8 @@ export function DeckBuilder({
               costCurve={costCurve}
               mainTotal={mainTotal}
             />
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -3630,9 +3770,15 @@ function MobileCockpitNav({
 }: {
   activeView: MobileView;
   tabsEnabled: boolean;
-  onChange: (view: MobileView) => void;
+  onChange: (view: MobileView, options?: MobileViewChangeOptions) => void;
 }) {
   function handleTabKey(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (tabsEnabled && event.key === "Tab" && !event.shiftKey) {
+      event.preventDefault();
+      onChange(mobileViews[index].id, { focusPanel: true });
+      return;
+    }
+
     const lastIndex = mobileViews.length - 1;
     const nextIndex =
       event.key === "ArrowRight"
@@ -3768,29 +3914,32 @@ function MobileActionSheet({
         aria-labelledby="mobile-action-sheet-title"
         onKeyDown={(event) => trapDialogFocus(event, sheetRef.current, onClose)}
       >
-        <h2 id="mobile-action-sheet-title" className="sr-only">
-          More deck actions
-        </h2>
-        <label className="col-span-2 grid gap-1 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-2">
-          <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
-            Deck name
-          </span>
-          <input
-            value={deckName}
-            onChange={(event) => onDeckNameChange(event.target.value)}
-            readOnly={deckNameReadOnly}
-            title={deckNameReadOnly ? "Clone this shared deck before renaming it" : undefined}
-            className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/10 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
-          />
-        </label>
-        <ToolbarButton
-          label="Close"
-          title="Close more deck actions"
-          onClick={onClose}
-          className="col-span-2 w-full"
-        >
-          <X size={16} />
-        </ToolbarButton>
+        <div className="col-span-2 grid grid-cols-[1fr_auto] items-start gap-2 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-2">
+          <label className="grid min-w-0 gap-1">
+            <span
+              id="mobile-action-sheet-title"
+              className="font-display text-xs font-black uppercase text-[#8bdcff]"
+            >
+              Deck name
+            </span>
+            <input
+              value={deckName}
+              onChange={(event) => onDeckNameChange(event.target.value)}
+              readOnly={deckNameReadOnly}
+              title={deckNameReadOnly ? "Clone this shared deck before renaming it" : undefined}
+              className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/10 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+            />
+          </label>
+          <button
+            type="button"
+            title="Close more deck actions"
+            aria-label="Close more deck actions"
+            onClick={onClose}
+            className="interactive-control grid size-11 place-items-center rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
+          >
+            <X size={18} />
+          </button>
+        </div>
         {canUndo && (
           <ToolbarButton
             label="Undo"
@@ -3937,7 +4086,7 @@ function FallbackPanelView({
 
   return (
     <div
-      className="fixed inset-0 z-40 grid place-items-end bg-black/42 px-3 pb-24 pt-6 backdrop-blur-sm xl:place-items-center xl:pb-6"
+      className="fallback-panel-overlay fixed inset-0 z-40 grid place-items-end bg-black/42 px-3 pb-24 pt-3 backdrop-blur-sm xl:place-items-center xl:pb-6 xl:pt-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="fallback-panel-title"
@@ -3945,7 +4094,7 @@ function FallbackPanelView({
     >
       <section
         ref={dialogRef}
-        className={panelClass("w-full max-w-2xl overflow-hidden")}
+        className={panelClass("fallback-panel-shell flex w-full max-w-2xl flex-col overflow-hidden")}
       >
         <div className="flex items-start justify-between gap-3 border-b border-[#a7b5c9]/20 p-3">
           <div className="min-w-0">
@@ -3970,13 +4119,13 @@ function FallbackPanelView({
             <X size={16} />
           </button>
         </div>
-        <div className="grid gap-3 p-3">
+        <div className="fallback-panel-body grid min-h-0 gap-3 overflow-auto p-3">
           <textarea
             readOnly
             value={panel.content}
             aria-label={`${panel.title} content`}
             onFocus={(event) => event.currentTarget.select()}
-            className="control-field min-h-64 w-full resize-y rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono text-sm font-bold leading-6 text-[#f7f7f2] outline-none focus:border-[#f6c542]"
+            className="fallback-panel-textarea control-field min-h-64 w-full resize-y rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono text-sm font-bold leading-6 text-[#f7f7f2] outline-none focus:border-[#f6c542]"
           />
           <div className="grid gap-2 sm:grid-cols-2">
             {panel.copyLabel && (
@@ -4142,21 +4291,33 @@ function CardLightbox({
       onClick={onClose}
       onKeyDown={(event) => trapDialogFocus(event, dialogRef.current, onClose)}
     >
-      <button
-        ref={closeButtonRef}
-        type="button"
-        className="lightbox-close interactive-control inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-[#a7b5c9]/28 bg-[#05070c]/94 text-[#f7f7f2] shadow-xl shadow-black/45"
-        onClick={onClose}
-        aria-label="Close card view"
-        title="Close"
-      >
-        <X size={19} />
-      </button>
       <div ref={scrollRef} className="card-lightbox h-full overflow-y-auto px-3 py-4 sm:px-5 sm:py-6">
-      <div
-        className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center"
-        onClick={(event) => event.stopPropagation()}
-      >
+        <div
+          className="mx-auto grid min-h-full w-full max-w-6xl content-center gap-3"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="lightbox-header flex items-center justify-between gap-3 rounded-sm border border-[#a7b5c9]/18 bg-[#05070c]/95 p-2 shadow-2xl shadow-black/45 backdrop-blur">
+            <div className="min-w-0">
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
+                  {printDisplayId(artVariant)}
+                </span>
+                <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
+                  {artDisplayLabel(artVariant)}
+                </span>
+              </div>
+            </div>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              className="lightbox-close interactive-control inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-[#a7b5c9]/28 bg-[#05070c]/94 text-[#f7f7f2] shadow-xl shadow-black/45"
+              onClick={onClose}
+              aria-label="Close card view"
+              title="Close"
+            >
+              <X size={19} />
+            </button>
+          </div>
         <section
           className="lightbox-shell relative grid w-full gap-3 rounded-sm border border-[#8bdcff]/34 bg-[#05070c]/96 p-3 shadow-2xl shadow-black/70 lg:grid-cols-[minmax(280px,0.9fr)_minmax(320px,0.68fr)] lg:p-4"
         >
@@ -4172,14 +4333,6 @@ function CardLightbox({
                 referrerPolicy="no-referrer"
                 onError={handleCardImageError}
               />
-              <div className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1.5">
-                <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
-                  {printDisplayId(artVariant)}
-                </span>
-                <span className="rounded-sm border border-[#f6c542]/35 bg-black/70 px-2 py-1 text-sm font-black text-[#fff2bd]">
-                  {artDisplayLabel(artVariant)}
-                </span>
-              </div>
             </div>
 
             {hasAltPrints && (
@@ -4284,7 +4437,7 @@ function CardLightbox({
             </a>
           </div>
         </section>
-      </div>
+        </div>
       </div>
     </div>
   );
@@ -4324,44 +4477,6 @@ function CostPanel({
           Mark Deck Prints Owned
         </button>
       </div>
-    </section>
-  );
-}
-
-function MissingPrintsSummary({
-  missingCount,
-  missingCost,
-  onOpen,
-}: {
-  missingCount: number;
-  missingCost: number;
-  onOpen: () => void;
-}) {
-  return (
-    <section className={panelClass("overflow-hidden")}>
-      <button
-        type="button"
-        className="interactive-control grid w-full grid-cols-[1fr_auto] items-center gap-3 p-3 text-left"
-        onClick={onOpen}
-      >
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 font-display text-lg font-black uppercase text-[#f6c542]">
-            <ShoppingCart size={17} />
-            Buy List
-          </div>
-          <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/62">
-            Copy missing selected prints with TCGplayer buy links.
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="font-display text-xl font-black text-[#f7f7f2]">
-            {missingCount}
-          </div>
-          <div className="text-sm font-black text-[#fff2bd]">
-            {formatMoney(missingCost)}
-          </div>
-        </div>
-      </button>
     </section>
   );
 }
@@ -4511,9 +4626,7 @@ function HandSimulatorPanel({
 function StatusBadge({ isLegal }: { isLegal: boolean }) {
   return (
     <span
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
+      aria-label={isLegal ? "Deck legal" : "Deck needs work"}
       className={`status-badge inline-flex h-8 w-fit items-center gap-2 rounded-sm border px-2.5 font-display text-base font-black uppercase ${
         isLegal
           ? "border-[#2e8cff]/45 bg-[#1167d8]/18 text-[#d9ecff]"
@@ -4715,7 +4828,6 @@ function QuantityStepper({
           className={`grid place-items-center rounded-sm border border-current/22 bg-black/28 font-display font-black ${
             compact ? "h-8 text-base" : "h-9 text-xl"
           }`}
-          aria-live="polite"
           aria-label={`${label} quantity`}
         >
           {quantity}
@@ -4810,7 +4922,6 @@ function MiniQuantityControl({
         className={`grid h-11 place-items-center border-x-0 bg-[#f7f7f2]/6 px-1 font-display font-black ${
           dense ? "text-base" : "text-lg"
         }`}
-        aria-live="polite"
         aria-label={`${label} quantity`}
       >
         {quantity}
@@ -4883,10 +4994,10 @@ function DeckPanel({
             Empty
           </div>
         ) : (
-          entries.map(({ card, quantity }) => {
+          entries.map(({ card, quantity }, index) => {
             const printEntries = printEntriesForCard(deck, zone, card);
             const artVariant = printEntries[0]?.variant ?? getArtVariant(card, deck.art);
-            const addConstraint = zoneAddConstraint(zone, card, quantity);
+            const addConstraint = zoneAddConstraint(zone, card, quantity, deck);
             return (
               <div
                 key={card.number}
@@ -4894,13 +5005,14 @@ function DeckPanel({
                   card.color,
                 )}`}
               >
-                  <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2.5">
+                <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2.5">
                   <CardThumb
                     card={card}
                     artVariant={artVariant}
                     onOpen={() => onOpenCard(card, artVariant)}
                     size="deck"
                     badge={`${quantity}`}
+                    eager={index < 4}
                     openLabel={`Open large view of ${zoneLabel(zone)} deck card ${card.name} ${card.number}`}
                   />
                   <div className="grid min-w-0 content-start gap-2">
@@ -4978,6 +5090,7 @@ function DeckPanel({
 
 function LibraryCard({
   card,
+  deck,
   artVariant,
   artVariants,
   selected,
@@ -4991,6 +5104,7 @@ function LibraryCard({
   onAdjustResource,
 }: {
   card: GundamCard;
+  deck: DeckState;
   artVariant: CardArtVariant;
   artVariants: readonly CardArtVariant[];
   selected: boolean;
@@ -5016,7 +5130,7 @@ function LibraryCard({
         ? resourceQuantity
         : 0;
   const primaryConstraint = primaryZone
-    ? zoneAddConstraint(primaryZone, card, primaryQuantity)
+    ? zoneAddConstraint(primaryZone, card, primaryQuantity, deck)
     : "No builder slot for this card type";
   const rulesPending =
     primaryZone === "main" && MAIN_TYPES.includes(card.type) && !hasDeckRulesData(card);
@@ -5224,6 +5338,7 @@ function EmptyInspectorPanel() {
 
 function InspectorPanel({
   card,
+  deck,
   artVariant,
   artVariants,
   neededQuantity,
@@ -5237,6 +5352,7 @@ function InspectorPanel({
   onOpenCard,
 }: {
   card: GundamCard;
+  deck: DeckState;
   artVariant: CardArtVariant;
   artVariants: readonly CardArtVariant[];
   neededQuantity: number;
@@ -5249,8 +5365,8 @@ function InspectorPanel({
   onAdjustCollection: (delta: number) => void;
   onOpenCard: () => void;
 }) {
-  const mainConstraint = zoneAddConstraint("main", card, mainQuantity);
-  const resourceConstraint = zoneAddConstraint("resource", card, resourceQuantity);
+  const mainConstraint = zoneAddConstraint("main", card, mainQuantity, deck);
+  const resourceConstraint = zoneAddConstraint("resource", card, resourceQuantity, deck);
   const artIndex = Math.max(
     0,
     artVariants.findIndex((variant) => variant.id === artVariant.id),
@@ -5455,6 +5571,7 @@ function CardThumb({
   onOpen,
   size = "sm",
   badge,
+  eager = false,
   openLabel,
 }: {
   card: GundamCard;
@@ -5462,6 +5579,7 @@ function CardThumb({
   onOpen?: () => void;
   size?: "sm" | "deck";
   badge?: string;
+  eager?: boolean;
   openLabel?: string;
 }) {
   const sizeClass =
@@ -5479,7 +5597,7 @@ function CardThumb({
       alt={`${card.name} card`}
       className="h-full w-full bg-black object-contain object-top"
       decoding="async"
-      loading={size === "deck" ? "eager" : "lazy"}
+      loading={eager ? "eager" : "lazy"}
       referrerPolicy="no-referrer"
       onError={handleCardImageError}
     />

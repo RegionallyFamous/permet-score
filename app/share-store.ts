@@ -66,7 +66,7 @@ async function loadLocalDeck(id: string) {
 export async function saveSharedDeck(id: string, deck: SharedDeckState) {
   assertShareStoreConfigured();
 
-  if (!hasBlobCredentials()) {
+  if (shouldUseLocalShareStore() || !hasBlobCredentials()) {
     await saveLocalDeck(id, deck);
     return;
   }
@@ -82,7 +82,7 @@ export async function saveSharedDeck(id: string, deck: SharedDeckState) {
 export async function loadSharedDeck(id: string) {
   assertShareStoreConfigured();
 
-  if (!hasBlobCredentials()) {
+  if (shouldUseLocalShareStore() || !hasBlobCredentials()) {
     return loadLocalDeck(id);
   }
 

@@ -5,6 +5,8 @@ import { saveSharedDeck } from "../../share-store";
 
 export const runtime = "nodejs";
 
+const MAX_SHARE_BODY_BYTES = 64 * 1024;
+
 function randomShareId() {
   return randomBytes(8).toString("base64url");
 }
@@ -25,6 +27,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Content-Type must be application/json." },
       { status: 415 },
+    );
+  }
+
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_SHARE_BODY_BYTES) {
+    return NextResponse.json(
+      { error: "Deck payload is too large." },
+      { status: 413 },
     );
   }
 
@@ -50,7 +60,8 @@ export async function POST(request: Request) {
       },
       { status: 201 },
     );
-  } catch {
+  } catch (error) {
+    console.error("Shared deck save failed", error);
     return NextResponse.json(
       { error: "Could not save this deck right now." },
       { status: 500 },

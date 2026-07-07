@@ -64,8 +64,8 @@ and chosen printings, but they do not include private collection ownership
 counts.
 
 On Vercel, connect a private Vercel Blob store to the project so the API can
-persist shared deck records. For local development without Blob credentials, the
-API writes throwaway records to `.local/shared-decks/`.
+persist shared deck records. Local development always writes throwaway records to
+`.local/shared-decks/`, even when Blob credentials are present in `.env.local`.
 
 ## Vercel
 

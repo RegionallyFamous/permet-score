@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-07-07T06:47:24.740Z",
+  "updatedAt": "2026-07-07T07:27:06.569Z",
   "source": "TCGplayer market",
   "gameName": "Gundam Card Game",
   "marketOrigin": "https://janie.up.railway.app",
   "releaseAudit": {
-    "generatedAt": "2026-07-07T06:47:00.874Z",
+    "generatedAt": "2026-07-07T07:26:39.764Z",
     "status": "degraded",
     "summary": {
       "setsReviewed": 20,
@@ -21,7 +21,7 @@
     }
   },
   "catalogDiscovery": {
-    "generatedAt": "2026-07-07T06:47:01.589Z",
+    "generatedAt": "2026-07-07T07:26:40.474Z",
     "status": "warning",
     "summary": {
       "categoriesChecked": 1,
@@ -37,7 +37,7 @@
       "errors": 0,
       "latestLivePublishedAt": "2026-07-24T00:00:00",
       "latestLocalReleasedAt": "2026-06-26T00:00:00.000Z",
-      "queueLength": 0
+      "queueLength": 76
     }
   },
   "productCount": 1655,

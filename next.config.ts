@@ -22,11 +22,7 @@ const nextConfig: NextConfig = {
       canonicalHostRedirect("permetscore.com"),
       canonicalHostRedirect("www.permetscore.com"),
       canonicalHostRedirect("permet-score.vercel.app"),
-    ].filter(
-      (redirect) =>
-        process.env.ENABLE_CANONICAL_HOST_REDIRECTS === "true" ||
-        redirect.has[0]?.value === "www.permetlink.com",
-    );
+    ];
   },
   async headers() {
     const staticAssetHeaders = [
