@@ -200,9 +200,9 @@ const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
   readonly CardArtVariant[]
 >;
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
-const CARD_IMAGE_FALLBACK = "/permet-score-logo.png";
+const CARD_IMAGE_FALLBACK = "/permet-link-logo.png";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
-const CANONICAL_ORIGIN = "https://permetscore.com";
+const CANONICAL_ORIGIN = "https://permetlink.com";
 const OFFICIAL_RULES_URL = "https://www.gundam-gcg.com/en/rules/";
 const OFFICIAL_PRODUCTS_URL = "https://www.gundam-gcg.com/en/";
 const OFFICIAL_RULES_UPDATED = "June 12, 2026";
@@ -1991,7 +1991,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       title: "Deck List",
       detail: "Clipboard access was blocked. The deck list is selected below.",
       content: deckList,
-      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-score"}-deck.txt`,
+      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-deck.txt`,
     });
     showToast("bad", "Copy failed", "Deck list opened in a manual copy panel.");
     window.setTimeout(() => setCopyState("Copy"), 1200);
@@ -2013,7 +2013,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       title: "Buy List",
       detail: "Clipboard access was blocked. The missing-print buy list is selected below.",
       content: buyListText,
-      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-score"}-buy-list.txt`,
+      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-buy-list.txt`,
     });
     showToast("warn", "Buy list ready", "Manual copy panel opened.");
   }
@@ -2101,7 +2101,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       showToast(
         "bad",
         "Import failed",
-        "Choose a valid Permet Score deck JSON file.",
+        "Choose a valid Permet Link deck JSON file.",
       );
     }
   }
@@ -2137,8 +2137,8 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
               <div className="flex w-40 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
-                  src="/permet-score-logo.png"
-                  alt="Permet Score"
+                  src="/permet-link-logo.png"
+                  alt="Permet Link"
                   className="h-auto w-full object-contain object-left"
                 />
               </div>
@@ -2148,7 +2148,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                 </p>
                 <div className="flex flex-wrap items-center gap-2 sm:mt-1">
                   <h1 className="sr-only">
-                    Permet Score
+                    Permet Link
                   </h1>
                   <StatusBadge isLegal={isLegal} />
                 </div>

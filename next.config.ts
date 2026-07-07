@@ -4,7 +4,7 @@ function canonicalHostRedirect(host: string) {
   return {
     source: "/:path*",
     has: [{ type: "host" as const, value: host }],
-    destination: "https://permetscore.com/:path*",
+    destination: "https://permetlink.com/:path*",
     permanent: true,
   };
 }
@@ -15,14 +15,14 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async redirects() {
     return [
-      canonicalHostRedirect("www.permetscore.com"),
-      canonicalHostRedirect("permetlink.com"),
       canonicalHostRedirect("www.permetlink.com"),
+      canonicalHostRedirect("permetscore.com"),
+      canonicalHostRedirect("www.permetscore.com"),
       canonicalHostRedirect("permet-score.vercel.app"),
     ].filter(
       (redirect) =>
         process.env.ENABLE_CANONICAL_HOST_REDIRECTS === "true" ||
-        redirect.has[0]?.value === "www.permetscore.com",
+        redirect.has[0]?.value === "www.permetlink.com",
     );
   },
 };

@@ -8,17 +8,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://permetscore.com"),
-  title: "Permet Score",
+  metadataBase: new URL("https://permetlink.com"),
+  title: "Permet Link",
   description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Permet Score",
+    title: "Permet Link",
     description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
-    url: "https://permetscore.com",
-    siteName: "Permet Score",
+    url: "https://permetlink.com",
+    siteName: "Permet Link",
     type: "website",
   },
   icons: {
@@ -44,7 +44,7 @@ export default function RootLayout({
       <head>
         <link rel="preload" as="image" href="/assets/permet-armor-ui-v2.webp" />
         <link rel="preload" as="image" href="/assets/mecha-deck-hangar.png" />
-        <link rel="preload" as="image" href="/permet-score-logo.png" />
+        <link rel="preload" as="image" href="/permet-link-logo.png" />
       </head>
       <body
         className={`${geistMono.variable} antialiased`}

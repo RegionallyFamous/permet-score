@@ -76,7 +76,7 @@ try {
   for (const viewport of viewports) {
     const page = await browser.newPage({ viewport });
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: "Permet Score", exact: true }).waitFor({
+    await page.getByRole("heading", { name: "Permet Link", exact: true }).waitFor({
       state: "visible",
       timeout: 15000,
     });
@@ -88,7 +88,7 @@ try {
 
     const audit = await readAudit(page);
 
-    if (audit.title !== "Permet Score") {
+    if (audit.title !== "Permet Link") {
       throw new Error(`${viewport.name}: unexpected title ${audit.title}`);
     }
     if (audit.overflow > 1) {

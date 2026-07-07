@@ -1,4 +1,4 @@
-# Permet Score
+# Permet Link
 
 A fast local-first Gundam Card Game deck builder, collection tracker, alt-art
 planner, and opening-hand simulator.
@@ -34,7 +34,7 @@ running on `http://localhost:3000`, ideally with `npm run build && npm run start
 
 ## Janie Market Source
 
-Janie is the bridge to TCGplayer product/catalog data. Permet Score does not
+Janie is the bridge to TCGplayer product/catalog data. Permet Link does not
 need its own TCGplayer credentials; it consumes Janie Firehose output into
 generated files so the app stays fast on Vercel:
 
@@ -74,7 +74,7 @@ npm run build
 npm run start
 ```
 
-The canonical domain is `https://permetscore.com`. Vercel should point
-`permetscore.com` at the project and redirect `www.permetscore.com`,
-`permetlink.com`, `www.permetlink.com`, and `permet-score.vercel.app` to the
-canonical host after DNS is configured.
+The canonical domain is `https://permetlink.com`. Vercel should point
+`permetlink.com` at the project and redirect `www.permetlink.com` to the
+canonical host after DNS is configured. Legacy hosts can also be redirected to
+the canonical host in `next.config.ts`.
