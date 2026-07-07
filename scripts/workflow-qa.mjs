@@ -487,14 +487,104 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   if (canonical !== expectedCanonical) {
     throw new Error(`Shared deck canonical was ${canonical}, expected ${expectedCanonical}`);
   }
-  await page.getByRole("button", { name: "Start a new deck" }).click();
-  await page.getByText("Clone to edit").waitFor({ timeout: 15000 });
+
+  async function assertDisabled(control, message) {
+    if (!(await control.isDisabled())) {
+      throw new Error(message);
+    }
+  }
+
+  let sharedPreviewPostCount = 0;
+  await page.route("**/api/decks", async (route) => {
+    if (route.request().method() === "POST") {
+      sharedPreviewPostCount += 1;
+      await route.fulfill({
+        status: 599,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Shared preview should not create a new share" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Copy current shared deck link" }).click();
+  await page.waitForTimeout(400);
+  await page.unroute("**/api/decks");
+  if (sharedPreviewPostCount !== 0) {
+    throw new Error("Shared preview Share posted a new /api/decks record instead of copying the current URL");
+  }
+
+  const desktopLockedControls = [
+    [page.getByRole("button", { name: "Start a new deck" }), "new deck button"],
+    [page.getByRole("button", { name: "Load sample deck" }), "sample deck button"],
+    [page.getByRole("button", { name: "Import JSON" }), "import button"],
+    [page.getByRole("button", { name: "Mark Deck Prints Owned" }), "mark-owned button"],
+    [page.getByRole("button", { name: "Add owned selected print" }), "owned increment button"],
+    [page.getByRole("button", { name: "Remove owned selected print" }), "owned decrement button"],
+    [
+      page.locator("#library-panel .library-result").first().locator(".mini-stepper button").first(),
+      "library decrement button",
+    ],
+    [
+      page.locator("#library-panel .library-result").first().locator(".mini-stepper button").last(),
+      "library increment button",
+    ],
+    [
+      page.locator("#deck-panel .deck-card-actions").first().locator(".mini-stepper button").first(),
+      "deck row decrement button",
+    ],
+    [
+      page.locator("#deck-panel .deck-card-actions").first().locator(".mini-stepper button").last(),
+      "deck row increment button",
+    ],
+    [
+      page.locator("#deck-panel .deck-card-actions").first().locator("button").last(),
+      "deck row remove button",
+    ],
+    [
+      page.locator("#card-panel .quantity-stepper").first().locator("button").first(),
+      "inspector main decrement button",
+    ],
+    [
+      page.locator("#card-panel .quantity-stepper").first().locator("button").last(),
+      "inspector main increment button",
+    ],
+    [
+      page.locator("#card-panel .quantity-stepper").nth(1).locator("button").first(),
+      "inspector resource decrement button",
+    ],
+    [
+      page.locator("#card-panel .quantity-stepper").nth(1).locator("button").last(),
+      "inspector resource increment button",
+    ],
+    [page.locator('#card-panel button[title="Clone to edit"]').first(), "inspector art down button"],
+    [page.locator('#card-panel button[title="Clone to edit"]').nth(1), "inspector art up button"],
+  ];
+  for (const [control, label] of desktopLockedControls) {
+    await assertDisabled(control, `Shared preview exposes an enabled mutating desktop control: ${label}`);
+  }
+
   const name = await page.locator("input").first().inputValue();
   if (name !== deck.name) {
     throw new Error(`Shared preview was mutated before clone: ${name}`);
   }
   if (!/\/decks\//.test(page.url())) {
     throw new Error(`Shared preview unexpectedly navigated away: ${page.url()}`);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "More deck actions" }).click();
+  await page.getByText("Shared preview · clone to edit").waitFor({ timeout: 15000 });
+  const mobileLockedControls = [
+    [page.getByRole("button", { name: "Start a new deck" }), "mobile new deck button"],
+    [page.getByRole("button", { name: "Load sample deck" }), "mobile sample deck button"],
+    [page.getByRole("button", { name: "Import JSON" }), "mobile import button"],
+    [page.getByRole("button", { name: "Downgrade deck art budget" }), "mobile art down button"],
+    [page.getByRole("button", { name: "Upgrade deck art budget" }), "mobile art up button"],
+  ];
+  for (const [control, label] of mobileLockedControls) {
+    await assertDisabled(control, `Shared preview exposes an enabled mutating mobile action: ${label}`);
   }
 }
 
@@ -683,7 +773,7 @@ async function assertMobileLibraryLayout(page) {
   await page.goto(baseUrl, { waitUntil: "networkidle" });
 
   const tcgClipping = await page
-    .locator('.library-result a[aria-label^="Search TCGplayer"]')
+    .locator('.library-result a[aria-label*="TCGplayer"]')
     .first()
     .evaluate((link) => {
       const linkRect = link.getBoundingClientRect();
@@ -698,7 +788,7 @@ async function assertMobileLibraryLayout(page) {
     const pagerNext = document.querySelector('button[aria-label="Next library page"]');
     const actionTargets = Array.from(
       document.querySelectorAll(
-        '.library-card-actions button[aria-label^="Select"], .library-card-actions button[aria-label*="details from action row"], .library-card-actions a[aria-label^="Search TCGplayer"]',
+        '.library-card-actions button[aria-label^="Select"], .library-card-actions button[aria-label*="details from action row"], .library-card-actions a[aria-label*="TCGplayer"]',
       ),
     ).map((node) => {
       const rect = node.getBoundingClientRect();

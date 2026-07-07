@@ -21,6 +21,7 @@ const validTypes = new Set(["UNIT", "PILOT", "COMMAND", "BASE", "RESOURCE", "EX 
 const validColors = new Set(["Blue", "Green", "Red", "White", "Purple", "-"]);
 
 const cards = [...CURATED_CARD_POOL, ...TCGPLAYER_CARD_POOL];
+const cardsByNumber = new Map(cards.map((card) => [card.number, card]));
 const printCount = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
   (sum, prints) => sum + prints.length,
   0,
@@ -53,6 +54,34 @@ const missingProductIds = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
 const missingMarketPrices = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
   (sum, prints) => sum + prints.filter((print) => !print.marketPrice).length,
   0,
+);
+const marketPriceAudit = Object.entries(TCGPLAYER_CARD_PRINTS).reduce(
+  (summary, [number, prints]) => {
+    const card = cardsByNumber.get(number);
+    prints.forEach((print, index) => {
+      const price = positiveMarketPrice(print);
+      if (price === null) return;
+      summary.rawMarketPrices += 1;
+      if (!card) {
+        summary.unmatchedMarketPrices += 1;
+        return;
+      }
+      const tier = printArtTier(number, print, index);
+      const estimate = estimatePrintCost(card, tier);
+      if (isVolatileMarketPrice(price, estimate)) {
+        summary.volatileMarketPrices += 1;
+      } else {
+        summary.usableMarketPrices += 1;
+      }
+    });
+    return summary;
+  },
+  {
+    rawMarketPrices: 0,
+    usableMarketPrices: 0,
+    volatileMarketPrices: 0,
+    unmatchedMarketPrices: 0,
+  },
 );
 const directProductsMissingMarketPrices = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
   (sum, prints) =>
@@ -92,6 +121,51 @@ function report(condition, message) {
   if (condition) return;
   if (strict) errors.push(message);
   else warnings.push(message);
+}
+
+function positiveMarketPrice(print) {
+  return typeof print.marketPrice === "number" &&
+    Number.isFinite(print.marketPrice) &&
+    print.marketPrice > 0
+    ? print.marketPrice
+    : null;
+}
+
+function printCostBase(card) {
+  const rarityBase = {
+    C: 0.25,
+    U: 0.6,
+    R: 1.25,
+    LR: 2.75,
+    P: 3.5,
+  };
+  const gameCost = Number(card.cost);
+  const costWeight = Number.isFinite(gameCost) ? gameCost * 0.22 : 0;
+  const unitWeight = card.type === "UNIT" ? 0.4 : 0;
+  return (rarityBase[card.rarity] ?? 0.4) + costWeight + unitWeight;
+}
+
+function artTierMultiplier(tier) {
+  if (tier <= 0) return 1;
+  return [1, 2.5, 5, 8.5, 13, 19, 27, 38][tier] ?? 38 + (tier - 7) * 12;
+}
+
+function estimatePrintCost(card, tier) {
+  const value = printCostBase(card) * artTierMultiplier(tier);
+  return Math.max(0.05, Math.round(value * 100) / 100);
+}
+
+function printArtTier(number, print, fallbackTier) {
+  const localVariant = CARD_ART_VARIANTS[number]?.find(
+    (variant) =>
+      variant.id === print.variantId ||
+      variant.officialId === print.officialId,
+  );
+  return localVariant?.tier ?? fallbackTier;
+}
+
+function isVolatileMarketPrice(price, estimatedPrice) {
+  return price >= Math.max(250, estimatedPrice * 25);
 }
 
 const seen = new Set();
@@ -135,6 +209,18 @@ if (missingMarketPrices) {
   );
 }
 
+if (marketPriceAudit.volatileMarketPrices) {
+  warnings.push(
+    `${marketPriceAudit.volatileMarketPrices} TCGplayer market prices look volatile and are excluded from deck cost math.`,
+  );
+}
+
+if (marketPriceAudit.unmatchedMarketPrices) {
+  warnings.push(
+    `${marketPriceAudit.unmatchedMarketPrices} priced market print records could not be matched to catalog cards.`,
+  );
+}
+
 if (directProductsMissingMarketPrices) {
   warnings.push(
     `${directProductsMissingMarketPrices} direct TCGplayer product records are missing market prices.`,
@@ -154,6 +240,10 @@ const summary = {
   totalCards: cards.length,
   marketPrints: printCount,
   directProductPrints,
+  rawMarketPrices: marketPriceAudit.rawMarketPrices,
+  usableMarketPrices: marketPriceAudit.usableMarketPrices,
+  volatileMarketPrices: marketPriceAudit.volatileMarketPrices,
+  unmatchedMarketPrices: marketPriceAudit.unmatchedMarketPrices,
   missingProductIds,
   missingMarketPrices,
   directProductsMissingMarketPrices,

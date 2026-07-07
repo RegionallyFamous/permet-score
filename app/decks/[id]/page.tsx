@@ -45,9 +45,9 @@ export async function generateMetadata({
       type: "website",
       images: [
         {
-          url: "/permet-link-logo.png",
-          width: 1983,
-          height: 793,
+          url: "/permet-link-logo-header.webp",
+          width: 960,
+          height: 384,
           alt: "Permet Link",
         },
       ],
@@ -56,7 +56,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: ["/permet-link-logo.png"],
+      images: ["/permet-link-logo-header.webp"],
     },
   };
 }

@@ -27,9 +27,8 @@ jobs:
       - name: Sync TCGplayer market snapshot
         run: npm run data:sync:tcgplayer
         env:
-          TCGPLAYER_BRIDGE_ORIGIN: ${{ vars.TCGPLAYER_BRIDGE_ORIGIN || vars.JANIE_API_ORIGIN || 'https://janie.up.railway.app' }}
-          TCGPLAYER_BRIDGE_TOKEN: ${{ secrets.TCGPLAYER_BRIDGE_TOKEN || secrets.JANIE_API_TOKEN }}
-          TCGPLAYER_BRIDGE_GAME_NAME: ${{ vars.TCGPLAYER_BRIDGE_GAME_NAME || vars.JANIE_GUNDAM_GAME_NAME || 'Gundam Card Game' }}
+          TCGPLAYER_BRIDGE_TOKEN: ${{ secrets.TCGPLAYER_BRIDGE_TOKEN }}
+          TCGPLAYER_BRIDGE_GAME_NAME: ${{ vars.TCGPLAYER_BRIDGE_GAME_NAME || 'Gundam Card Game' }}
 
       - name: Validate generated app
         run: |

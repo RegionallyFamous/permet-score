@@ -1274,6 +1274,33 @@ textarea {
     padding-right: 5.75rem;
   }
 
+  .app-content-shell > header .max-w-\[1800px\] {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .app-content-shell > header img[alt="Permet Link"] {
+    max-width: 8.5rem;
+  }
+
+  .short-cockpit-deck-name,
+  .mobile-deck-title-chip {
+    display: none;
+  }
+
+  .short-cockpit-actions .grid {
+    gap: 0.35rem;
+  }
+
+  .short-cockpit-actions .interactive-control {
+    height: 2.5rem;
+    min-width: 2.35rem;
+    min-height: 2.5rem;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+    font-size: 0.78rem;
+  }
+
   .app-content-shell > section {
     padding-bottom: 0.75rem;
   }
@@ -1293,8 +1320,100 @@ textarea {
     max-height: calc(100dvh - 1.5rem);
   }
 
+  .library-panel .sticky {
+    padding: 0.4rem;
+  }
+
+  .library-panel .sticky h2 {
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .library-panel .filter-cell > span {
+    display: none;
+  }
+
+  .library-panel .control-field,
+  .library-panel select {
+    height: 2.45rem;
+    min-height: 2.45rem;
+    font-size: 0.9rem;
+  }
+
+  .library-panel button[aria-expanded] {
+    min-height: 2.45rem;
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+    font-size: 0.86rem;
+  }
+
   .library-filters-popover {
-    max-height: min(56dvh, 13rem);
+    position: fixed;
+    inset: 0.5rem 6rem 0.5rem 0.5rem;
+    z-index: 85;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-height: none;
+    align-content: start;
+    overflow-y: auto;
+  }
+
+  .card-lightbox {
+    padding-right: 5.75rem;
+  }
+
+  .card-lightbox > div {
+    max-width: none;
+    min-height: calc(100dvh - 1rem);
+    align-content: stretch;
+    gap: 0.4rem;
+  }
+
+  .lightbox-header {
+    position: static;
+    padding: 0.32rem;
+  }
+
+  .lightbox-header span {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+    font-size: 0.78rem;
+  }
+
+  .lightbox-close {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .lightbox-shell {
+    grid-template-columns: minmax(220px, 0.95fr) minmax(220px, 0.8fr);
+    min-height: 0;
+    gap: 0.55rem;
+    padding: 0.55rem;
+  }
+
+  .lightbox-card-stage {
+    min-height: calc(100dvh - 6rem);
+  }
+
+  .lightbox-card-stage img {
+    width: auto;
+    max-height: calc(100dvh - 7rem) !important;
+  }
+
+  .lightbox-card-stage + div {
+    max-height: 4rem;
+    overflow-y: auto;
+  }
+
+  .lightbox-shell > div:nth-child(2) {
+    max-height: calc(100dvh - 4.75rem);
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+
+  .lightbox-shell h2 {
+    font-size: 1.55rem;
+    line-height: 1;
   }
 }
 
@@ -1446,6 +1565,14 @@ textarea {
   .library-card-actions > a {
     height: 2.75rem;
     min-height: 2.75rem;
+  }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .library-filters-popover {
+    inset: 0.5rem 6rem 0.5rem 0.5rem;
+    max-height: none;
+    padding-bottom: 0.5rem;
   }
 }
 

@@ -145,6 +145,7 @@ type DataStatus = {
   tcgPrints: number;
   tcgCardsWithPrints: number;
   pricedPrints: number;
+  volatilePricedPrints: number;
   rulesReadyCards: number;
   pendingRulesCards: number;
   lastSync: string | null;
@@ -250,6 +251,24 @@ const starterDeck: DeckState = {
   collection: {},
 };
 
+function sameDeckQuantities(
+  current: Record<string, number>,
+  template: Record<string, number>,
+) {
+  const currentEntries = Object.entries(current).filter(([, quantity]) => quantity > 0);
+  const templateEntries = Object.entries(template).filter(([, quantity]) => quantity > 0);
+  if (currentEntries.length !== templateEntries.length) return false;
+  return templateEntries.every(([number, quantity]) => current[number] === quantity);
+}
+
+function isStarterDeckState(deck: DeckState) {
+  return (
+    deck.name === starterDeck.name &&
+    sameDeckQuantities(deck.main, starterDeck.main) &&
+    sameDeckQuantities(deck.resource, starterDeck.resource)
+  );
+}
+
 function emptyDeck(): DeckState {
   return {
     name: "Untitled Deck",
@@ -316,13 +335,18 @@ function cardArtVariants(card: GundamCard) {
     tier: 0,
     officialId: card.number,
   };
-  const tcgVariants = tcgPrints.map((print, index) => ({
-    id: print.variantId,
-    label: print.variantId === "standard" ? "Standard" : `Market Print ${index + 1}`,
-    image: tcgplayerPrintImageUrl(print) ?? standardVariant.image,
-    tier: index,
-    officialId: print.officialId,
-  }));
+  let marketTier = 0;
+  const tcgVariants = tcgPrints.map((print) => {
+    const isStandard = print.variantId === "standard";
+    const tier = isStandard ? 0 : ++marketTier;
+    return {
+      id: print.variantId,
+      label: isStandard ? "Standard" : `Market Print ${tier}`,
+      image: tcgplayerPrintImageUrl(print) ?? standardVariant.image,
+      tier,
+      officialId: print.officialId,
+    };
+  });
 
   if (localVariants) {
     return localVariants.some((variant) => variant.id === "standard")
@@ -330,9 +354,14 @@ function cardArtVariants(card: GundamCard) {
       : [standardVariant, ...localVariants];
   }
 
-  return (
-    tcgVariants.length ? tcgVariants : [standardVariant]
-  );
+  if (hasLocalArt) {
+    return [
+      standardVariant,
+      ...tcgVariants.filter((variant) => variant.id !== "standard"),
+    ];
+  }
+
+  return tcgVariants.length ? tcgVariants : [standardVariant];
 }
 
 function sanitizeArtChoices(
@@ -527,7 +556,7 @@ function getArtVariant(card: GundamCard, choices: ArtChoiceMap) {
 
 function cardImagePath(card: GundamCard, variant?: CardArtVariant, size = 1500) {
   const selectedVariant = variant ?? cardArtVariants(card)[0];
-  if (selectedVariant.image.startsWith("/") && size <= 1000) {
+  if (selectedVariant.image.startsWith("/")) {
     return selectedVariant.image;
   }
 
@@ -657,6 +686,38 @@ function tcgplayerPrint(card: GundamCard, variant: CardArtVariant): TcgplayerPri
     (variant.id === "standard" ? prints.find((print) => print.variantId === "standard") : undefined) ??
     null
   );
+}
+
+function cardVariantForTcgplayerPrint(card: GundamCard, print: TcgplayerPrint) {
+  const variants = cardArtVariants(card);
+  return (
+    variants.find((variant) => variant.id === print.variantId) ??
+    variants.find((variant) => variant.officialId === print.officialId) ??
+    (print.variantId === "standard" ? variants.find((variant) => variant.id === "standard") : undefined) ??
+    null
+  );
+}
+
+function positiveMarketPrice(print: TcgplayerPrint) {
+  return typeof print.marketPrice === "number" &&
+    Number.isFinite(print.marketPrice) &&
+    print.marketPrice > 0
+    ? print.marketPrice
+    : null;
+}
+
+function hasUsableMarketPriceForPrint(card: GundamCard, print: TcgplayerPrint) {
+  const price = positiveMarketPrice(print);
+  if (price === null) return false;
+  const variant = cardVariantForTcgplayerPrint(card, print);
+  return variant ? !isVolatileMarketPrice(price, estimatePrintCost(card, variant)) : false;
+}
+
+function hasVolatileMarketPriceForPrint(card: GundamCard, print: TcgplayerPrint) {
+  const price = positiveMarketPrice(print);
+  if (price === null) return false;
+  const variant = cardVariantForTcgplayerPrint(card, print);
+  return variant ? isVolatileMarketPrice(price, estimatePrintCost(card, variant)) : false;
 }
 
 function rawTcgplayerMarketPrice(card: GundamCard, variant: CardArtVariant) {
@@ -789,6 +850,12 @@ function tcgplayerUrl(card: GundamCard, variant?: CardArtVariant) {
   } catch {
     return tcgplayerSearchUrl(card, variant);
   }
+}
+
+function tcgplayerActionLabel(card: GundamCard, variant?: CardArtVariant) {
+  return variant && hasDirectMarketProduct(tcgplayerPrint(card, variant))
+    ? "View on TCGplayer"
+    : "Search TCGplayer";
 }
 
 function colorAccentClass(color: CardColor) {
@@ -1029,17 +1096,19 @@ function databaseStatus(now?: number) {
     0,
   );
   const tcgCardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
-  const pricedPrints = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
-    (sum, prints) =>
-      sum +
-      prints.filter(
-        (print) =>
-          typeof print.marketPrice === "number" &&
-          Number.isFinite(print.marketPrice) &&
-          print.marketPrice > 0,
-      ).length,
-    0,
-  );
+  let pricedPrints = 0;
+  let volatilePricedPrints = 0;
+  Object.entries(TCGPLAYER_CARD_PRINTS).forEach(([number, prints]) => {
+    const card = CARD_BY_NUMBER.get(number);
+    if (!card) return;
+    prints.forEach((print) => {
+      if (hasUsableMarketPriceForPrint(card, print)) {
+        pricedPrints += 1;
+      } else if (hasVolatileMarketPriceForPrint(card, print)) {
+        volatilePricedPrints += 1;
+      }
+    });
+  });
   const rulesReadyCards = CARD_POOL.filter(hasDeckRulesData).length;
   const pendingRulesCards = Math.max(0, totalCards - rulesReadyCards);
   const syncAgeHours = tcgplayerSyncAgeHours(now);
@@ -1064,6 +1133,7 @@ function databaseStatus(now?: number) {
     tcgPrints,
     tcgCardsWithPrints,
     pricedPrints,
+    volatilePricedPrints,
     rulesReadyCards,
     pendingRulesCards,
     lastSync: TCGPLAYER_LAST_SYNC,
@@ -1618,6 +1688,9 @@ export function DeckBuilder({
 
   const isDialogOpen = Boolean(fallbackPanel || lightbox || mobileActionsOpen);
   const sharedPreviewLocked = Boolean(sharedDeckId && sharedStatus === "ready");
+  const sharedPreviewEditReason = "Clone this shared deck before editing";
+  const shareButtonLabel =
+    sharedPreviewLocked && shareState === "Share" ? "Copy Link" : shareState;
   const renderAllPanels = !mobileTabsEnabled;
   const renderLibraryPanel = renderAllPanels || mobileView === "library";
   const renderCardPanel = renderAllPanels || mobileView === "card";
@@ -1935,6 +2008,7 @@ export function DeckBuilder({
     [deck.collection, selectedArtVariant, selectedCard],
   );
   const typeCounts = useMemo(() => countByType(mainEntries), [mainEntries]);
+  const isStarterTemplate = useMemo(() => isStarterDeckState(deck), [deck]);
 
   const deckColors = useMemo(() => mainColorsForQuantities(deck.main), [deck.main]);
 
@@ -2676,6 +2750,31 @@ export function DeckBuilder({
   async function copyShareUrl() {
     rememberFallbackReturnFocus();
     if (shareState === "Saving") return;
+    if (sharedPreviewLocked) {
+      const shareUrl = window.location.href;
+      const copied = await writeClipboardText(shareUrl);
+      setShareState(copied ? "Copied" : "Link Ready");
+      if (!copied) {
+        setFallbackPanel({
+          title: "Share Link",
+          detail:
+            "Clipboard access was blocked. This read-only link shares decklist and selected printings only; ownership is not included.",
+          content: shareUrl,
+          href: shareUrl,
+          copyLabel: "Copy Share Link",
+        });
+      }
+      showToast(
+        copied ? "good" : "warn",
+        copied ? "Shared link copied" : "Shared link ready",
+        copied
+          ? "Current shared deck URL copied; ownership is not included."
+          : "Manual share panel opened; ownership is not included.",
+      );
+      window.setTimeout(() => setShareState("Share"), copied ? 1400 : 2600);
+      return;
+    }
+
     if (!isLegal) {
       setShareState("Fix Deck");
       const blockingNotice = notices.find((notice) => notice.tone === "bad");
@@ -2914,6 +3013,11 @@ export function DeckBuilder({
                     Permet Link
                   </h1>
                   <StatusBadge isLegal={isLegal} />
+                  {isStarterTemplate && (
+                    <span className="inline-flex h-8 items-center rounded-sm border border-[#8bdcff]/34 bg-[#1167d8]/14 px-2.5 font-display text-sm font-black uppercase text-[#d9ecff]">
+                      Starter Template
+                    </span>
+                  )}
                 </div>
                 <p className="mobile-deck-title-chip mt-1 truncate rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 px-2 py-1 font-display text-sm font-black uppercase text-[#f7f7f2]/76">
                   {deck.name}
@@ -2957,9 +3061,18 @@ export function DeckBuilder({
                     <ShoppingCart size={16} />
                   </ToolbarButton>
                   <ToolbarButton
-                    label={shareState}
-                    mobileLabel={shareState}
-                    title="Share decklist and selected printings"
+                    label={shareButtonLabel}
+                    mobileLabel={shareButtonLabel}
+                    title={
+                      sharedPreviewLocked
+                        ? "Copy current shared deck link"
+                        : "Share decklist and selected printings"
+                    }
+                    ariaLabel={
+                      sharedPreviewLocked
+                        ? "Copy current shared deck link"
+                        : "Share decklist and selected printings"
+                    }
                     onClick={copyShareUrl}
                     disabled={shareState === "Saving"}
                     showDesktopLabel
@@ -2988,23 +3101,39 @@ export function DeckBuilder({
                         <Undo2 size={16} />
                       </ToolbarButton>
                     )}
-                    <ToolbarButton label="Sample" title="Load sample deck" onClick={loadSampleDeck}>
+                    <ToolbarButton
+                      label="Sample"
+                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Load sample deck"}
+                      ariaLabel="Load sample deck"
+                      onClick={loadSampleDeck}
+                      disabled={sharedPreviewLocked}
+                    >
                       <ShieldCheck size={16} />
                     </ToolbarButton>
-                    <ToolbarButton label="New" title="Start a new deck" onClick={startNewDeck}>
+                    <ToolbarButton
+                      label="New"
+                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Start a new deck"}
+                      ariaLabel="Start a new deck"
+                      onClick={startNewDeck}
+                      disabled={sharedPreviewLocked}
+                    >
                       <RotateCcw size={16} />
                     </ToolbarButton>
-                  <ToolbarButton
+                    <ToolbarButton
                       label="Art -"
-                      title="Downgrade deck art budget"
+                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Downgrade deck art budget"}
+                      ariaLabel="Downgrade deck art budget"
                       onClick={() => stepDeckArt(-1)}
+                      disabled={sharedPreviewLocked}
                     >
                       <ChevronDown size={16} />
                     </ToolbarButton>
                     <ToolbarButton
                       label="Art +"
-                      title="Upgrade deck art budget"
+                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Upgrade deck art budget"}
+                      ariaLabel="Upgrade deck art budget"
                       onClick={() => stepDeckArt(1)}
+                      disabled={sharedPreviewLocked}
                     >
                       <ChevronUp size={16} />
                     </ToolbarButton>
@@ -3027,8 +3156,10 @@ export function DeckBuilder({
                     </ToolbarButton>
                     <ToolbarButton
                       label="Import"
-                      title="Import JSON"
+                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Import JSON"}
+                      ariaLabel="Import JSON"
                       onClick={() => importInputRef.current?.click()}
+                      disabled={sharedPreviewLocked}
                     >
                       <Upload size={16} />
                     </ToolbarButton>
@@ -3062,6 +3193,7 @@ export function DeckBuilder({
             isLegal={isLegal}
             sharedStatus={sharedStatus}
             deckName={deck.name}
+            isStarterTemplate={isStarterTemplate}
             selectedCard={selectedCard}
             openingHandCards={openingHandEntries}
             missingCost={costSummary.missingCost}
@@ -3360,6 +3492,7 @@ export function DeckBuilder({
                     resourceQuantity={deck.resource[card.number] ?? 0}
                     ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
                     missingQuantity={getMissingCopiesForCard(deck, card)}
+                    readOnly={sharedPreviewLocked}
                     eagerImage={index === 0}
                     onSelect={() => setSelectedNumber(card.number)}
                     onOpenCard={() => {
@@ -3427,6 +3560,7 @@ export function DeckBuilder({
                     adjustCollection(selectedCard.number, selectedArtVariant.id, delta)
                   }
                   onOpenCard={() => openCardLightbox(selectedCard, selectedArtVariant)}
+                  readOnly={sharedPreviewLocked}
                 />
               ) : (
                 <EmptyInspectorPanel onClear={clearLibraryFilters} />
@@ -3451,7 +3585,11 @@ export function DeckBuilder({
                 <>
               <DataIntegrityPanel status={dataStatus} />
 
-              <CostPanel summary={costSummary} onMarkOwned={markDeckOwned} />
+              <CostPanel
+                summary={costSummary}
+                onMarkOwned={markDeckOwned}
+                readOnly={sharedPreviewLocked}
+              />
 
               <LegalityPanel notices={notices} />
 
@@ -3507,6 +3645,7 @@ export function DeckBuilder({
               onOpenCard={openCardLightbox}
               eagerImages={eagerDeckThumbnails}
               onBrowseLibrary={() => changeMobileView("library")}
+              readOnly={sharedPreviewLocked}
               compact
             />
 
@@ -3522,6 +3661,7 @@ export function DeckBuilder({
               onOpenCard={openCardLightbox}
               eagerImages={false}
               onBrowseLibrary={() => changeMobileView("library")}
+              readOnly={sharedPreviewLocked}
               compact
             />
 
@@ -3551,6 +3691,8 @@ export function DeckBuilder({
         open={mobileActionsOpen}
         deckName={deck.name}
         deckNameReadOnly={sharedPreviewLocked}
+        readOnly={sharedPreviewLocked}
+        readOnlyReason={sharedPreviewEditReason}
         copyState={copyState}
         canUndo={canUndo}
         onDeckNameChange={(name) => {
@@ -3601,6 +3743,7 @@ function HudStrip({
   isLegal,
   sharedStatus,
   deckName,
+  isStarterTemplate,
   selectedCard,
   openingHandCards,
   missingCost,
@@ -3608,6 +3751,7 @@ function HudStrip({
   isLegal: boolean;
   sharedStatus: SharedStatus;
   deckName: string;
+  isStarterTemplate: boolean;
   selectedCard: GundamCard | null;
   openingHandCards: readonly GundamCard[];
   missingCost: number;
@@ -3649,6 +3793,11 @@ function HudStrip({
           <span className="rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-2 py-1 text-[#fff2bd]">
             {deckName}
           </span>
+          {isStarterTemplate && (
+            <span className="rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 py-1 text-[#d9ecff]">
+              Starter Template
+            </span>
+          )}
           {openingHandCards.length > 0 && (
             <span
               className="max-w-[24rem] truncate rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 py-1 text-[#d9ecff]"
@@ -3960,6 +4109,8 @@ function MobileActionSheet({
   open,
   deckName,
   deckNameReadOnly,
+  readOnly,
+  readOnlyReason,
   copyState,
   canUndo,
   onDeckNameChange,
@@ -3977,6 +4128,8 @@ function MobileActionSheet({
   open: boolean;
   deckName: string;
   deckNameReadOnly: boolean;
+  readOnly: boolean;
+  readOnlyReason: string;
   copyState: string;
   canUndo: boolean;
   onDeckNameChange: (name: string) => void;
@@ -4035,6 +4188,11 @@ function MobileActionSheet({
         <h2 id="mobile-action-sheet-title" className="sr-only">
           More deck actions
         </h2>
+        {readOnly && (
+          <div className="col-span-2 rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-3 py-2 font-display text-sm font-black uppercase text-[#fff2bd]">
+            Shared preview · clone to edit
+          </div>
+        )}
         <div className="col-span-2 grid grid-cols-[1fr_auto] items-start gap-2 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-2">
           <label className="grid min-w-0 gap-1">
             <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
@@ -4068,24 +4226,42 @@ function MobileActionSheet({
             <Undo2 size={16} />
           </ToolbarButton>
         )}
-        <ToolbarButton label="Sample" title="Load sample deck" onClick={onSample} className="w-full">
+        <ToolbarButton
+          label="Sample"
+          title={readOnly ? readOnlyReason : "Load sample deck"}
+          ariaLabel="Load sample deck"
+          onClick={onSample}
+          disabled={readOnly}
+          className="w-full"
+        >
           <ShieldCheck size={16} />
         </ToolbarButton>
-        <ToolbarButton label="New" title="Start a new deck" onClick={onNew} className="w-full">
+        <ToolbarButton
+          label="New"
+          title={readOnly ? readOnlyReason : "Start a new deck"}
+          ariaLabel="Start a new deck"
+          onClick={onNew}
+          disabled={readOnly}
+          className="w-full"
+        >
           <RotateCcw size={16} />
         </ToolbarButton>
         <ToolbarButton
           label="Cheaper Prints"
-          title="Downgrade deck art budget"
+          title={readOnly ? readOnlyReason : "Downgrade deck art budget"}
+          ariaLabel="Downgrade deck art budget"
           onClick={onArtDown}
+          disabled={readOnly}
           className="w-full"
         >
           <ChevronDown size={16} />
         </ToolbarButton>
         <ToolbarButton
           label="Fancier Prints"
-          title="Upgrade deck art budget"
+          title={readOnly ? readOnlyReason : "Upgrade deck art budget"}
+          ariaLabel="Upgrade deck art budget"
           onClick={onArtUp}
+          disabled={readOnly}
           className="w-full"
         >
           <ChevronUp size={16} />
@@ -4099,7 +4275,14 @@ function MobileActionSheet({
         <ToolbarButton label="Deck Image" title="Export deck image" onClick={onSheet} className="w-full">
           <Layers size={16} />
         </ToolbarButton>
-        <ToolbarButton label="Import" title="Import JSON" onClick={onImport} className="w-full">
+        <ToolbarButton
+          label="Import"
+          title={readOnly ? readOnlyReason : "Import JSON"}
+          ariaLabel="Import JSON"
+          onClick={onImport}
+          disabled={readOnly}
+          className="w-full"
+        >
           <Upload size={16} />
         </ToolbarButton>
       </div>
@@ -4300,9 +4483,12 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
     status.pendingRulesCards === 0
       ? "All catalog records are deck-ready"
       : `${status.rulesReadyCards} deck-ready cards · ${status.pendingRulesCards} catalog-only listings indexed`;
+  const volatileDetail = status.volatilePricedPrints
+    ? ` ${status.volatilePricedPrints} volatile TCGplayer prices are using local estimates.`
+    : "";
   const marketDetail = status.isMarketCoverageLimited
-    ? `${status.pricedPrints}/${status.tcgPrints} prints priced; unpriced prints use estimates or TCGplayer search fallback.`
-    : `Pricing and discovered printings should sync every ${MARKET_FRESH_HOURS}h.`;
+    ? `${status.pricedPrints}/${status.tcgPrints} prints have usable market prices; unpriced prints use estimates or TCGplayer search fallback.${volatileDetail}`
+    : `Pricing and discovered printings should sync every ${MARKET_FRESH_HOURS}h.${volatileDetail}`;
 
   return (
     <section className={panelClass()}>
@@ -4324,7 +4510,7 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
           <Spec label="Rules Ready" value={`${status.rulesReadyCards}`} />
           <Spec label="Market Cards" value={`${status.tcgCards}`} />
           <Spec label="Prints" value={`${status.tcgPrints}`} />
-          <Spec label="Priced Prints" value={`${status.pricedPrints}`} />
+          <Spec label="Usable Prices" value={`${status.pricedPrints}`} />
         </div>
 
         <div className={`rounded-sm border p-3 ${noticeClass(status.syncTone)}`}>
@@ -4405,6 +4591,7 @@ function CardLightbox({
     variants.find((variant) => variant.id === item.artVariant.id) ?? item.artVariant;
   const hasAltPrints = variants.length > 1;
   const sourceLabel = priceSourceLabel(card, artVariant);
+  const tcgplayerLabel = tcgplayerActionLabel(card, artVariant);
 
   return (
     <div
@@ -4555,10 +4742,10 @@ function CardLightbox({
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/42 bg-[#f6c542]/13 font-display text-lg font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
-              title={`Search TCGplayer for ${card.name} ${artDisplayLabel(artVariant)}`}
+              title={`${tcgplayerLabel} for ${card.name} ${artDisplayLabel(artVariant)}`}
             >
               <ShoppingCart size={17} />
-              Search TCGplayer
+              {tcgplayerLabel}
             </a>
           </div>
         </section>
@@ -4571,9 +4758,11 @@ function CardLightbox({
 function CostPanel({
   summary,
   onMarkOwned,
+  readOnly = false,
 }: {
   summary: CostSummary;
   onMarkOwned: () => void;
+  readOnly?: boolean;
 }) {
   return (
     <section className={panelClass()}>
@@ -4595,8 +4784,14 @@ function CostPanel({
         </div>
         <button
           type="button"
-          className="interactive-control mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#28d17c]/35 bg-[#28d17c]/12 font-display text-base font-black uppercase text-[#d9ffe9] hover:bg-[#28d17c]/18"
+          className={`interactive-control mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
+            readOnly
+              ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
+              : "border-[#28d17c]/35 bg-[#28d17c]/12 text-[#d9ffe9] hover:bg-[#28d17c]/18"
+          }`}
           onClick={onMarkOwned}
+          disabled={readOnly}
+          title={readOnly ? "Clone this shared deck before editing ownership" : "Mark deck prints owned"}
         >
           <WalletCards size={16} />
           Mark Deck Prints Owned
@@ -4769,6 +4964,7 @@ function ToolbarButton({
   label,
   mobileLabel,
   title,
+  ariaLabel,
   onClick,
   disabled = false,
   ariaExpanded,
@@ -4780,6 +4976,7 @@ function ToolbarButton({
   label: string;
   mobileLabel?: string;
   title: string;
+  ariaLabel?: string;
   onClick: () => void;
   disabled?: boolean;
   ariaExpanded?: boolean;
@@ -4799,7 +4996,7 @@ function ToolbarButton({
       }`}
       onClick={onClick}
       title={title}
-      aria-label={title}
+      aria-label={ariaLabel ?? title}
       aria-expanded={ariaExpanded}
       aria-controls={ariaControls}
       disabled={disabled}
@@ -5088,6 +5285,7 @@ function DeckPanel({
   entries,
   deck,
   zone,
+  readOnly = false,
   compact = false,
   eagerImages = false,
   onAdjust,
@@ -5101,6 +5299,7 @@ function DeckPanel({
   entries: DeckEntry[];
   deck: DeckState;
   zone: "main" | "resource";
+  readOnly?: boolean;
   compact?: boolean;
   eagerImages?: boolean;
   onAdjust: (zone: "main" | "resource", number: string, delta: number) => void;
@@ -5149,6 +5348,7 @@ function DeckPanel({
             const printEntries = printEntriesForCard(deck, zone, card);
             const artVariant = printEntries[0]?.variant ?? getArtVariant(card, deck.art);
             const addConstraint = zoneAddConstraint(zone, card, quantity, deck);
+            const tcgplayerLabel = tcgplayerActionLabel(card, artVariant);
             return (
               <div
                 key={card.number}
@@ -5206,8 +5406,8 @@ function DeckPanel({
                         target="_blank"
                         rel="noopener noreferrer nofollow"
                         className="interactive-control inline-flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/34 bg-[#f6c542]/10 px-2 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/16"
-                        title={`Search TCGplayer for ${card.name}`}
-                        aria-label={`Search TCGplayer for ${card.name}`}
+                        title={`${tcgplayerLabel} for ${card.name}`}
+                        aria-label={`${tcgplayerLabel} for ${card.name}`}
                       >
                         <ShoppingCart size={15} />
                         <span className="deck-tcg-label">TCG</span>
@@ -5216,15 +5416,18 @@ function DeckPanel({
                         label={card.name}
                         quantity={quantity}
                         tone={zone}
-                        incrementDisabled={Boolean(addConstraint)}
-                        decrementDisabled={quantity <= 0}
-                        incrementReason={addConstraint}
-                        decrementReason={`No ${zoneLabel(zone).toLowerCase()} copies`}
+                        incrementDisabled={readOnly || Boolean(addConstraint)}
+                        decrementDisabled={readOnly || quantity <= 0}
+                        incrementReason={readOnly ? "Clone to edit" : addConstraint}
+                        decrementReason={
+                          readOnly ? "Clone to edit" : `No ${zoneLabel(zone).toLowerCase()} copies`
+                        }
                         onIncrement={() => onAdjust(zone, card.number, 1)}
                         onDecrement={() => onAdjust(zone, card.number, -1)}
                       />
                       <IconButton
                         label={`Remove ${card.name}`}
+                        disabled={readOnly}
                         onClick={() => onRemove(zone, card.number)}
                       >
                         <Trash2 size={14} />
@@ -5251,6 +5454,7 @@ function LibraryCard({
   resourceQuantity,
   ownedQuantity,
   missingQuantity,
+  readOnly = false,
   eagerImage = false,
   onSelect,
   onOpenCard,
@@ -5266,6 +5470,7 @@ function LibraryCard({
   resourceQuantity: number;
   ownedQuantity: number;
   missingQuantity: number;
+  readOnly?: boolean;
   eagerImage?: boolean;
   onSelect: () => void;
   onOpenCard: () => void;
@@ -5292,6 +5497,7 @@ function LibraryCard({
   const deckReady = isDeckReadyCard(card);
   const cardActionLabel = `${card.name} ${card.number}`;
   const priceSummary = printPriceSummary(card, artVariant);
+  const tcgplayerLabel = tcgplayerActionLabel(card, artVariant);
   const onAdjustPrimary =
     primaryZone === "main"
       ? onAdjustMain
@@ -5428,10 +5634,10 @@ function LibraryCard({
             quantity={primaryQuantity}
             tone={primaryZone}
             dense
-            incrementDisabled={Boolean(primaryConstraint)}
-            decrementDisabled={primaryQuantity <= 0}
-            incrementReason={primaryConstraint}
-            decrementReason={`No ${zoneLabel(primaryZone).toLowerCase()} copies`}
+            incrementDisabled={readOnly || Boolean(primaryConstraint)}
+            decrementDisabled={readOnly || primaryQuantity <= 0}
+            incrementReason={readOnly ? "Clone to edit" : primaryConstraint}
+            decrementReason={readOnly ? "Clone to edit" : `No ${zoneLabel(primaryZone).toLowerCase()} copies`}
             onIncrement={() => onAdjustPrimary(1)}
             onDecrement={() => onAdjustPrimary(-1)}
           />
@@ -5474,8 +5680,8 @@ function LibraryCard({
           rel="noopener noreferrer nofollow"
           className="interactive-control inline-flex h-11 min-h-11 items-center justify-center gap-0.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-xs font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 sm:gap-1 sm:text-sm"
           onClick={(event) => event.stopPropagation()}
-          title={`Search TCGplayer for ${cardActionLabel}`}
-          aria-label={`Search TCGplayer for ${cardActionLabel}`}
+          title={`${tcgplayerLabel} for ${cardActionLabel}`}
+          aria-label={`${tcgplayerLabel} for ${cardActionLabel}`}
         >
           <ShoppingCart size={15} />
           <span className="hidden min-[380px]:inline sm:inline">TCG</span>
@@ -5521,6 +5727,7 @@ function InspectorPanel({
   ownedQuantity,
   mainQuantity,
   resourceQuantity,
+  readOnly = false,
   onAdjustMain,
   onAdjustResource,
   onStepArt,
@@ -5535,6 +5742,7 @@ function InspectorPanel({
   ownedQuantity: number;
   mainQuantity: number;
   resourceQuantity: number;
+  readOnly?: boolean;
   onAdjustMain: (delta: number) => void;
   onAdjustResource: (delta: number) => void;
   onStepArt: (delta: number) => void;
@@ -5546,6 +5754,7 @@ function InspectorPanel({
   const canDowngradeArt = canShiftCardArt(deck, card, -1);
   const canUpgradeArt = canShiftCardArt(deck, card, 1);
   const missingSelectedPrint = Math.max(0, neededQuantity - ownedQuantity);
+  const tcgplayerLabel = tcgplayerActionLabel(card, artVariant);
 
   return (
     <section className={panelClass("overflow-hidden")}>
@@ -5607,10 +5816,10 @@ function InspectorPanel({
           label="Main"
           quantity={mainQuantity}
           tone="main"
-          incrementDisabled={Boolean(mainConstraint)}
-          decrementDisabled={mainQuantity <= 0}
-          incrementReason={mainConstraint}
-          decrementReason="No main copies"
+          incrementDisabled={readOnly || Boolean(mainConstraint)}
+          decrementDisabled={readOnly || mainQuantity <= 0}
+          incrementReason={readOnly ? "Clone to edit" : mainConstraint}
+          decrementReason={readOnly ? "Clone to edit" : "No main copies"}
           onIncrement={() => onAdjustMain(1)}
           onDecrement={() => onAdjustMain(-1)}
         />
@@ -5618,10 +5827,10 @@ function InspectorPanel({
           label="Res"
           quantity={resourceQuantity}
           tone="resource"
-          incrementDisabled={Boolean(resourceConstraint)}
-          decrementDisabled={resourceQuantity <= 0}
-          incrementReason={resourceConstraint}
-          decrementReason="No resource copies"
+          incrementDisabled={readOnly || Boolean(resourceConstraint)}
+          decrementDisabled={readOnly || resourceQuantity <= 0}
+          incrementReason={readOnly ? "Clone to edit" : resourceConstraint}
+          decrementReason={readOnly ? "Clone to edit" : "No resource copies"}
           onIncrement={() => onAdjustResource(1)}
           onDecrement={() => onAdjustResource(-1)}
         />
@@ -5651,14 +5860,14 @@ function InspectorPanel({
             <button
               type="button"
               className={`interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
-                canDowngradeArt
+                !readOnly && canDowngradeArt
                   ? "border-[#a7b5c9]/25 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
                   : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
               }`}
-              disabled={!canDowngradeArt}
+              disabled={readOnly || !canDowngradeArt}
               onClick={() => onStepArt(-1)}
-              title="Downgrade art cost"
-              aria-label="Downgrade art cost"
+              title={readOnly ? "Clone to edit" : "Downgrade art cost"}
+              aria-label={readOnly ? "Clone to edit" : "Downgrade art cost"}
             >
               <ChevronDown size={15} />
               Down
@@ -5666,14 +5875,14 @@ function InspectorPanel({
             <button
               type="button"
               className={`interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
-                canUpgradeArt
+                !readOnly && canUpgradeArt
                   ? "border-[#f6c542]/40 bg-[#f6c542]/12 text-[#fff2bd] hover:bg-[#f6c542]/18"
                   : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
               }`}
-              disabled={!canUpgradeArt}
+              disabled={readOnly || !canUpgradeArt}
               onClick={() => onStepArt(1)}
-              title="Upgrade art cost"
-              aria-label="Upgrade art cost"
+              title={readOnly ? "Clone to edit" : "Upgrade art cost"}
+              aria-label={readOnly ? "Clone to edit" : "Upgrade art cost"}
             >
               <ChevronUp size={15} />
               Up
@@ -5683,8 +5892,8 @@ function InspectorPanel({
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="interactive-control col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 2xl:col-span-1"
-              title={`Search TCGplayer for ${card.name} ${artDisplayLabel(artVariant)}`}
-              aria-label={`Search TCGplayer for ${card.name} ${artDisplayLabel(artVariant)}`}
+              title={`${tcgplayerLabel} for ${card.name} ${artDisplayLabel(artVariant)}`}
+              aria-label={`${tcgplayerLabel} for ${card.name} ${artDisplayLabel(artVariant)}`}
             >
               <ShoppingCart size={15} />
               TCG
@@ -5716,12 +5925,16 @@ function InspectorPanel({
           </div>
           <IconButton
             label="Remove owned selected print"
-            disabled={ownedQuantity <= 0}
+            disabled={readOnly || ownedQuantity <= 0}
             onClick={() => onAdjustCollection(-1)}
           >
             <Minus size={14} />
           </IconButton>
-          <IconButton label="Add owned selected print" onClick={() => onAdjustCollection(1)}>
+          <IconButton
+            label="Add owned selected print"
+            disabled={readOnly}
+            onClick={() => onAdjustCollection(1)}
+          >
             <Plus size={14} />
           </IconButton>
         </div>

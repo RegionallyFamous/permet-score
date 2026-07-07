@@ -1,5 +1,8 @@
 const baseUrl = process.env.PERMET_BASE_URL ?? "http://localhost:3000";
 const samples = Number(process.env.PERMET_ROUTE_SAMPLES ?? 3);
+const baseHost = new URL(baseUrl).hostname;
+const isLocalBase = ["localhost", "127.0.0.1", "::1"].includes(baseHost);
+const writesAllowed = isLocalBase || process.env.PERMET_ROUTE_ALLOW_WRITE === "1";
 
 const sampleDeck = {
   name: "Route Timing Probe",
@@ -26,7 +29,7 @@ const sampleDeck = {
   prints: { main: {}, resource: { "R-001": { standard: 10 } } },
 };
 
-async function time(label, run) {
+async function time(label, run, expectedStatuses = [200]) {
   const timings = [];
 
   for (let index = 0; index < samples; index += 1) {
@@ -35,7 +38,7 @@ async function time(label, run) {
     const elapsed = Math.round(performance.now() - start);
     timings.push(elapsed);
 
-    if (!response.ok) {
+    if (!expectedStatuses.includes(response.status)) {
       throw new Error(`${label} returned ${response.status}`);
     }
   }
@@ -50,29 +53,46 @@ async function time(label, run) {
 }
 
 const home = await time("GET /", () => fetch(baseUrl));
-const saveStart = performance.now();
-const saveResponse = await fetch(new URL("/api/decks", baseUrl), {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(sampleDeck),
-});
+const rows = [home];
 
-if (!saveResponse.ok) {
-  throw new Error(`POST /api/decks returned ${saveResponse.status}`);
+if (writesAllowed) {
+  const saveStart = performance.now();
+  const saveResponse = await fetch(new URL("/api/decks", baseUrl), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(sampleDeck),
+  });
+
+  if (!saveResponse.ok) {
+    throw new Error(`POST /api/decks returned ${saveResponse.status}`);
+  }
+
+  const saved = await saveResponse.json();
+  const saveElapsed = Math.round(performance.now() - saveStart);
+  const load = await time(`GET /api/decks/${saved.id}`, () =>
+    fetch(new URL(`/api/decks/${saved.id}`, baseUrl)),
+  );
+  const sharedPage = await time(`GET /decks/${saved.id}`, () =>
+    fetch(new URL(`/decks/${saved.id}`, baseUrl)),
+  );
+
+  rows.push(
+    { label: "POST /api/decks", min: saveElapsed, median: saveElapsed, max: saveElapsed },
+    load,
+    sharedPage,
+  );
+} else {
+  console.log(
+    "Read-only route timing mode. Set PERMET_ROUTE_ALLOW_WRITE=1 to include production share writes.",
+  );
+  rows.push(
+    await time("GET /api/decks/routeprobe", () =>
+      fetch(new URL("/api/decks/routeprobe", baseUrl)),
+    [404]),
+    await time("GET /decks/routeprobe", () =>
+      fetch(new URL("/decks/routeprobe", baseUrl)),
+    [404]),
+  );
 }
 
-const saved = await saveResponse.json();
-const saveElapsed = Math.round(performance.now() - saveStart);
-const load = await time(`GET /api/decks/${saved.id}`, () =>
-  fetch(new URL(`/api/decks/${saved.id}`, baseUrl)),
-);
-const sharedPage = await time(`GET /decks/${saved.id}`, () =>
-  fetch(new URL(`/decks/${saved.id}`, baseUrl)),
-);
-
-console.table([
-  home,
-  { label: "POST /api/decks", min: saveElapsed, median: saveElapsed, max: saveElapsed },
-  load,
-  sharedPage,
-]);
+console.table(rows);
