@@ -1,0 +1,54 @@
+name: QA
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Strict data audit
+        run: npm run data:audit:strict
+
+      - name: Build
+        run: npm run build
+
+      - name: Route timing
+        run: |
+          npm run start > /tmp/permet-next.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl -fsS http://localhost:3000 >/dev/null; then
+              break
+            fi
+            if [ "$attempt" = "60" ]; then
+              cat /tmp/permet-next.log
+              exit 1
+            fi
+            sleep 1
+          done
+          npm run qa:routes

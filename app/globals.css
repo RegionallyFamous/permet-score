@@ -14,6 +14,11 @@
   --panel-line: rgba(247, 247, 242, 0.16);
   --font-gundam-ui: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-gundam-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --motion-fast: 130ms;
+  --motion-med: 210ms;
+  --motion-dock: 280ms;
+  --ease-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-dock: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @theme inline {
@@ -42,7 +47,7 @@ body {
 }
 
 html {
-  scroll-padding-bottom: calc(env(safe-area-inset-bottom) + 5.75rem);
+  scroll-padding-bottom: calc(env(safe-area-inset-bottom) + 7.5rem);
 }
 
 h1,
@@ -238,6 +243,10 @@ textarea {
   overflow: hidden;
 }
 
+.start-build-panel {
+  min-height: 10.25rem;
+}
+
 .hero-surface::before {
   content: "";
   pointer-events: none;
@@ -279,7 +288,7 @@ textarea {
 }
 
 .hand-strip {
-  animation: hand-lock 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: hand-lock 360ms var(--ease-dock) both;
 }
 
 .virtual-card {
@@ -312,7 +321,6 @@ textarea {
 
 .virtual-card:hover {
   border-color: rgba(139, 220, 255, 0.5);
-  filter: saturate(1.04) contrast(1.02);
   transform: translateY(-3px);
   box-shadow:
     0 14px 28px rgba(0, 0, 0, 0.34),
@@ -401,7 +409,8 @@ textarea {
   box-shadow:
     inset 0 0 20px rgba(17, 103, 216, 0.24),
     0 0 20px rgba(17, 103, 216, 0.12);
-  animation: scan-frame-glow 4.8s ease-in-out infinite;
+  opacity: 0.72;
+  animation: none;
 }
 
 .scan-frame::after {
@@ -423,6 +432,12 @@ textarea {
   animation: scan-frame-sweep 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.scan-frame:hover::before,
+.scan-frame:focus-visible::before,
+.active-scan-card .scan-frame::before {
+  animation: scan-frame-glow 1.4s ease-in-out 1 both;
+}
+
 .permet-sweep {
   animation: permet-sweep 4.5s ease-in-out infinite;
   will-change: transform;
@@ -434,14 +449,33 @@ textarea {
   animation: none;
 }
 
+.active-scan-card .permet-scanline {
+  animation: scan-frame-sweep 880ms var(--ease-snap) both;
+}
+
 .interactive-control {
   position: relative;
   overflow: hidden;
+  touch-action: manipulation;
   transition:
-    border-color 130ms ease,
-    background-color 130ms ease,
-    box-shadow 130ms ease,
-    color 130ms ease;
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    scale var(--motion-fast) var(--ease-snap),
+    translate var(--motion-fast) var(--ease-snap);
+}
+
+.interactive-control.absolute {
+  position: absolute;
+}
+
+.interactive-control.fixed {
+  position: fixed;
+}
+
+.interactive-control.sticky {
+  position: sticky;
 }
 
 .interactive-control::after {
@@ -468,6 +502,12 @@ textarea {
 
 .interactive-control:not(:disabled):active {
   box-shadow: inset 0 0 0 1px rgba(246, 197, 66, 0.2);
+  translate: 0 1px;
+  scale: 0.988;
+}
+
+.interactive-control:not(:disabled):active svg {
+  transform: translateY(0.5px);
 }
 
 .interactive-control:focus-visible,
@@ -551,13 +591,18 @@ textarea {
 }
 
 .status-badge::after {
-  content: none;
+  content: "";
   pointer-events: none;
   position: absolute;
   inset: -2px;
-  background: conic-gradient(from var(--pulse-angle), transparent, rgba(139, 220, 255, 0.45), transparent 32%);
-  opacity: 0.26;
+  background: conic-gradient(from var(--pulse-angle), transparent, rgba(246, 197, 66, 0.36), rgba(227, 27, 35, 0.26), transparent 32%);
+  opacity: 0;
   z-index: 0;
+  animation: none;
+}
+
+.status-badge-alert::after {
+  opacity: 0.22;
   animation: badge-scan 4.6s linear infinite;
 }
 
@@ -573,7 +618,9 @@ textarea {
     border-color 170ms ease,
     background-color 170ms ease,
     box-shadow 170ms ease,
-    filter 170ms ease;
+    filter 170ms ease,
+    scale var(--motion-fast) var(--ease-snap),
+    translate var(--motion-fast) var(--ease-snap);
 }
 
 .cockpit-tab::after {
@@ -592,6 +639,11 @@ textarea {
 
 .cockpit-tab:hover {
   filter: brightness(1.08);
+}
+
+.cockpit-tab:active {
+  translate: 0 1px;
+  scale: 0.988;
 }
 
 .cockpit-tab-active::after {
@@ -624,14 +676,29 @@ textarea {
   width: auto;
   max-height: min(76dvh, 32rem);
   overflow-y: auto;
+  animation: sheet-dock var(--motion-dock) var(--ease-dock) both;
 }
 
 .fallback-panel-shell {
   max-height: calc(100dvh - env(safe-area-inset-bottom) - 6.5rem);
+  animation: panel-dock var(--motion-dock) var(--ease-dock) both;
 }
 
 .fallback-panel-body {
   overscroll-behavior: contain;
+}
+
+.lightbox-variant-nav {
+  opacity: 0.78;
+  transition:
+    opacity var(--motion-fast) ease,
+    transform var(--motion-fast) var(--ease-snap),
+    border-color var(--motion-fast) ease;
+}
+
+.lightbox-card-stage:hover .lightbox-variant-nav,
+.lightbox-variant-nav:focus-visible {
+  opacity: 1;
 }
 
 .interactive-row {
@@ -653,6 +720,18 @@ textarea {
     box-shadow:
       0 16px 30px rgba(0, 0, 0, 0.3),
       0 0 26px rgba(139, 220, 255, 0.12);
+  }
+
+  .library-result:hover .library-card-image {
+    transform: scale(1.018);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .preview-card:hover,
+  .virtual-card:hover,
+  .metric-tile:hover {
+    transform: none;
   }
 }
 
@@ -695,6 +774,41 @@ textarea {
 
 .type-meter-fill:hover {
   filter: brightness(1.18);
+}
+
+.deck-progress-rail > span,
+.mobile-progress-chip > i {
+  transition: transform 260ms var(--ease-snap);
+}
+
+.mobile-progress-chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.mobile-progress-chip > i {
+  pointer-events: none;
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  transform-origin: left center;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.quantity-readout[data-pulse] {
+  animation: quantity-pulse 420ms var(--ease-snap) both;
+}
+
+.mini-stepper:has(button:active) output,
+.quantity-stepper:has(button:active) output {
+  border-color: rgba(246, 197, 66, 0.54);
+  background-color: rgba(246, 197, 66, 0.14);
+}
+
+.mobile-tab-badge {
+  display: none;
+  pointer-events: none;
 }
 
 .workbench-scroll {
@@ -757,7 +871,8 @@ textarea {
 .quantity-stepper output {
   transition:
     border-color 130ms ease,
-    background-color 130ms ease;
+    background-color 130ms ease,
+    transform 130ms var(--ease-snap);
 }
 
 .quantity-stepper:focus-within output {
@@ -790,6 +905,7 @@ textarea {
     overflow: hidden;
   }
 
+  .app-content-shell > section:has(.start-build-panel),
   .app-content-shell > section:has(.shared-deck-banner) {
     grid-template-rows: auto minmax(0, 1fr);
   }
@@ -808,14 +924,49 @@ textarea {
   }
 
   .library-panel,
-  #card-panel,
   #deck-panel,
-  #stats-panel {
+  .inspector-stack {
     max-height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     scrollbar-color: rgba(139, 220, 255, 0.34) rgba(5, 6, 10, 0.38);
     scrollbar-width: thin;
+  }
+
+  .library-panel::-webkit-scrollbar,
+  #deck-panel::-webkit-scrollbar,
+  .inspector-stack::-webkit-scrollbar {
+    width: 0.625rem;
+  }
+
+  .library-panel::-webkit-scrollbar-track,
+  #deck-panel::-webkit-scrollbar-track,
+  .inspector-stack::-webkit-scrollbar-track {
+    background: rgba(5, 6, 10, 0.42);
+  }
+
+  .library-panel::-webkit-scrollbar-thumb,
+  #deck-panel::-webkit-scrollbar-thumb,
+  .inspector-stack::-webkit-scrollbar-thumb {
+    border: 2px solid rgba(5, 6, 10, 0.42);
+    background: rgba(139, 220, 255, 0.46);
+  }
+
+  #card-panel,
+  #stats-panel {
+    max-height: none;
+    overflow: visible;
+  }
+
+  #card-panel {
+    position: relative;
+    z-index: 2;
+  }
+
+  #stats-panel {
+    position: relative;
+    z-index: 1;
   }
 
   .deck-entry > div {
@@ -825,6 +976,70 @@ textarea {
   .deck-entry .h-28.w-20 {
     width: 5.75rem;
     height: 8.05rem;
+  }
+}
+
+@media (min-width: 1280px) and (max-height: 760px) {
+  header .brand-logo-lockup {
+    width: 10rem;
+  }
+
+  header .status-badge,
+  header .mobile-deck-title-chip {
+    height: 1.55rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+    font-size: 0.75rem;
+  }
+
+  .app-content-shell > header > div {
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+  }
+
+  header .brand-status-cluster {
+    gap: 0.4rem;
+  }
+
+  header .mobile-deck-title-chip {
+    margin-top: 0.15rem;
+  }
+
+  header p {
+    line-height: 1.05;
+  }
+
+  .short-cockpit-deck-name {
+    height: 2.35rem;
+  }
+
+  .short-cockpit-actions .interactive-control {
+    height: 2.35rem;
+    min-height: 2.35rem;
+    font-size: 0.82rem;
+  }
+
+  .workbench-grid {
+    gap: 0.75rem;
+  }
+
+  .library-panel .sticky {
+    padding: 0.5rem;
+  }
+
+  .panel-title {
+    padding: 0.55rem 0.75rem;
+  }
+
+  .panel-title h2,
+  .library-panel h2 {
+    font-size: 1.25rem;
+  }
+}
+
+@media (min-width: 1280px) and (max-height: 680px) {
+  .hud-strip {
+    display: none !important;
   }
 }
 
@@ -1135,6 +1350,43 @@ textarea {
   }
 }
 
+@keyframes quantity-pulse {
+  0% {
+    transform: scale(1);
+    border-color: rgba(246, 197, 66, 0.24);
+  }
+  42% {
+    transform: scale(1.045);
+    border-color: rgba(246, 197, 66, 0.82);
+    background-color: rgba(246, 197, 66, 0.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes sheet-dock {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes panel-dock {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes toast-dock {
   from {
     opacity: 0;
@@ -1199,12 +1451,18 @@ textarea {
   .cockpit-tab-active,
   .gcg-panel:hover,
   .interactive-control:not(:disabled):hover,
+  .interactive-control:not(:disabled):active,
   .interactive-row:hover,
   .metric-tile:hover,
   .preview-card:hover,
   .virtual-card:hover,
-  .virtual-card:active {
+  .virtual-card:active,
+  .cockpit-tab:active,
+  .quantity-readout[data-pulse],
+  .hand-strip {
     transform: none;
+    translate: 0;
+    scale: 1;
   }
 }
 
@@ -1226,7 +1484,7 @@ textarea {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding-bottom: calc(env(safe-area-inset-bottom) + 5.75rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 7.5rem);
     scrollbar-width: none;
   }
 
@@ -1257,7 +1515,7 @@ textarea {
     position: fixed;
     top: max(calc(env(safe-area-inset-top) + 10.25rem), 12.75rem);
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom) + 5.25rem);
+    bottom: calc(env(safe-area-inset-bottom) + 7.5rem);
     left: 0.75rem;
     z-index: 55;
     max-height: none;
@@ -1289,14 +1547,14 @@ textarea {
 
   .library-card-actions {
     grid-template-columns: minmax(7.5rem, 1fr) 2.75rem 2.75rem 2.75rem;
-    scroll-margin-bottom: calc(env(safe-area-inset-bottom) + 5.75rem);
+    scroll-margin-bottom: calc(env(safe-area-inset-bottom) + 7.5rem);
   }
 
   .deck-card-actions,
   .deck-entry,
   .library-result,
   .mobile-nav-clearance {
-    scroll-margin-bottom: calc(env(safe-area-inset-bottom) + 5.75rem);
+    scroll-margin-bottom: calc(env(safe-area-inset-bottom) + 7.5rem);
   }
 
   .fallback-panel-textarea {
@@ -1330,6 +1588,10 @@ textarea {
 }
 
 @media (max-width: 360px) {
+  .start-build-panel {
+    display: none;
+  }
+
   header .w-32 {
     width: 8.75rem;
   }
@@ -1352,11 +1614,12 @@ textarea {
   .library-result h3 {
     font-size: 1.14rem;
     line-height: 1.04;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
   }
 
   .library-result .library-card-rules {
-    display: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
   }
 
   .short-cockpit-deck-name {
@@ -1421,6 +1684,10 @@ textarea {
 }
 
 @media (max-height: 480px) and (orientation: landscape) {
+  .start-build-panel {
+    display: none;
+  }
+
   .mobile-cockpit-nav {
     position: fixed !important;
     inset: 0 0 0 auto !important;
@@ -1441,9 +1708,31 @@ textarea {
     gap: 0.375rem;
   }
 
+  .mobile-cockpit-nav .mobile-progress-strip {
+    display: none !important;
+  }
+
   .mobile-cockpit-nav .cockpit-tab {
+    position: relative;
     height: min(4.2rem, calc((100dvh - 2rem) / 4));
     font-size: 0.75rem;
+  }
+
+  .mobile-cockpit-nav .mobile-tab-badge {
+    position: absolute;
+    top: 0.18rem;
+    right: 0.18rem;
+    display: grid;
+    min-width: 1.35rem;
+    height: 1rem;
+    place-items: center;
+    border: 1px solid rgba(246, 197, 66, 0.34);
+    border-radius: 2px;
+    background: rgba(5, 6, 10, 0.84);
+    padding: 0 0.18rem;
+    font-size: 0.55rem;
+    line-height: 1;
+    color: #fff2bd;
   }
 
   .mobile-cockpit-nav .cockpit-tab svg {
@@ -1713,7 +2002,7 @@ textarea {
   .library-result h3 {
     font-size: 1.08rem;
     line-height: 1.04;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
   }
 
   .library-result p {
@@ -1722,7 +2011,8 @@ textarea {
   }
 
   .library-result .library-card-rules {
-    display: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
   }
 
   .library-card-actions {

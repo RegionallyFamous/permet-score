@@ -1,16 +1,20 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   sanitizeSharedDeck,
   validateSharedDeckPayload,
 } from "../../deck-share-schema";
-import { saveSharedDeck } from "../../share-store";
+import {
+  incrementSharedDeckDailyCounter,
+  saveSharedDeck,
+} from "../../share-store";
 
 export const runtime = "nodejs";
 
 const MAX_SHARE_BODY_BYTES = 64 * 1024;
 const SHARE_RATE_LIMIT_MAX = 180;
 const SHARE_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const SHARE_DAILY_RATE_LIMIT_MAX = 600;
 const shareRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function randomShareId() {
@@ -33,6 +37,29 @@ function shareRateKey(request: Request) {
     forwardedFor ??
     request.headers.get("x-real-ip") ??
     "anonymous"
+  );
+}
+
+function shareRateKeyHash(request: Request) {
+  return createHash("sha256").update(shareRateKey(request)).digest("hex");
+}
+
+function utcDayKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function secondsUntilNextUtcDay(date = new Date()) {
+  return Math.max(
+    1,
+    Math.ceil(
+      (Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate() + 1,
+      ) -
+        date.getTime()) /
+        1000,
+    ),
   );
 }
 
@@ -123,6 +150,29 @@ export async function POST(request: Request) {
         status: 429,
         headers: { "Retry-After": String(retryAfter) },
       },
+    );
+  }
+
+  try {
+    const dailyLimit = await incrementSharedDeckDailyCounter(
+      shareRateKeyHash(request),
+      utcDayKey(),
+      SHARE_DAILY_RATE_LIMIT_MAX,
+    );
+    if (!dailyLimit.allowed) {
+      return NextResponse.json(
+        { error: "Daily shared deck limit reached. Try again tomorrow." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(secondsUntilNextUtcDay()) },
+        },
+      );
+    }
+  } catch (error) {
+    console.error("Shared deck rate limit check failed", error);
+    return NextResponse.json(
+      { error: "Could not save this deck right now." },
+      { status: 503 },
     );
   }
 

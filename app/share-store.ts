@@ -13,7 +13,16 @@ type SharedDeckRecord = {
   deck: SharedDeckState;
 };
 
+type ShareRateLimitRecord = {
+  version: 1;
+  keyHash: string;
+  day: string;
+  count: number;
+  updatedAt: string;
+};
+
 const LOCAL_SHARE_DIR = join(process.cwd(), ".local", "shared-decks");
+const LOCAL_RATE_LIMIT_DIR = join(process.cwd(), ".local", "share-rate-limits");
 
 function hasBlobCredentials() {
   return Boolean(
@@ -33,6 +42,10 @@ function assertShareStoreConfigured() {
 
 function blobPath(id: string) {
   return `decks/${id}.json`;
+}
+
+function rateLimitBlobPath(keyHash: string, day: string) {
+  return `rate-limits/share/${day}/${keyHash}.json`;
 }
 
 function recordForDeck(id: string, deck: SharedDeckState): SharedDeckRecord {
@@ -61,6 +74,84 @@ async function loadLocalDeck(id: string) {
   } catch {
     return null;
   }
+}
+
+async function readLocalDailyCounter(keyHash: string, day: string) {
+  try {
+    const text = await readFile(join(LOCAL_RATE_LIMIT_DIR, day, `${keyHash}.json`), "utf8");
+    return JSON.parse(text) as Partial<ShareRateLimitRecord>;
+  } catch {
+    return null;
+  }
+}
+
+async function writeLocalDailyCounter(record: ShareRateLimitRecord) {
+  await mkdir(join(LOCAL_RATE_LIMIT_DIR, record.day), { recursive: true });
+  await writeFile(
+    join(LOCAL_RATE_LIMIT_DIR, record.day, `${record.keyHash}.json`),
+    JSON.stringify(record, null, 2),
+    "utf8",
+  );
+}
+
+async function readBlobDailyCounter(keyHash: string, day: string) {
+  const result = await get(rateLimitBlobPath(keyHash, day), { access: "private" });
+  if (result?.statusCode !== 200) return null;
+
+  try {
+    const text = await new Response(result.stream).text();
+    return JSON.parse(text) as Partial<ShareRateLimitRecord>;
+  } catch {
+    return null;
+  }
+}
+
+async function writeBlobDailyCounter(record: ShareRateLimitRecord) {
+  await put(rateLimitBlobPath(record.keyHash, record.day), JSON.stringify(record), {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+  });
+}
+
+export async function incrementSharedDeckDailyCounter(
+  keyHash: string,
+  day: string,
+  limit: number,
+) {
+  assertShareStoreConfigured();
+
+  const current = shouldUseLocalShareStore()
+    ? await readLocalDailyCounter(keyHash, day)
+    : await readBlobDailyCounter(keyHash, day);
+  const count = current?.day === day && current.keyHash === keyHash ? current.count ?? 0 : 0;
+
+  if (count >= limit) {
+    return {
+      allowed: false,
+      count,
+    };
+  }
+
+  const next: ShareRateLimitRecord = {
+    version: 1,
+    keyHash,
+    day,
+    count: count + 1,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (shouldUseLocalShareStore()) {
+    await writeLocalDailyCounter(next);
+  } else {
+    await writeBlobDailyCounter(next);
+  }
+
+  return {
+    allowed: true,
+    count: next.count,
+  };
 }
 
 export async function saveSharedDeck(id: string, deck: SharedDeckState) {

@@ -15,6 +15,7 @@
     "qa:visual": "node scripts/visual-qa.mjs",
     "qa:workflow": "node scripts/workflow-qa.mjs",
     "qa:deployed": "node scripts/deployed-qa.mjs",
+    "share:prune": "node scripts/prune-share-records.mjs --qa-only --days=7",
     "mcp:site": "node scripts/mcp-site-inspector.mjs",
     "data:audit": "node scripts/audit-data.mjs",
     "data:audit:strict": "node scripts/audit-data.mjs --strict",

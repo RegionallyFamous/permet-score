@@ -92,6 +92,46 @@ async function assertDeck404() {
   assertIncludes(text, "Open Builder", "shared deck 404");
 }
 
+async function assertShareCanary() {
+  const deck = {
+    name: `Deployed QA ${Date.now()}`,
+    main: { "ST01-001": 1 },
+    resource: { "R-001": 1 },
+    art: {},
+    prints: {
+      main: { "ST01-001": { standard: 1 } },
+      resource: { "R-001": { standard: 1 } },
+    },
+  };
+  const saveResponse = await fetchWithTimeout(absolute("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deck),
+  });
+  if (saveResponse.status !== 201) {
+    throw new Error(`POST /api/decks returned ${saveResponse.status}, expected 201`);
+  }
+  const saved = await saveResponse.json();
+  if (!saved.id || !saved.shareUrl) {
+    throw new Error("Share canary response did not include id/shareUrl.");
+  }
+
+  const apiResponse = await fetchWithTimeout(absolute(`/api/decks/${saved.id}`));
+  if (apiResponse.status !== 200) {
+    throw new Error(`GET /api/decks/${saved.id} returned ${apiResponse.status}`);
+  }
+  const apiJson = await apiResponse.json();
+  if (apiJson.deck?.name !== deck.name) {
+    throw new Error("Share canary API payload did not round-trip.");
+  }
+
+  const { text } = await read(saved.shareUrl);
+  assertIncludes(text, deck.name, "share canary deck page");
+  assertIncludes(text, 'name="robots" content="noindex, follow"', "share noindex");
+
+  return saved.id;
+}
+
 async function assertRedirects() {
   for (const origin of redirectOrigins) {
     const response = await fetchWithTimeout(absolute("/", origin), {
@@ -128,6 +168,7 @@ await assertJsonAsset("/manifest.webmanifest", (manifest) => {
   }
 });
 await assertDeck404();
+const shareCanaryId = await assertShareCanary();
 await assertRedirects();
 
 assertMatch(baseUrl, /^https?:\/\//, "base URL");
@@ -138,6 +179,7 @@ console.log(
       baseUrl,
       expectedCanonical,
       redirectOrigins,
+      shareCanaryId,
     },
     null,
     2,

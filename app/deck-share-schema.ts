@@ -145,8 +145,8 @@ function validateQuantities(value: unknown, zone: "main" | "resource") {
     quantities[number] = quantity;
   }
 
-  if (totalCards(quantities) !== maxTotal) {
-    return `${zone} deck must contain exactly ${maxTotal} cards.`;
+  if (totalCards(quantities) > maxTotal) {
+    return `${zone} deck cannot contain more than ${maxTotal} cards.`;
   }
 
   return quantities;
@@ -322,6 +322,9 @@ export function validateSharedDeckPayload(value: unknown): string | null {
   if (mainDeckColors(main).size > MAX_MAIN_COLORS) {
     return `Main deck cannot use more than ${MAX_MAIN_COLORS} colors.`;
   }
+  if (totalCards(main) + totalCards(resource) === 0) {
+    return "Shared deck must contain at least one card.";
+  }
 
   const deckNumbers = new Set([...Object.keys(main), ...Object.keys(resource)]);
   return (
@@ -338,7 +341,7 @@ export function sanitizeSharedDeck(value: unknown): SharedDeckState | null {
   const deckNumbers = new Set([...Object.keys(main), ...Object.keys(resource)]);
   const art = sanitizeArtChoices(maybeDeck.art, deckNumbers);
 
-  if (totalCards(main) !== MAIN_TARGET || totalCards(resource) !== RESOURCE_TARGET) {
+  if (totalCards(main) + totalCards(resource) === 0) {
     return null;
   }
 

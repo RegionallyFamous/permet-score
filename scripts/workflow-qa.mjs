@@ -315,7 +315,13 @@ async function assertInvalidShareBlocked(page) {
     { timeout: 15000 },
   );
   await page.getByRole("button", { name: "Share" }).click();
-  await page.getByText("Share blocked").waitFor({ timeout: 15000 });
+  await page.getByText("Share needs cards").waitFor({ timeout: 15000 });
+
+  await page.getByPlaceholder("Name, #, text").fill("ST01-001");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  await page.locator(".library-result").first().getByLabel(/Add one/i).click();
+  await page.getByRole("button", { name: "Share" }).click();
+  await page.locator(".toast-shell").getByText(/Share link|Shared link|Deck link/i).waitFor({ timeout: 15000 });
 }
 
 async function assertLocalStorageDropsNonDeckCards(page) {
@@ -417,6 +423,104 @@ async function assertImportRejectsEmptyObject(page) {
   }
 }
 
+async function writeClipboard(page, text) {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(baseUrl).origin,
+  });
+  await page.evaluate(async (value) => navigator.clipboard.writeText(value), text);
+}
+
+async function assertJsonImportDoesNotFallThroughToText(page) {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Load sample deck" }).click();
+  const startingName = await page.locator("input").first().inputValue();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "not-a-deck.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ note: "ST01-001" })),
+  });
+  await page.getByText("Import failed").waitFor({ timeout: 15000 });
+  const currentName = await page.locator("input").first().inputValue();
+  if (currentName !== startingName) {
+    throw new Error(`Non-deck JSON fell through to text import as "${currentName}"`);
+  }
+}
+
+async function assertPasteConfirmsBeforeReplacingDeck(page) {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Load sample deck" }).click();
+  const startingName = await page.locator("input").first().inputValue();
+  await writeClipboard(page, "Name: Tiny Paste\nMain\n1 ST01-001\nResource\n1 R-001");
+
+  const dialogPromise = page.waitForEvent("dialog", { timeout: 15000 }).then(async (dialog) => {
+    const message = dialog.message();
+    await dialog.dismiss();
+    return message;
+  });
+  const [message] = await Promise.all([
+    dialogPromise,
+    page.getByRole("button", { name: "Paste decklist" }).click(),
+  ]);
+
+  if (!/replace the current deck/i.test(String(message))) {
+    throw new Error(`Paste replacement dialog was not explicit: ${message}`);
+  }
+
+  const currentName = await page.locator("input").first().inputValue();
+  if (currentName !== startingName) {
+    throw new Error(`Paste replaced deck after dismissing confirmation: ${currentName}`);
+  }
+}
+
+async function assertPlainTextImportPreservesPrintIds(page) {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await writeClipboard(
+    page,
+    "Name: Alt Text Import\nMain\n1 ST01-001 Gundam [Alt Print 1] [print:p1]\nResource\n1 R-001 Resource [print:standard]",
+  );
+  await page.getByRole("button", { name: "Paste decklist" }).click();
+  await page.waitForFunction(
+    () => {
+      const stored = window.localStorage.getItem("gundam-deck-builder-v1");
+      if (!stored) return false;
+      const deck = JSON.parse(stored);
+      return deck.prints?.main?.["ST01-001"]?.p1 === 1;
+    },
+    null,
+    { timeout: 15000 },
+  );
+}
+
+async function assertStartPanelVisibleOnMobile(page) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
+  await gotoApp(page);
+
+  const audit = await page.evaluate(() => {
+    const panel = document.querySelector(".start-build-panel");
+    const browse = Array.from(document.querySelectorAll("button")).find((button) =>
+      /^Browse$/i.test(button.textContent?.trim() ?? ""),
+    );
+    if (!panel || !browse) return { height: 0, hitText: "", browseVisible: false };
+    const panelRect = panel.getBoundingClientRect();
+    const browseRect = browse.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      browseRect.left + browseRect.width / 2,
+      browseRect.top + browseRect.height / 2,
+    );
+    return {
+      height: panelRect.height,
+      hitText: hit?.closest("button")?.textContent?.trim() ?? "",
+      browseVisible: browseRect.width > 0 && browseRect.height > 0,
+    };
+  });
+
+  if (audit.height < 120 || !audit.browseVisible || audit.hitText !== "Browse") {
+    throw new Error(`Start panel is collapsed or covered on mobile: ${JSON.stringify(audit)}`);
+  }
+}
+
 async function assertEmptyDeckArtButtonsExplainNoOp(page) {
   await gotoApp(page);
   await page.getByRole("button", { name: "Start a new deck" }).click();
@@ -506,6 +610,46 @@ async function assertNoResultSearchShowsRecovery(page) {
   }
 }
 
+async function assertLibraryMicroInteractions(page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await gotoApp(page);
+
+  await page.getByPlaceholder("Name, #, text").fill("gundam blue");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  await page.locator(".library-result").first().getByRole("heading", { name: /Gundam/i }).waitFor({
+    timeout: 15000,
+  });
+
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await page.waitForFunction(
+    () => document.querySelector('input[aria-label="Search cards"]')?.value === "",
+    null,
+    { timeout: 15000 },
+  );
+
+  await page.getByPlaceholder("Name, #, text").fill("ST01-002");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  await page.locator(".library-result").first().getByRole("heading").click();
+  const selectedPressed = await page
+    .locator(".library-result")
+    .first()
+    .getByRole("button", { name: /Select/i })
+    .getAttribute("aria-pressed");
+  if (selectedPressed !== "true") {
+    throw new Error(`Library row click did not select first result: ${selectedPressed}`);
+  }
+
+  await page.locator(".library-result").first().dblclick();
+  await page.getByRole("dialog", { name: /Gundam/i }).waitFor({ timeout: 15000 });
+  const beforePrint = await page.locator('[role="dialog"] [aria-pressed="true"]').first().getAttribute("aria-label");
+  await page.keyboard.press("ArrowRight");
+  const afterPrint = await page.locator('[role="dialog"] [aria-pressed="true"]').first().getAttribute("aria-label");
+  if (!afterPrint || afterPrint === beforePrint) {
+    throw new Error(`Lightbox next print did not change active print: ${beforePrint} -> ${afterPrint}`);
+  }
+  await page.keyboard.press("Escape");
+}
+
 async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   const deck = legalDeck({ name: "Workflow QA Shared Preview" });
   const saveResponse = await fetch(absoluteUrl("/api/decks"), {
@@ -577,7 +721,8 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   const desktopLockedControls = [
     [page.getByRole("button", { name: "Start a new deck" }), "new deck button"],
     [page.getByRole("button", { name: "Load sample deck" }), "sample deck button"],
-    [page.getByRole("button", { name: "Import JSON" }), "import button"],
+    [page.getByRole("button", { name: "Import deck" }), "import button"],
+    [page.getByRole("button", { name: "Paste decklist" }), "paste button"],
     [page.getByRole("button", { name: "Mark Deck Prints Owned" }), "mark-owned button"],
     [page.getByRole("button", { name: "Add owned selected print" }), "owned increment button"],
     [page.getByRole("button", { name: "Remove owned selected print" }), "owned decrement button"],
@@ -639,7 +784,8 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   const mobileLockedControls = [
     [page.getByRole("button", { name: "Start a new deck" }), "mobile new deck button"],
     [page.getByRole("button", { name: "Load sample deck" }), "mobile sample deck button"],
-    [page.getByRole("button", { name: "Import JSON" }), "mobile import button"],
+    [page.getByRole("button", { name: "Import deck" }), "mobile import button"],
+    [page.getByRole("button", { name: "Paste decklist" }), "mobile paste button"],
     [page.getByRole("button", { name: "Downgrade deck art budget" }), "mobile art down button"],
     [page.getByRole("button", { name: "Upgrade deck art budget" }), "mobile art up button"],
   ];
@@ -814,10 +960,10 @@ async function assertMarketCatalogOnlyCardsAreLabeled(page) {
   }
 
   await page.getByRole("button", { name: /Filters/i }).click();
-  await page.getByLabel("Build").selectOption("Deck Ready");
+  await page.getByLabel("Card Data").selectOption("Deck Ready");
   await page.getByText("No cards found").waitFor({ timeout: 15000 });
 
-  await page.getByLabel("Build").selectOption("Catalog Only");
+  await page.getByLabel("Card Data").selectOption("Catalog Only");
   await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
 }
 
@@ -840,6 +986,13 @@ async function assertMobileLibraryLayout(page) {
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
   await gotoApp(page);
 
+  await page.getByRole("tab", { name: "Show Library" }).click();
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute("aria-label") === "Search cards",
+    null,
+    { timeout: 15000 },
+  );
+
   const tcgClipping = await page
     .locator('.library-result a[aria-label*="TCGplayer"]')
     .first()
@@ -854,6 +1007,7 @@ async function assertMobileLibraryLayout(page) {
 
   const mobileActionAudit = await page.evaluate(() => {
     const pagerNext = document.querySelector('button[aria-label="Next library page"]');
+    const pageSize = document.querySelector('select[aria-label="Cards per library page"]');
     const actionTargets = Array.from(
       document.querySelectorAll(
         '.library-card-actions button[aria-label^="Select"], .library-card-actions button[aria-label*="details from action row"], .library-card-actions a[aria-label*="TCGplayer"]',
@@ -867,19 +1021,51 @@ async function assertMobileLibraryLayout(page) {
       };
     });
     const pagerRect = pagerNext?.getBoundingClientRect();
+    const pageSizeRect = pageSize?.getBoundingClientRect();
     return {
       pagerVisible: Boolean(pagerRect && pagerRect.width > 0 && pagerRect.height > 0),
+      pageSizeVisible: Boolean(
+        pageSizeRect && pageSizeRect.width >= 44 && pageSizeRect.height >= 44,
+      ),
       narrowActions: actionTargets.filter((target) => target.width < 44 || target.height < 44),
     };
   });
   if (!mobileActionAudit.pagerVisible) {
     throw new Error("320px library pagination next button is not visible");
   }
+  if (!mobileActionAudit.pageSizeVisible) {
+    throw new Error("320px library page-size selector is not visible");
+  }
   if (mobileActionAudit.narrowActions.length) {
     throw new Error(
       `320px library actions below 44px: ${JSON.stringify(mobileActionAudit.narrowActions)}`,
     );
   }
+
+  await page.getByPlaceholder("Name, #, text").fill("ST01-001");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  const addMain = page
+    .getByRole("button", { name: /Add one Gundam ST01-001 main copy/i })
+    .first();
+  const addBox = await addMain.boundingBox();
+  if (!addBox) throw new Error("Missing mobile add button box for press-hold test");
+  await page.mouse.move(addBox.x + addBox.width / 2, addBox.y + addBox.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(900);
+  await page.mouse.up();
+  await page.waitForFunction(
+    () => {
+      const deck = JSON.parse(window.localStorage.getItem("gundam-deck-builder-v1") ?? "{}");
+      return deck.main?.["ST01-001"] === 4;
+    },
+    null,
+    { timeout: 15000 },
+  );
+  const pulseVisible = await page.locator('[data-pulse]').first().isVisible().catch(() => false);
+  if (!pulseVisible) {
+    throw new Error("Press-hold add did not leave a visible pulse marker");
+  }
+  await page.getByPlaceholder("Name, #, text").fill("");
 
   await page.getByRole("button", { name: /Filters/i }).click();
   await page.locator(".library-filters-popover").waitFor({ timeout: 15000 });
@@ -1227,6 +1413,7 @@ async function main() {
     await page.waitForFunction(() => !document.querySelector("#mobile-action-sheet"));
     await assertMobileActionSheetFocusTrap(page);
 
+    await assertStartPanelVisibleOnMobile(page);
     await assertMobileLibraryLayout(page);
     await assertShortMobileControlsClearNav(page);
 
@@ -1249,10 +1436,14 @@ async function main() {
     await assertLocalStorageCapsLongDeckNames(desktop);
     await assertLibraryRowAddsFromBlankDeck(desktop);
     await assertImportRejectsEmptyObject(desktop);
+    await assertJsonImportDoesNotFallThroughToText(desktop);
+    await assertPasteConfirmsBeforeReplacingDeck(desktop);
+    await assertPlainTextImportPreservesPrintIds(desktop);
     await assertEmptyDeckArtButtonsExplainNoOp(desktop);
     await assertSelectedCardArtButtonsTrackMixedPrints(desktop);
     await assertSampleDeckClearsLibraryFilters(desktop);
     await assertNoResultSearchShowsRecovery(desktop);
+    await assertLibraryMicroInteractions(desktop);
     await assertSharedPreviewRequiresCloneBeforeEditing(desktop);
     await assertAccessibleControlNames(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
