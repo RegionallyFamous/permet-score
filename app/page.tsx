@@ -1168,7 +1168,9 @@ function hasRulesValue(value: string) {
 }
 
 function hasDeckRulesData(card: GundamCard) {
-  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") return true;
+  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") {
+    return hasRulesValue(card.text);
+  }
   if (!MAIN_TYPES.includes(card.type)) return false;
   return (
     hasRulesValue(card.color) &&
@@ -1197,7 +1199,7 @@ function canCardEnterZone(zone: Zone, card: GundamCard) {
     return MAIN_TYPES.includes(card.type) && hasDeckRulesData(card);
   }
 
-  return RESOURCE_TYPES.includes(card.type);
+  return RESOURCE_TYPES.includes(card.type) && hasDeckRulesData(card);
 }
 
 function isDeckReadyCard(card: GundamCard) {
@@ -2751,7 +2753,7 @@ export function DeckBuilder({
     rememberFallbackReturnFocus();
     if (shareState === "Saving") return;
     if (sharedPreviewLocked) {
-      const shareUrl = window.location.href;
+      const shareUrl = new URL(window.location.pathname, window.location.origin).toString();
       const copied = await writeClipboardText(shareUrl);
       setShareState(copied ? "Copied" : "Link Ready");
       if (!copied) {
@@ -2996,10 +2998,10 @@ export function DeckBuilder({
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
               <div className="flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
-                  src="/permet-link-logo-header.webp"
+                  src="/permet-link-logo.png"
                   alt="Permet Link"
-                  width={960}
-                  height={384}
+                  width={1983}
+                  height={793}
                   decoding="async"
                   className="h-auto w-full object-contain object-left"
                 />
@@ -3026,7 +3028,7 @@ export function DeckBuilder({
             </div>
 
             <div className="grid min-w-0 flex-1 gap-2 xl:grid-cols-1 min-[1500px]:grid-cols-[minmax(220px,1fr)_auto]">
-              <label className="block min-w-0 md:col-span-1">
+              <label className="hidden min-w-0 md:col-span-1 xl:block">
                 <span className="sr-only">Deck name</span>
                 <input
                   value={deck.name}
@@ -3039,7 +3041,7 @@ export function DeckBuilder({
                 />
               </label>
               <div className="relative short-cockpit-actions">
-                <div className="grid grid-cols-4 gap-2 xl:flex xl:justify-end">
+                <div className="grid grid-cols-4 gap-2 xl:flex xl:flex-wrap xl:justify-end">
                   <ToolbarButton
                     label={`Draw ${OPENING_HAND_SIZE}`}
                     mobileLabel={`Draw ${OPENING_HAND_SIZE}`}
@@ -3092,7 +3094,7 @@ export function DeckBuilder({
                     {mobileActionsOpen ? <X size={16} /> : <MoreHorizontal size={16} />}
                   </ToolbarButton>
                   <div className="hidden xl:contents">
-                    {canUndo && (
+                      {canUndo && (
                       <ToolbarButton
                         label="Undo"
                         title="Restore previous deck state"
@@ -3100,25 +3102,27 @@ export function DeckBuilder({
                       >
                         <Undo2 size={16} />
                       </ToolbarButton>
-                    )}
+                      )}
                     <ToolbarButton
                       label="Sample"
                       title={sharedPreviewLocked ? sharedPreviewEditReason : "Load sample deck"}
-                      ariaLabel="Load sample deck"
-                      onClick={loadSampleDeck}
-                      disabled={sharedPreviewLocked}
-                    >
-                      <ShieldCheck size={16} />
-                    </ToolbarButton>
+                        ariaLabel="Load sample deck"
+                        onClick={loadSampleDeck}
+                        disabled={sharedPreviewLocked}
+                        showDesktopLabel
+                      >
+                        <ShieldCheck size={16} />
+                      </ToolbarButton>
                     <ToolbarButton
                       label="New"
                       title={sharedPreviewLocked ? sharedPreviewEditReason : "Start a new deck"}
-                      ariaLabel="Start a new deck"
-                      onClick={startNewDeck}
-                      disabled={sharedPreviewLocked}
-                    >
-                      <RotateCcw size={16} />
-                    </ToolbarButton>
+                        ariaLabel="Start a new deck"
+                        onClick={startNewDeck}
+                        disabled={sharedPreviewLocked}
+                        showDesktopLabel
+                      >
+                        <RotateCcw size={16} />
+                      </ToolbarButton>
                     <ToolbarButton
                       label="Art -"
                       title={sharedPreviewLocked ? sharedPreviewEditReason : "Downgrade deck art budget"}
@@ -3137,10 +3141,14 @@ export function DeckBuilder({
                     >
                       <ChevronUp size={16} />
                     </ToolbarButton>
-                    <ToolbarButton label={copyState} title="Copy deck list" onClick={copyDeckList}>
+                    <ToolbarButton
+                      label={copyState}
+                      title="Copy deck list"
+                      onClick={copyDeckList}
+                    >
                       <Clipboard size={16} />
                     </ToolbarButton>
-                    <ToolbarButton
+                      <ToolbarButton
                       label="Backup"
                       title="Export backup JSON"
                       onClick={exportJson}
@@ -3157,12 +3165,13 @@ export function DeckBuilder({
                     <ToolbarButton
                       label="Import"
                       title={sharedPreviewLocked ? sharedPreviewEditReason : "Import JSON"}
-                      ariaLabel="Import JSON"
-                      onClick={() => importInputRef.current?.click()}
-                      disabled={sharedPreviewLocked}
-                    >
-                      <Upload size={16} />
-                    </ToolbarButton>
+                        ariaLabel="Import JSON"
+                        onClick={() => importInputRef.current?.click()}
+                        disabled={sharedPreviewLocked}
+                        showDesktopLabel
+                      >
+                        <Upload size={16} />
+                      </ToolbarButton>
                   </div>
                 </div>
               </div>
@@ -3764,6 +3773,18 @@ function HudStrip({
         : sharedStatus === "missing"
           ? "Offline"
           : "Local";
+  const handTitle = openingHandCards
+    .map((card) => `${card.name} ${card.number}`)
+    .join(", ");
+  const handLabel =
+    openingHandCards.length > 0
+      ? `Hand ${openingHandCards
+          .slice(0, 2)
+          .map((card) => card.name)
+          .join(" / ")}${
+          openingHandCards.length > 2 ? ` +${openingHandCards.length - 2}` : ""
+        }`
+      : "";
 
   return (
     <div className="mt-1 hidden overflow-hidden rounded-sm border border-[#2e8cff]/25 bg-[#07111d]/70 shadow-lg shadow-[#03111f]/30 backdrop-blur xl:block">
@@ -3801,9 +3822,9 @@ function HudStrip({
           {openingHandCards.length > 0 && (
             <span
               className="max-w-[24rem] truncate rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 py-1 text-[#d9ecff]"
-              title={`Opening hand: ${openingHandCards.map((card) => card.number).join(", ")}`}
+              title={`Opening hand: ${handTitle}`}
             >
-              Hand {openingHandCards.map((card) => card.number).join(" / ")}
+              {handLabel}
             </span>
           )}
           <span className="rounded-sm border border-[#a7b5c9]/20 bg-black/24 px-2 py-1 text-[#f7f7f2]/70">
@@ -5325,9 +5346,9 @@ function DeckPanel({
         }`}
       >
         {entries.length === 0 ? (
-          <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-[#f7f7f2]/15 text-center">
+          <div className="empty-deck-bay flex h-32 flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-[#8bdcff]/22 bg-[#06111d]/32 text-center">
             <span className="font-display text-lg font-black uppercase text-[#f7f7f2]/68">
-              No {zoneLabel(zone).toLowerCase()} deck cards
+              {zoneLabel(zone)} Bay Empty
             </span>
             <span className="text-sm font-black text-[#8bdcff]/70">
               0/{target} occupied
@@ -5757,15 +5778,15 @@ function InspectorPanel({
   const tcgplayerLabel = tcgplayerActionLabel(card, artVariant);
 
   return (
-    <section className={panelClass("overflow-hidden")}>
-      <div className={`border-b border-[#a7b5c9]/20 p-3 ${colorAccentClass(card.color)}`}>
-        <div className="flex items-start gap-3">
-          <button
-            type="button"
-            className="scan-frame interactive-control relative h-48 w-[137px] shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black text-left shadow-2xl shadow-black/40 sm:h-56 sm:w-40 xl:h-52 xl:w-[149px] 2xl:h-60 2xl:w-[171px]"
-            onClick={onOpenCard}
-            aria-label={`Open large view of selected card ${card.name} ${card.number}`}
-            title={`Open large view of selected card ${card.name} ${card.number}`}
+      <section className={panelClass("overflow-hidden")}>
+        <div className={`border-b border-[#a7b5c9]/20 p-3 ${colorAccentClass(card.color)}`}>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
+            <button
+              type="button"
+              className="selected-card-scan scan-frame interactive-control relative shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black text-left shadow-2xl shadow-black/40"
+              onClick={onOpenCard}
+              aria-label={`Open large view of selected card ${card.name} ${card.number}`}
+              title={`Open large view of selected card ${card.name} ${card.number}`}
           >
             <img
               src={cardImagePath(card, artVariant, 1000)}
@@ -5780,14 +5801,14 @@ function InspectorPanel({
             />
             <span className="absolute inset-x-0 bottom-0 z-10 inline-flex h-7 items-center justify-center gap-1 bg-black/72 font-display text-sm font-black uppercase text-[#d9ecff]">
               <Maximize2 size={12} />
-              View
-            </span>
-          </button>
-          <div className="min-w-0">
-            <div className="flex flex-wrap gap-1.5">
-              <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
-                {card.number}
+                View
               </span>
+            </button>
+            <div className="w-full min-w-0 text-center sm:text-left">
+              <div className="flex flex-wrap justify-center gap-1.5 sm:justify-start">
+                <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
+                  {card.number}
+                </span>
               <span className={`rounded-sm border px-2 py-1 text-sm font-black ${colorChipClass(card.color)}`}>
                 {card.color}
               </span>

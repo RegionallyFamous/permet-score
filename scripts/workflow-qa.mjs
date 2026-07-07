@@ -114,6 +114,26 @@ async function assertShareRejectsPendingRulesCards() {
   }
 }
 
+async function assertShareRejectsGeneratedResourceCards() {
+  const deck = legalDeck({
+    name: "Workflow QA Generated Resource",
+    resource: { "R-002": 10 },
+    prints: { main: {}, resource: { "R-002": { standard: 10 } } },
+  });
+
+  const saveResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deck),
+  });
+
+  if (saveResponse.status !== 400) {
+    throw new Error(
+      `Expected generated-resource share POST to return 400, got ${saveResponse.status}`,
+    );
+  }
+}
+
 async function assertShareRejectsOrphanArt() {
   const deck = legalDeck({
     name: "Workflow QA Orphan Art",
@@ -494,6 +514,22 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
     }
   }
 
+  const copiedSharedLinks = [];
+  await page.exposeFunction("captureSharedPreviewClipboard", (value) => {
+    copiedSharedLinks.push(value);
+  });
+  await page.goto(absoluteUrl(`/decks/${saved.id}?debug=1#frag`).toString(), {
+    waitUntil: "networkidle",
+  });
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (value) => globalThis.captureSharedPreviewClipboard(value),
+      },
+    });
+  });
+
   let sharedPreviewPostCount = 0;
   await page.route("**/api/decks", async (route) => {
     if (route.request().method() === "POST") {
@@ -512,6 +548,12 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   await page.unroute("**/api/decks");
   if (sharedPreviewPostCount !== 0) {
     throw new Error("Shared preview Share posted a new /api/decks record instead of copying the current URL");
+  }
+  const expectedShareUrl = absoluteUrl(`/decks/${saved.id}`).toString();
+  if (copiedSharedLinks.at(-1) !== expectedShareUrl) {
+    throw new Error(
+      `Shared preview copied ${copiedSharedLinks.at(-1)}, expected clean URL ${expectedShareUrl}`,
+    );
   }
 
   const desktopLockedControls = [
@@ -1105,6 +1147,7 @@ async function assertShortMobileControlsClearNav(page) {
 async function main() {
   await assertSharePreservesPrints();
   await assertShareRejectsPendingRulesCards();
+  await assertShareRejectsGeneratedResourceCards();
   await assertShareRejectsOrphanArt();
   await assertShareRejectsNonJsonContentType();
   await assertShareRejectsIncompleteDecksAndMalformedQuantities();

@@ -250,6 +250,30 @@ try {
     }
 
     if (viewport.width < 1280) {
+      await page.getByRole("tab", { name: "Show Card" }).click();
+      const cardAudit = await readAudit(page);
+      if (cardAudit.overflow > 1 || cardAudit.overflowOffenders.length) {
+        throw new Error(
+          `${viewport.name} card: overflow ${cardAudit.overflow}px ${JSON.stringify(
+            cardAudit.overflowOffenders,
+          )}`,
+        );
+      }
+      if (viewport.width <= 480) {
+        const selectedScan = await page.locator(".selected-card-scan").boundingBox();
+        const expectedWidth =
+          viewport.height <= 700
+            ? Math.min(viewport.width * 0.5, 180)
+            : Math.min(viewport.width * 0.68, 230);
+        if (!selectedScan || selectedScan.width < expectedWidth) {
+          throw new Error(
+            `${viewport.name} card: selected scan too small ${Math.round(
+              selectedScan?.width ?? 0,
+            )}px, expected at least ${Math.round(expectedWidth)}px`,
+          );
+        }
+      }
+
       await page.getByRole("tab", { name: "Show Deck" }).click();
       const deckAudit = await readAudit(page);
       if (deckAudit.overflow > 1 || deckAudit.overflowOffenders.length) {

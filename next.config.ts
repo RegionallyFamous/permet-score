@@ -9,6 +9,8 @@ function canonicalHostRedirect(host: string) {
   };
 }
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   devIndicators: false,
@@ -34,7 +36,7 @@ const nextConfig: NextConfig = {
           "form-action 'self'",
           "frame-ancestors 'none'",
           "object-src 'none'",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+          `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"} blob:`,
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data: blob: https://product-images.tcgplayer.com https://tcgplayer-cdn.tcgplayer.com https://*.tcgplayer.com",
           "font-src 'self' data:",
@@ -47,13 +49,16 @@ const nextConfig: NextConfig = {
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      ...(isProduction
+        ? [{ key: "Strict-Transport-Security", value: "max-age=63072000" }]
+        : []),
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "X-Frame-Options", value: "DENY" },
     ];
     const staticAssetHeaders = [
       {
         key: "Cache-Control",
-        value: "public, max-age=86400, stale-while-revalidate=604800",
+        value: "public, max-age=604800, stale-while-revalidate=2592000",
       },
       {
         key: "Vercel-CDN-Cache-Control",
@@ -75,10 +80,6 @@ const nextConfig: NextConfig = {
         headers: staticAssetHeaders,
       },
       {
-        source: "/permet-link-logo-header.webp",
-        headers: staticAssetHeaders,
-      },
-      {
         source: "/permet-link-logo-fallback.webp",
         headers: staticAssetHeaders,
       },
@@ -92,6 +93,14 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/favicon.png",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/icon-192.png",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/icon-512.png",
         headers: staticAssetHeaders,
       },
       {

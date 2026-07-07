@@ -216,6 +216,34 @@ function generatedCardFromProduct(row) {
   };
 }
 
+function compareOptionalNumber(a, b) {
+  const left = safeNumber(a);
+  const right = safeNumber(b);
+  if (left === undefined && right === undefined) return 0;
+  if (left === undefined) return 1;
+  if (right === undefined) return -1;
+  return left - right;
+}
+
+function compareProducts(a, b) {
+  const altDelta = Number(isAltProduct(a)) - Number(isAltProduct(b));
+  if (altDelta !== 0) return altDelta;
+
+  const nameDelta = String(a.product_name).localeCompare(String(b.product_name));
+  if (nameDelta !== 0) return nameDelta;
+
+  const setDelta = String(a.set_name).localeCompare(String(b.set_name));
+  if (setDelta !== 0) return setDelta;
+
+  const rarityDelta = String(a.rarity).localeCompare(String(b.rarity));
+  if (rarityDelta !== 0) return rarityDelta;
+
+  const tcgProductDelta = compareOptionalNumber(a.tcg_product_id, b.tcg_product_id);
+  if (tcgProductDelta !== 0) return tcgProductDelta;
+
+  return compareOptionalNumber(a.product_id, b.product_id);
+}
+
 async function marketBridgeGet(path) {
   const url = new URL(path, marketOrigin);
   const maxAttempts = 5;
@@ -433,11 +461,7 @@ function generateFiles({
   const seenGenerated = new Set();
 
   for (const [number, groupedProducts] of [...productsByNumber.entries()].sort()) {
-    groupedProducts.sort((a, b) => {
-      const altDelta = Number(isAltProduct(a)) - Number(isAltProduct(b));
-      if (altDelta !== 0) return altDelta;
-      return String(a.product_name).localeCompare(String(b.product_name));
-    });
+    groupedProducts.sort(compareProducts);
 
     const localVariants = localVariantsByNumber[number] ?? [];
     printRecords[number] = groupedProducts.map((product, index) => {
@@ -479,6 +503,7 @@ function generateFiles({
       color: card.color,
       level: card.level,
       cost: card.cost,
+      text: card.text,
       artIds,
     };
   }
@@ -522,6 +547,7 @@ export type DeckValidationCard = {
   color: string;
   level: string;
   cost: string;
+  text: string;
   artIds: readonly string[];
 };
 

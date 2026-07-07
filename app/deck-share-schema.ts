@@ -65,7 +65,9 @@ function hasRulesValue(value: string) {
 }
 
 function hasDeckRulesData(card: DeckValidationCard) {
-  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") return true;
+  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") {
+    return hasRulesValue(card.text);
+  }
   if (!MAIN_TYPES.includes(card.type)) return false;
   return (
     hasRulesValue(card.color) &&
@@ -77,7 +79,7 @@ function hasDeckRulesData(card: DeckValidationCard) {
 function canCardEnterZone(zone: "main" | "resource", card: DeckValidationCard) {
   return zone === "main"
     ? MAIN_TYPES.includes(card.type) && hasDeckRulesData(card)
-    : RESOURCE_TYPES.includes(card.type);
+    : RESOURCE_TYPES.includes(card.type) && hasDeckRulesData(card);
 }
 
 function mainDeckColors(main: QuantityMap) {

@@ -10,6 +10,8 @@ type SharedDeckPageProps = {
   }>;
 };
 
+export const revalidate = 300;
+
 function isValidShareId(id: string) {
   return /^[A-Za-z0-9_-]{8,48}$/.test(id);
 }
@@ -45,9 +47,9 @@ export async function generateMetadata({
       type: "website",
       images: [
         {
-          url: "/permet-link-logo-header.webp",
-          width: 960,
-          height: 384,
+          url: "/permet-link-logo.png",
+          width: 1983,
+          height: 793,
           alt: "Permet Link",
         },
       ],
@@ -56,7 +58,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: ["/permet-link-logo-header.webp"],
+      images: ["/permet-link-logo.png"],
     },
   };
 }

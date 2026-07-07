@@ -35,9 +35,9 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/permet-link-logo-header.webp",
-        width: 960,
-        height: 384,
+        url: "/permet-link-logo.png",
+        width: 1983,
+        height: 793,
         alt: "Permet Link",
       },
     ],
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Permet Link",
     description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
-    images: ["/permet-link-logo-header.webp"],
+    images: ["/permet-link-logo.png"],
   },
   appleWebApp: {
     capable: true,

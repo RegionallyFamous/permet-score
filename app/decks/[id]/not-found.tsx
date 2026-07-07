@@ -15,10 +15,10 @@ export default function SharedDeckNotFound() {
         }}
       >
         <Image
-          src="/permet-link-logo-header.webp"
+          src="/permet-link-logo.png"
           alt="Permet Link"
-          width={640}
-          height={256}
+          width={1983}
+          height={793}
           className="h-auto w-48 object-contain object-left sm:w-64"
         />
         <section className="gcg-panel overflow-hidden rounded-sm border border-[#e31b23]/35 bg-[#07090d]/96 shadow-2xl shadow-black/40">
