@@ -90,7 +90,7 @@ async function assertSharePreservesPrints() {
   }
 }
 
-async function assertShareDropsPendingRulesCards() {
+async function assertShareRejectsPendingRulesCards() {
   const deck = legalDeck({
     name: "Workflow QA Pending Rules",
     main: { "EB01-001": 4, ...legalMain },
@@ -107,36 +107,14 @@ async function assertShareDropsPendingRulesCards() {
     body: JSON.stringify(deck),
   });
 
-  if (!saveResponse.ok) {
-    throw new Error(`POST /api/decks pending-rules probe failed with ${saveResponse.status}`);
-  }
-
-  const saved = await saveResponse.json();
-  await assertLocalShareFileExists(saved.id);
-  const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
-  if (!loadResponse.ok) {
-    throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
-  }
-
-  const loaded = await loadResponse.json();
-  if (loaded.deck?.main?.["EB01-001"]) {
-    throw new Error("Shared deck sanitizer kept pending-rules EB01-001 in the main deck");
-  }
-
-  if (loaded.deck?.art?.["EB01-001"]) {
-    throw new Error("Shared deck sanitizer kept orphan art for pending-rules EB01-001");
-  }
-
-  if (loaded.deck?.prints?.main?.["EB01-001"]) {
-    throw new Error("Shared deck sanitizer kept orphan prints for pending-rules EB01-001");
-  }
-
-  if (loaded.deck?.resource?.["R-001"] !== 10) {
-    throw new Error("Shared deck sanitizer dropped valid resource cards");
+  if (saveResponse.status !== 400) {
+    throw new Error(
+      `Expected pending-rules share POST to return 400, got ${saveResponse.status}`,
+    );
   }
 }
 
-async function assertSharePrunesOrphanArt() {
+async function assertShareRejectsOrphanArt() {
   const deck = legalDeck({
     name: "Workflow QA Orphan Art",
     main: { "EB01-001": 4, ...legalMain },
@@ -156,24 +134,8 @@ async function assertSharePrunesOrphanArt() {
     body: JSON.stringify(deck),
   });
 
-  if (!saveResponse.ok) {
-    throw new Error(`POST /api/decks orphan-art probe failed with ${saveResponse.status}`);
-  }
-
-  const saved = await saveResponse.json();
-  await assertLocalShareFileExists(saved.id);
-  const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
-  if (!loadResponse.ok) {
-    throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
-  }
-
-  const loaded = await loadResponse.json();
-  if (loaded.deck?.main?.["EB01-001"] || loaded.deck?.art?.["EB01-001"]) {
-    throw new Error("Shared deck sanitizer kept orphan pending-rules card/art data");
-  }
-
-  if (loaded.deck?.art?.["ST01-001"] !== "p1") {
-    throw new Error("Shared deck sanitizer dropped valid surviving art choice");
+  if (saveResponse.status !== 400) {
+    throw new Error(`Expected orphan-art share POST to return 400, got ${saveResponse.status}`);
   }
 }
 
@@ -277,7 +239,7 @@ async function assertShareRejectsOversizedPayloads() {
   }
 }
 
-async function assertSharePreservesPreferredAltWhenTrimmingPrints() {
+async function assertShareRejectsOverflowingPrintQuantities() {
   const deck = legalDeck({
     name: "Workflow QA Alt Trim",
     art: { "ST01-001": "p7" },
@@ -292,23 +254,10 @@ async function assertSharePreservesPreferredAltWhenTrimmingPrints() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(deck),
   });
-  if (!saveResponse.ok) {
-    throw new Error(`POST /api/decks alt-trim probe failed with ${saveResponse.status}`);
-  }
-
-  const saved = await saveResponse.json();
-  await assertLocalShareFileExists(saved.id);
-  const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
-  if (!loadResponse.ok) {
-    throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
-  }
-
-  const loaded = await loadResponse.json();
-  if (loaded.deck?.art?.["ST01-001"] !== "p7") {
-    throw new Error("Shared deck sanitizer dropped preferred p7 art choice");
-  }
-  if (loaded.deck?.prints?.main?.["ST01-001"]?.p7 !== 4) {
-    throw new Error("Shared deck sanitizer trimmed preferred p7 print copies first");
+  if (saveResponse.status !== 400) {
+    throw new Error(
+      `Expected overflowing print quantities to return 400, got ${saveResponse.status}`,
+    );
   }
 }
 
@@ -942,12 +891,12 @@ async function assertShortMobileControlsClearNav(page) {
 
 async function main() {
   await assertSharePreservesPrints();
-  await assertShareDropsPendingRulesCards();
-  await assertSharePrunesOrphanArt();
+  await assertShareRejectsPendingRulesCards();
+  await assertShareRejectsOrphanArt();
   await assertShareRejectsNonJsonContentType();
   await assertShareRejectsIncompleteDecksAndMalformedQuantities();
   await assertShareRejectsOversizedPayloads();
-  await assertSharePreservesPreferredAltWhenTrimmingPrints();
+  await assertShareRejectsOverflowingPrintQuantities();
 
   const browser = await launchBrowser();
   try {

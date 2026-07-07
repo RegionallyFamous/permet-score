@@ -1,11 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { sanitizeSharedDeck } from "../../deck-share-schema";
+import {
+  sanitizeSharedDeck,
+  validateSharedDeckPayload,
+} from "../../deck-share-schema";
 import { saveSharedDeck } from "../../share-store";
 
 export const runtime = "nodejs";
 
 const MAX_SHARE_BODY_BYTES = 64 * 1024;
+const SHARE_RATE_LIMIT_MAX = 60;
+const SHARE_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const shareRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function randomShareId() {
   return randomBytes(8).toString("base64url");
@@ -18,6 +24,37 @@ function hasJsonContentType(request: Request) {
     mediaType === "application/json" ||
     (mediaType.startsWith("application/") && mediaType.endsWith("+json"))
   );
+}
+
+function shareRateKey(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return (
+    request.headers.get("cf-connecting-ip") ??
+    forwardedFor ??
+    request.headers.get("x-real-ip") ??
+    "anonymous"
+  );
+}
+
+function checkShareRateLimit(request: Request) {
+  const now = Date.now();
+  const key = shareRateKey(request);
+  const current = shareRateBuckets.get(key);
+
+  if (!current || current.resetAt <= now) {
+    shareRateBuckets.set(key, {
+      count: 1,
+      resetAt: now + SHARE_RATE_LIMIT_WINDOW_MS,
+    });
+    return null;
+  }
+
+  if (current.count >= SHARE_RATE_LIMIT_MAX) {
+    return Math.max(1, Math.ceil((current.resetAt - now) / 1000));
+  }
+
+  current.count += 1;
+  return null;
 }
 
 async function readRequestTextWithinLimit(request: Request) {
@@ -60,6 +97,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const retryAfter = checkShareRateLimit(request);
+  if (retryAfter !== null) {
+    return NextResponse.json(
+      { error: "Too many shared decks. Try again shortly." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfter) },
+      },
+    );
+  }
+
   try {
     const bodyText = await readRequestTextWithinLimit(request);
     if (bodyText === null) {
@@ -71,6 +119,11 @@ export async function POST(request: Request) {
     body = JSON.parse(bodyText);
   } catch {
     return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+  }
+
+  const validationError = validateSharedDeckPayload(body);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
   const deck = sanitizeSharedDeck(body);

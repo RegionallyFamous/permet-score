@@ -745,7 +745,18 @@ function tcgplayerSearchUrl(card: GundamCard, variant?: CardArtVariant) {
 
 function tcgplayerUrl(card: GundamCard, variant?: CardArtVariant) {
   if (!variant) return tcgplayerSearchUrl(card);
-  return tcgplayerPrint(card, variant)?.url ?? tcgplayerSearchUrl(card, variant);
+  const printUrl = tcgplayerPrint(card, variant)?.url;
+  if (!printUrl) return tcgplayerSearchUrl(card, variant);
+
+  try {
+    const url = new URL(printUrl);
+    const isAllowedHost =
+      url.protocol === "https:" &&
+      (url.hostname === "www.tcgplayer.com" || url.hostname === "tcgplayer.com");
+    return isAllowedHost ? url.toString() : tcgplayerSearchUrl(card, variant);
+  } catch {
+    return tcgplayerSearchUrl(card, variant);
+  }
 }
 
 function colorAccentClass(color: CardColor) {
@@ -1548,7 +1559,7 @@ export function DeckBuilder({
   const renderCardPanel = renderAllPanels || mobileView === "card";
   const renderStatsPanel = renderAllPanels || mobileView === "stats";
   const renderDeckPanel = renderAllPanels || mobileView === "deck";
-  const eagerDeckThumbnails = statusTimestamp !== null && !mobileTabsEnabled;
+  const eagerDeckThumbnails = false;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
@@ -3265,7 +3276,7 @@ export function DeckBuilder({
                     resourceQuantity={deck.resource[card.number] ?? 0}
                     ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
                     missingQuantity={getMissingCopiesForCard(deck, card)}
-                    eagerImage={statusTimestamp !== null && index < 3}
+                    eagerImage={index === 0}
                     onSelect={() => setSelectedNumber(card.number)}
                     onOpenCard={() => {
                       setSelectedNumber(card.number);
@@ -3300,7 +3311,7 @@ export function DeckBuilder({
             )}
           </section>
 
-          <aside className="contents xl:grid xl:gap-4">
+          <div className="contents xl:grid xl:gap-4">
             <div
               id="card-panel"
               role={mobileTabsEnabled ? "tabpanel" : "region"}
@@ -3386,7 +3397,7 @@ export function DeckBuilder({
                 </>
               )}
             </div>
-          </aside>
+          </div>
 
           <div
             id="deck-panel"
@@ -3424,7 +3435,7 @@ export function DeckBuilder({
               onAdjust={adjustCard}
               onRemove={removeCard}
               onOpenCard={openCardLightbox}
-              eagerImages={eagerDeckThumbnails}
+              eagerImages={false}
               compact
             />
 
@@ -3789,12 +3800,6 @@ function MobileCockpitNav({
   onChange: (view: MobileView, options?: MobileViewChangeOptions) => void;
 }) {
   function handleTabKey(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (tabsEnabled && event.key === "Tab" && !event.shiftKey) {
-      event.preventDefault();
-      onChange(mobileViews[index].id, { focusPanel: true });
-      return;
-    }
-
     const lastIndex = mobileViews.length - 1;
     const nextIndex =
       event.key === "ArrowRight"
@@ -4051,7 +4056,6 @@ function ToastViewport({
             type="button"
             className="interactive-control inline-flex min-h-11 shrink-0 items-center rounded-sm border border-current/35 bg-current/10 px-3 font-display text-base font-black uppercase"
             onClick={onAction}
-            tabIndex={-1}
           >
             {toast.actionLabel}
           </button>
@@ -4063,7 +4067,6 @@ function ToastViewport({
             onClick={onDismiss}
             aria-label="Dismiss status"
             title="Dismiss status"
-            tabIndex={-1}
           >
             <X size={15} />
           </button>
@@ -5045,7 +5048,7 @@ function DeckPanel({
                     onOpen={() => onOpenCard(card, artVariant)}
                     size="deck"
                     badge={`${quantity}`}
-                    eager={eagerImages && index < 4}
+                    eager={eagerImages && index < 2}
                     openLabel={`Open large view of ${zoneLabel(zone)} deck card ${card.name} ${card.number}`}
                   />
                   <div className="grid min-w-0 content-start gap-2">

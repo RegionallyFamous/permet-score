@@ -51,6 +51,10 @@ function validationCard(number: string) {
   return DECK_VALIDATION_CARDS[number];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function parseCost(card: DeckValidationCard) {
   const cost = Number(card.cost);
   return Number.isFinite(cost) ? cost : null;
@@ -107,6 +111,42 @@ function sanitizeQuantities(
   return next;
 }
 
+function validateQuantities(value: unknown, zone: "main" | "resource") {
+  if (!isRecord(value)) return `${zone} deck must be an object.`;
+
+  const maxCopies = zone === "main" ? MAX_MAIN_COPIES : RESOURCE_TARGET;
+  const maxTotal = zone === "main" ? MAIN_TARGET : RESOURCE_TARGET;
+  const quantities: QuantityMap = {};
+
+  for (const [number, quantity] of Object.entries(value)) {
+    const card = validationCard(number);
+    if (!card || !canCardEnterZone(zone, card)) {
+      return `${number} cannot be shared in the ${zone} zone.`;
+    }
+
+    if (
+      typeof quantity !== "number" ||
+      !Number.isFinite(quantity) ||
+      !Number.isInteger(quantity) ||
+      quantity <= 0
+    ) {
+      return `${number} has an invalid ${zone} quantity.`;
+    }
+
+    if (quantity > maxCopies) {
+      return `${number} exceeds the ${zone} copy limit.`;
+    }
+
+    quantities[number] = quantity;
+  }
+
+  if (totalCards(quantities) !== maxTotal) {
+    return `${zone} deck must contain exactly ${maxTotal} cards.`;
+  }
+
+  return quantities;
+}
+
 function sanitizeArtChoices(
   value: unknown,
   allowedNumbers: ReadonlySet<string>,
@@ -123,6 +163,22 @@ function sanitizeArtChoices(
       })
       .map(([number, artId]) => [number, artId as string]),
   );
+}
+
+function validateArtChoices(value: unknown, allowedNumbers: ReadonlySet<string>) {
+  if (value === undefined) return null;
+  if (!isRecord(value)) return "Art choices must be an object.";
+
+  for (const [number, artId] of Object.entries(value)) {
+    if (!allowedNumbers.has(number)) return `${number} has an orphan art choice.`;
+    if (typeof artId !== "string") return `${number} has an invalid art choice.`;
+    const card = validationCard(number);
+    if (!card || !validArtId(card, artId)) {
+      return `${number} has an unknown art choice.`;
+    }
+  }
+
+  return null;
 }
 
 function normalizePrintQuantities(
@@ -201,6 +257,72 @@ function sanitizePrints(
     main: sanitizeZonePrints(raw.main, main, artChoices),
     resource: sanitizeZonePrints(raw.resource, resource, artChoices),
   };
+}
+
+function validateZonePrints(
+  value: unknown,
+  zone: "main" | "resource",
+  zoneQuantities: QuantityMap,
+) {
+  if (value === undefined) return null;
+  if (!isRecord(value)) return `${zone} print choices must be an object.`;
+
+  for (const [number, printMap] of Object.entries(value)) {
+    const targetQuantity = zoneQuantities[number];
+    if (!targetQuantity) return `${number} has orphan ${zone} print choices.`;
+    const card = validationCard(number);
+    if (!card) return `${number} has unknown ${zone} print choices.`;
+    if (!isRecord(printMap)) return `${number} print choices must be an object.`;
+
+    let printTotal = 0;
+    for (const [artId, quantity] of Object.entries(printMap)) {
+      if (!validArtId(card, artId)) return `${number} has an unknown print choice.`;
+      if (
+        typeof quantity !== "number" ||
+        !Number.isFinite(quantity) ||
+        !Number.isInteger(quantity) ||
+        quantity <= 0
+      ) {
+        return `${number} has an invalid print quantity.`;
+      }
+      printTotal += quantity;
+    }
+
+    if (printTotal > targetQuantity) {
+      return `${number} print quantities exceed the ${zone} deck quantity.`;
+    }
+  }
+
+  return null;
+}
+
+function validatePrints(value: unknown, main: QuantityMap, resource: QuantityMap) {
+  if (value === undefined) return null;
+  if (!isRecord(value)) return "Print choices must be an object.";
+
+  const raw = value as Partial<DeckPrints>;
+  return (
+    validateZonePrints(raw.main, "main", main) ??
+    validateZonePrints(raw.resource, "resource", resource)
+  );
+}
+
+export function validateSharedDeckPayload(value: unknown): string | null {
+  if (!isRecord(value)) return "Deck payload must be an object.";
+  const maybeDeck = value as Partial<SharedDeckState>;
+  const main = validateQuantities(maybeDeck.main, "main");
+  if (typeof main === "string") return main;
+  const resource = validateQuantities(maybeDeck.resource, "resource");
+  if (typeof resource === "string") return resource;
+  if (mainDeckColors(main).size > MAX_MAIN_COLORS) {
+    return `Main deck cannot use more than ${MAX_MAIN_COLORS} colors.`;
+  }
+
+  const deckNumbers = new Set([...Object.keys(main), ...Object.keys(resource)]);
+  return (
+    validateArtChoices(maybeDeck.art, deckNumbers) ??
+    validatePrints(maybeDeck.prints, main, resource)
+  );
 }
 
 export function sanitizeSharedDeck(value: unknown): SharedDeckState | null {

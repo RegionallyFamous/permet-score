@@ -1304,12 +1304,16 @@ textarea {
   }
 
   nav[aria-label="Mobile workspace views"] {
-    padding-top: 0.25rem;
-    padding-bottom: calc(env(safe-area-inset-bottom) + 0.25rem);
+    padding-top: 0.125rem;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.125rem);
   }
 
   .library-result {
-    padding: 0.45rem;
+    padding: 0.45rem 0.45rem 0.125rem;
+  }
+
+  .deck-entry {
+    padding-bottom: 0.125rem;
   }
 
   .library-result > div {
