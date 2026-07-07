@@ -186,7 +186,7 @@ const artFilters = [
 const collectionFilters = ["All", "Owned", "Missing", "Budget"] as const;
 const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
-const LIBRARY_PAGE_SIZE = 8;
+const LIBRARY_PAGE_SIZE = 6;
 
 const CARD_POOL = [
   ...CURATED_CARD_POOL,
@@ -552,10 +552,6 @@ function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
 
 function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
   return tcgplayerMarketPrice(card, variant) === null ? "local estimate" : "market estimate";
-}
-
-function formatCopyCount(quantity: number) {
-  return `${quantity} ${quantity === 1 ? "copy" : "copies"}`;
 }
 
 function artDisplayLabel(variant: CardArtVariant) {
@@ -1180,7 +1176,6 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const missingPrintsRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
   const undoDeckRef = useRef<DeckState | null>(null);
@@ -1632,13 +1627,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   }
 
   function openBuyList() {
-    setMobileView("stats");
-    window.requestAnimationFrame(() => {
-      missingPrintsRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
+    void copyBuyList();
   }
 
   function openCardLightbox(card: GundamCard, artVariant?: CardArtVariant) {
@@ -2547,7 +2536,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
               </div>
             </div>
 
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2.5 p-2.5 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] sm:gap-3 sm:p-3 2xl:grid-cols-[repeat(auto-fill,minmax(248px,1fr))]">
+            <div className="grid grid-cols-1 gap-2.5 p-2.5 sm:gap-3 sm:p-3">
               {visibleLibraryCards.length ? (
                 visibleLibraryCards.map((card) => (
                   <LibraryCard
@@ -2620,14 +2609,6 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
               <DataIntegrityPanel status={dataStatus} />
 
               <CostPanel summary={costSummary} onMarkOwned={markDeckOwned} />
-
-              <div ref={missingPrintsRef}>
-                <MissingPrintsPanel
-                  entries={missingPrints}
-                  onCopy={copyBuyList}
-                  onOpenCard={openCardLightbox}
-                />
-              </div>
 
               <LegalityPanel notices={notices} />
 
@@ -3387,7 +3368,7 @@ function MissingPrintsSummary({
             Buy List
           </div>
           <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/62">
-            Missing selected prints with TCGplayer buy links.
+            Copy missing selected prints with TCGplayer buy links.
           </p>
         </div>
         <div className="text-right">
@@ -3399,98 +3380,6 @@ function MissingPrintsSummary({
           </div>
         </div>
       </button>
-    </section>
-  );
-}
-
-function MissingPrintsPanel({
-  entries,
-  onCopy,
-  onOpenCard,
-}: {
-  entries: MissingPrintEntry[];
-  onCopy: () => void;
-  onOpenCard: (card: GundamCard, artVariant: CardArtVariant) => void;
-}) {
-  const totalMissingCost = entries.reduce((sum, entry) => sum + entry.totalCost, 0);
-
-  return (
-    <section className={panelClass()}>
-      <PanelTitle icon={<ShoppingCart size={18} />} title="Missing Prints" />
-      <div className="grid gap-2 p-3">
-        <div className="rounded-sm border border-[#f6c542]/20 bg-[#f6c542]/10 p-2 text-sm font-bold leading-6 text-[#fff2bd]/86">
-          Prices use matched market snapshots when available. Verify exact language and condition before buying.
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Spec label="Missing" value={`${entries.reduce((sum, entry) => sum + entry.missing, 0)}`} />
-          <Spec label="Market / Est." value={formatMoney(totalMissingCost)} />
-        </div>
-        <button
-          type="button"
-          className="interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18"
-          onClick={onCopy}
-        >
-          <Clipboard size={15} />
-          Copy Buy List
-        </button>
-        {entries.length === 0 ? (
-          <div className="rounded-sm border border-[#28d17c]/22 bg-[#28d17c]/10 p-3 text-base font-bold text-[#d9ffe9]/78">
-            Every selected print is covered by your collection counts.
-          </div>
-        ) : (
-          <div className="grid max-h-[540px] gap-2 overflow-auto pr-1">
-            {entries.map((entry) => (
-              <div
-                key={`${entry.card.number}-${entry.variant.id}`}
-                className={`interactive-row rounded-sm border bg-black/24 p-2 ${colorAccentClass(
-                  entry.card.color,
-                )}`}
-              >
-                <div className="grid grid-cols-[auto_1fr] gap-2">
-                  <CardThumb
-                    card={entry.card}
-                    artVariant={entry.variant}
-                    onOpen={() => onOpenCard(entry.card, entry.variant)}
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate text-base font-black text-[#f7f7f2]">
-                          {entry.card.name}
-                        </div>
-                        <div className="truncate text-sm font-bold text-[#f7f7f2]/58">
-                          {printDisplayId(entry.variant)} · {artDisplayLabel(entry.variant)}
-                        </div>
-                      </div>
-                      <span className="shrink-0 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
-                        Need {entry.missing}
-                      </span>
-                    </div>
-                    <div className="mt-2 grid gap-1 text-sm font-bold text-[#f7f7f2]/62">
-                      <span>
-                        Owned {entry.owned} / Deck {entry.needed} · {priceSourceLabel(entry.card, entry.variant)} {formatMoney(entry.unitCost)} each
-                      </span>
-                      <span>
-                        {formatCopyCount(entry.missing)} missing · Total {formatMoney(entry.totalCost)}
-                      </span>
-                    </div>
-                    <a
-                      href={tcgplayerUrl(entry.card, entry.variant)}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow"
-                      className="interactive-control mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
-                      title={`Search TCGplayer for ${entry.card.name} ${artDisplayLabel(entry.variant)}`}
-                    >
-                      <ShoppingCart size={15} />
-                      Search TCGplayer
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </section>
   );
 }
@@ -4119,78 +4008,80 @@ function LibraryCard({
         onOpenCard();
       }}
     >
-      <div className="grid grid-cols-[4.4rem_minmax(0,1fr)] gap-2.5">
-        <button
-          type="button"
-          className="scan-frame relative h-[6.15rem] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-[#11141b] text-left shadow-lg shadow-black/35"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenCard();
-          }}
-          aria-label={`Open large view of ${card.name}`}
-          title={`Open large view of ${card.name}`}
-        >
-          <img
-            src={cardImagePath(card, artVariant)}
-            alt={`${card.name} card`}
-            className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.035]"
-            loading="lazy"
-            onError={handleCardImageError}
-          />
-          {quantity > 0 && (
-            <span className="absolute right-1 top-1 grid size-6 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-sm font-black leading-none text-white shadow-lg shadow-black/30">
-              {quantity}
+      <button
+        type="button"
+        className="scan-frame relative block h-40 w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-[#11141b] text-left shadow-lg shadow-black/35 sm:h-44"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpenCard();
+        }}
+        aria-label={`Open large view of ${card.name}`}
+        title={`Open large view of ${card.name}`}
+      >
+        <img
+          src={cardImagePath(card, artVariant)}
+          alt={`${card.name} card`}
+          className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.035]"
+          loading="lazy"
+          onError={handleCardImageError}
+        />
+        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#06080d]/95 via-[#06080d]/28 to-transparent" />
+        {selected && (
+          <span className="permet-scanline pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#8bdcff]/0 via-[#8bdcff]/28 to-[#8bdcff]/0" />
+        )}
+        <span className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1">
+          <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-[11px] font-black leading-none text-black">
+            {card.number}
+          </span>
+          <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] font-black leading-none ${colorChipClass(card.color)}`}>
+            {card.color}
+          </span>
+          {artVariants.length > 1 && (
+            <span className="rounded-sm border border-[#f6c542]/35 bg-black/70 px-1.5 py-0.5 text-[11px] font-black leading-none text-[#fff2bd]">
+              {artDisplayLabel(artVariant)}
             </span>
           )}
-          <span className="absolute inset-x-0 bottom-0 z-10 inline-flex h-6 items-center justify-center bg-black/74 text-[#d9ecff] opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
-            <Maximize2 size={13} />
+        </span>
+        {quantity > 0 && (
+          <span className="absolute right-2 top-2 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
+            {quantity}
           </span>
-        </button>
-
-        <div className="grid min-w-0 content-start gap-1.5">
-          <div className="flex min-w-0 flex-wrap items-center gap-1">
-            <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-[11px] font-black leading-none text-black">
-              {card.number}
-            </span>
-            <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] font-black leading-none ${colorChipClass(card.color)}`}>
-              {card.color}
-            </span>
-            {artVariants.length > 1 && (
-              <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/10 px-1.5 py-0.5 text-[11px] font-black leading-none text-[#fff2bd]">
-                {artDisplayLabel(artVariant)}
-              </span>
-            )}
-          </div>
-          <h3 className="line-clamp-2 font-display text-base font-black uppercase leading-tight text-[#f7f7f2]">
+        )}
+        <span className="pointer-events-none absolute bottom-2 right-2 grid size-8 place-items-center rounded-sm border border-[#8bdcff]/36 bg-black/70 text-[#d9ecff]">
+          <Maximize2 size={15} />
+        </span>
+        <span className="pointer-events-none absolute bottom-2 left-2 right-12 min-w-0">
+          <span className="line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
             {card.name}
-          </h3>
-          <p className="truncate text-sm font-bold text-[#f7f7f2]/62">
+          </span>
+          <span className="mt-1 block truncate text-sm font-bold text-[#f7f7f2]/72">
             {card.type} · {formatPrintMoney(card, artVariant)}
-          </p>
-          <div className="flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
-            {quantity > 0 && (
-              <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
-                Deck {quantity}
-              </span>
-            )}
-            {ownedQuantity > 0 && (
-              <span
-                className="rounded-sm border border-[#28d17c]/24 bg-[#28d17c]/10 px-1.5 py-0.5 text-[#d9ffe9]"
-                title={`${ownedQuantity} owned across all prints`}
-              >
-                Owned {ownedQuantity}
-              </span>
-            )}
-            {missingQuantity > 0 && (
-              <span
-                className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 text-[#fff2bd]"
-                title={`${missingQuantity} missing selected-print copies`}
-              >
-                Need {missingQuantity}
-              </span>
-            )}
-          </div>
-        </div>
+          </span>
+        </span>
+      </button>
+
+      <div className="mt-2 flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
+        {quantity > 0 && (
+          <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
+            Deck {quantity}
+          </span>
+        )}
+        {ownedQuantity > 0 && (
+          <span
+            className="rounded-sm border border-[#28d17c]/24 bg-[#28d17c]/10 px-1.5 py-0.5 text-[#d9ffe9]"
+            title={`${ownedQuantity} owned across all prints`}
+          >
+            Owned {ownedQuantity}
+          </span>
+        )}
+        {missingQuantity > 0 && (
+          <span
+            className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 text-[#fff2bd]"
+            title={`${missingQuantity} missing selected-print copies`}
+          >
+            Need {missingQuantity}
+          </span>
+        )}
       </div>
 
       <div className="mt-2 grid grid-cols-[minmax(5.7rem,1fr)_2.35rem_3.1rem] gap-1.5">
