@@ -33,7 +33,14 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type SyntheticEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   CARD_ART_VARIANTS,
   type CardArtVariant,
@@ -143,6 +150,7 @@ const RESOURCE_TARGET = 10;
 const MAX_MAIN_COPIES = 4;
 const MAX_MAIN_COLORS = 2;
 const TCGPLAYER_FRESH_HOURS = 48;
+const MARKET_FRESH_HOURS = TCGPLAYER_FRESH_HOURS;
 const COMPLETE_DATABASE_CARD_TARGET = 700;
 const MAIN_TYPES: CardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
 const RESOURCE_TYPES: CardType[] = ["RESOURCE"];
@@ -189,6 +197,7 @@ const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
   readonly CardArtVariant[]
 >;
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
+const CARD_IMAGE_FALLBACK = "/permet-score-logo.png";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
 const CANONICAL_ORIGIN = "https://permetscore.com";
 const OFFICIAL_RULES_URL = "https://www.gundam-gcg.com/en/rules/";
@@ -260,7 +269,7 @@ function cardArtVariants(card: GundamCard) {
   const tcgPrints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
   const tcgVariants = tcgPrints.map((print, index) => ({
     id: print.variantId,
-    label: print.variantId === "standard" ? "Standard" : `TCG Print ${index + 1}`,
+    label: print.variantId === "standard" ? "Standard" : `Market Print ${index + 1}`,
     image: print.imageUrl ?? `/card-images/${card.number}.webp`,
     tier: index,
     officialId: print.officialId,
@@ -462,6 +471,15 @@ function cardImagePath(card: GundamCard, variant?: CardArtVariant) {
   return variant?.image ?? cardArtVariants(card)[0].image;
 }
 
+function handleCardImageError(event: SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+  if (image.dataset.fallbackApplied === "true") return;
+  image.dataset.fallbackApplied = "true";
+  image.src = CARD_IMAGE_FALLBACK;
+  image.classList.remove("object-cover", "object-top");
+  image.classList.add("object-contain", "p-2");
+}
+
 function printCostBase(card: GundamCard) {
   const rarityBase: Record<string, number> = {
     C: 0.25,
@@ -526,11 +544,11 @@ function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
   const price = tcgplayerMarketPrice(card, variant);
   return price === null
     ? formatEstimatedMoney(estimatePrintCost(card, variant))
-    : `TCG market ${formatMoney(price)}`;
+    : `Janie market ${formatMoney(price)}`;
 }
 
 function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
-  return tcgplayerMarketPrice(card, variant) === null ? "local estimate" : "TCGplayer market";
+  return tcgplayerMarketPrice(card, variant) === null ? "local estimate" : "Janie market";
 }
 
 function formatCopyCount(quantity: number) {
@@ -1442,12 +1460,12 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         ? {
             tone: dataStatus.isFresh ? "good" : "warn",
             label: "Card DB",
-            detail: dataStatus.isFresh ? "Fresh TCGplayer" : "TCGplayer stale",
+            detail: dataStatus.isFresh ? "Fresh Janie" : "Janie stale",
           }
         : {
             tone: "warn",
             label: "Card DB",
-            detail: "TCGplayer missing",
+            detail: "Janie pending",
           },
     );
 
@@ -2264,7 +2282,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
             <Metric label="Colors" value={deckColors.length ? deckColors.join(" / ") : "-"} />
             <Metric label="Cards" value={`${CARD_POOL.length} loaded`} />
             <Metric label="Alt Prints" value={`${altReadyTotal}`} />
-            <Metric label="TCG / Est." value={formatMoney(costSummary.artTotal)} />
+            <Metric label="Market / Est." value={formatMoney(costSummary.artTotal)} />
             <Metric label="Missing Est." value={formatMoney(missingPrintCost)} />
             <Metric label="Showing" value={`${filteredCards.length}`} />
           </div>
@@ -2714,6 +2732,7 @@ function SharedDeckBanner({
                 src={cardImagePath(card)}
                 alt=""
                 className="preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
+                onError={handleCardImageError}
               />
             ))}
           </div>
@@ -2992,18 +3011,18 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
 
         <div className="grid grid-cols-2 gap-2">
           <Spec label="Curated" value={`${status.curatedCards}`} />
-          <Spec label="TCG Cards" value={`${status.tcgCards}`} />
+          <Spec label="Janie Cards" value={`${status.tcgCards}`} />
           <Spec label="Prints" value={`${status.tcgPrints}`} />
           <Spec label="Priced IDs" value={`${status.tcgCardsWithPrints}`} />
         </div>
 
         <div className={`rounded-sm border p-3 ${noticeClass(status.syncTone)}`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-base font-black">TCGplayer Snapshot</span>
+            <span className="text-base font-black">Janie Snapshot</span>
             <span className="text-right text-base font-black">{syncLabel}</span>
           </div>
           <p className="mt-1 text-sm font-bold opacity-75">
-            Source-of-truth pricing and discovered printings must sync every {TCGPLAYER_FRESH_HOURS}h.
+            Janie-backed pricing and discovered printings should sync every {MARKET_FRESH_HOURS}h.
           </p>
         </div>
 
@@ -3079,6 +3098,7 @@ function CardLightbox({
                 src={cardImagePath(card, artVariant)}
                 alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
                 className="mx-auto max-h-[72vh] max-w-full object-contain object-top lg:max-h-[78vh]"
+                onError={handleCardImageError}
               />
               <div className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1.5">
                 <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
@@ -3115,6 +3135,7 @@ function CardLightbox({
                         alt=""
                         className="aspect-[5/7] w-full object-cover object-top"
                         loading="lazy"
+                        onError={handleCardImageError}
                       />
                     </button>
                   ))}
@@ -3204,12 +3225,12 @@ function CostPanel({
 }) {
   return (
     <section className={panelClass()}>
-      <PanelTitle icon={<BadgeDollarSign size={18} />} title="TCGplayer Cost" />
+      <PanelTitle icon={<BadgeDollarSign size={18} />} title="Market Cost" />
       <div className="grid gap-2 p-3">
         <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-sm font-bold leading-6 text-[#d9ecff]/82">
           {TCGPLAYER_LAST_SYNC
-            ? `TCGplayer snapshot synced ${TCGPLAYER_LAST_SYNC}. Unmatched prints fall back to local estimates.`
-            : "TCGplayer sync is ready, but no snapshot has been generated yet. Showing local estimates."}
+            ? `Janie market snapshot synced ${TCGPLAYER_LAST_SYNC}. Unmatched prints fall back to local estimates.`
+            : "Janie is connected, but no market snapshot has been generated yet. Showing local estimates."}
         </div>
         <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
         <CostRow label="Alt-art premium" value={formatMoney(summary.altPremium)} />
@@ -3255,7 +3276,7 @@ function MissingPrintsSummary({
             Buy List
           </div>
           <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/62">
-            Missing selected prints with TCGplayer links.
+            Missing selected prints with TCGplayer buy links.
           </p>
         </div>
         <div className="text-right">
@@ -3287,11 +3308,11 @@ function MissingPrintsPanel({
       <PanelTitle icon={<ShoppingCart size={18} />} title="Missing Prints" />
       <div className="grid gap-2 p-3">
         <div className="rounded-sm border border-[#f6c542]/20 bg-[#f6c542]/10 p-2 text-sm font-bold leading-6 text-[#fff2bd]/86">
-          Prices use the TCGplayer snapshot when matched. Verify exact language and condition before buying.
+          Prices use Janie&apos;s market snapshot when matched. Verify exact language and condition before buying.
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Spec label="Missing" value={`${entries.reduce((sum, entry) => sum + entry.missing, 0)}`} />
-          <Spec label="TCG / Est." value={formatMoney(totalMissingCost)} />
+          <Spec label="Market / Est." value={formatMoney(totalMissingCost)} />
         </div>
         <button
           type="button"
@@ -4002,6 +4023,7 @@ function LibraryCard({
           alt={`${card.name} card`}
           className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.018]"
           loading="lazy"
+          onError={handleCardImageError}
         />
         {selected && (
           <div className="pointer-events-none absolute inset-0 border border-[#8bdcff]/65">
@@ -4158,6 +4180,7 @@ function InspectorPanel({
               alt={`${card.name} card`}
               className="h-full w-full object-cover object-top"
               loading="lazy"
+              onError={handleCardImageError}
             />
             <span className="absolute inset-x-0 bottom-0 z-10 inline-flex h-7 items-center justify-center gap-1 bg-black/72 font-display text-sm font-black uppercase text-[#d9ecff]">
               <Maximize2 size={12} />
@@ -4349,6 +4372,7 @@ function CardThumb({
       alt={`${card.name} card`}
       className="h-full w-full object-cover object-top"
       loading="lazy"
+      onError={handleCardImageError}
     />
   );
 

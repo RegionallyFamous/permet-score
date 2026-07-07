@@ -1,4 +1,4 @@
-name: Sync TCGplayer Data
+name: Sync Janie Gundam Data
 
 on:
   workflow_dispatch:
@@ -24,13 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Sync TCGplayer snapshot
-        run: npm run data:sync:tcgplayer
+      - name: Sync Janie market snapshot
+        run: npm run data:sync:janie
         env:
-          TCGPLAYER_PUBLIC_KEY: ${{ secrets.TCGPLAYER_PUBLIC_KEY }}
-          TCGPLAYER_PRIVATE_KEY: ${{ secrets.TCGPLAYER_PRIVATE_KEY }}
-          TCGPLAYER_CATEGORY_ID: ${{ secrets.TCGPLAYER_CATEGORY_ID }}
-          TCGPLAYER_CATEGORY_NAME: ${{ vars.TCGPLAYER_CATEGORY_NAME || 'Gundam Card Game' }}
+          JANIE_API_ORIGIN: ${{ vars.JANIE_API_ORIGIN || 'https://janie.up.railway.app' }}
+          JANIE_API_TOKEN: ${{ secrets.JANIE_API_TOKEN }}
+          JANIE_GUNDAM_GAME_NAME: ${{ vars.JANIE_GUNDAM_GAME_NAME || 'Gundam Card Game' }}
 
       - name: Validate generated app
         run: |
@@ -41,5 +40,5 @@ jobs:
       - name: Commit generated data
         uses: stefanzweifel/git-auto-commit-action@v6
         with:
-          commit_message: "Sync TCGplayer card data"
-          file_pattern: "app/tcgplayer-data.ts app/tcgplayer-card-data.ts data/tcgplayer-unmatched.json"
+          commit_message: "Sync Janie Gundam card data"
+          file_pattern: "app/tcgplayer-data.ts app/tcgplayer-card-data.ts data/janie-gundam-sync.json"

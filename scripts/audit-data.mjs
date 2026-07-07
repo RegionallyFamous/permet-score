@@ -10,7 +10,9 @@ import {
 const strict = process.argv.includes("--strict");
 const minCardCount = Number(process.env.MIN_GUNDAM_CARD_COUNT ?? 700);
 const minPrintCount = Number(process.env.MIN_GUNDAM_PRINT_COUNT ?? minCardCount);
-const maxSyncAgeHours = Number(process.env.TCGPLAYER_MAX_SYNC_HOURS ?? 48);
+const maxSyncAgeHours = Number(
+  process.env.JANIE_MAX_SYNC_HOURS ?? process.env.TCGPLAYER_MAX_SYNC_HOURS ?? 48,
+);
 const validTypes = new Set(["UNIT", "PILOT", "COMMAND", "BASE", "RESOURCE", "EX RESOURCE"]);
 const validColors = new Set(["Blue", "Green", "Red", "White", "Purple", "-"]);
 
@@ -49,21 +51,21 @@ if (duplicateNumbers.length) {
 }
 
 report(cards.length >= minCardCount, `Only ${cards.length} cards loaded; expected at least ${minCardCount}.`);
-report(printCount >= minPrintCount, `Only ${printCount} TCGplayer print records loaded; expected at least ${minPrintCount}.`);
-report(Boolean(TCGPLAYER_LAST_SYNC), "TCGplayer snapshot is missing.");
+report(printCount >= minPrintCount, `Only ${printCount} Janie market print records loaded; expected at least ${minPrintCount}.`);
+report(Boolean(TCGPLAYER_LAST_SYNC), "Janie market snapshot is missing.");
 report(
   syncAgeHours !== null && syncAgeHours <= maxSyncAgeHours,
-  `TCGplayer snapshot is stale or missing; expected <= ${maxSyncAgeHours}h.`,
+  `Janie market snapshot is stale or missing; expected <= ${maxSyncAgeHours}h.`,
 );
 
 const summary = {
   strict,
   curatedCards: CURATED_CARD_POOL.length,
-  tcgCards: TCGPLAYER_CARD_POOL.length,
+  marketCards: TCGPLAYER_CARD_POOL.length,
   totalCards: cards.length,
-  tcgPrints: printCount,
-  tcgCardsWithPrints: cardsWithPrints,
-  tcgplayerLastSync: TCGPLAYER_LAST_SYNC,
+  marketPrints: printCount,
+  marketCardsWithPrints: cardsWithPrints,
+  janieLastSync: TCGPLAYER_LAST_SYNC,
   syncAgeHours: syncAgeHours === null ? null : Math.round(syncAgeHours * 10) / 10,
   minCardCount,
   minPrintCount,

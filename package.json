@@ -15,8 +15,10 @@
     "qa:visual": "node scripts/visual-qa.mjs",
     "data:audit": "node scripts/audit-data.mjs",
     "data:audit:strict": "node scripts/audit-data.mjs --strict",
-    "data:sync:tcgplayer": "node scripts/sync-tcgplayer.mjs",
-    "data:check:tcgplayer": "node scripts/sync-tcgplayer.mjs --check",
+    "data:sync:janie": "node scripts/sync-janie-gundam.mjs",
+    "data:check:janie": "npm run data:audit:strict",
+    "data:sync:tcgplayer": "node scripts/sync-janie-gundam.mjs",
+    "data:check:tcgplayer": "npm run data:audit:strict",
     "perf:lighthouse": "npx lighthouse@latest http://localhost:3000 --output=html --output-path=./qa-screenshots/lighthouse.html --only-categories=performance,accessibility,best-practices,seo --chrome-flags='--headless=new'",
     "analyze": "next experimental-analyze --output"
   },

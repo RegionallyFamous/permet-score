@@ -32,26 +32,27 @@ API, and shared deck page. `perf:lighthouse` expects the app to already be
 running on `http://localhost:3000`, ideally with `npm run build && npm run start`.
 `analyze` uses the Turbopack analyzer built into current Next.js.
 
-## TCGplayer Source Of Truth
+## Janie Market Source
 
-TCGplayer product/catalog data is synced into generated files so the app stays
-fast on Vercel:
+Janie is the bridge to TCGplayer product/catalog data. Permet Score does not
+need its own TCGplayer credentials; it consumes Janie Firehose output into
+generated files so the app stays fast on Vercel:
 
 ```bash
-TCGPLAYER_PUBLIC_KEY=... TCGPLAYER_PRIVATE_KEY=... npm run data:sync:tcgplayer
+JANIE_API_TOKEN=... npm run data:sync:janie
 ```
 
 The sync writes:
 
-- `app/tcgplayer-data.ts`: product IDs, product URLs, image URLs, and market prices.
-- `app/tcgplayer-card-data.ts`: new cards discovered from TCGplayer that are not in the curated rules file yet.
-- `data/tcgplayer-unmatched.json`: products that need manual cleanup or matching.
+- `app/tcgplayer-data.ts`: Janie/TCGplayer product IDs, buy links, image URLs when Janie has them, and market prices.
+- `app/tcgplayer-card-data.ts`: new market rows discovered by Janie that are not in the curated rules file yet.
+- `data/janie-gundam-sync.json`: Janie release coverage, search coverage, warnings, and unmatched products.
 
-In GitHub, add repository secrets `TCGPLAYER_PUBLIC_KEY` and
-`TCGPLAYER_PRIVATE_KEY`. If category discovery ever misses Gundam, add
-`TCGPLAYER_CATEGORY_ID` as a repository secret. The scheduled workflow
-`.github/workflows/sync-tcgplayer.yml` runs daily and commits generated updates
-back to `main` when TCGplayer changes.
+In GitHub, add repository secret `JANIE_API_TOKEN`. The optional repository
+variables are `JANIE_API_ORIGIN` and `JANIE_GUNDAM_GAME_NAME`; by default they
+point at the hosted Janie Firehose and `Gundam Card Game`. The scheduled
+workflow `.github/workflows/sync-janie.yml` runs daily and commits generated
+updates back to `main` when Janie has new Gundam products or prices.
 
 ## Share Links
 
