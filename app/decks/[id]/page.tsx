@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { DeckBuilder } from "../../page";
 import { loadSharedDeck } from "../../share-store";
 
@@ -13,12 +14,12 @@ function isValidShareId(id: string) {
   return /^[A-Za-z0-9_-]{8,48}$/.test(id);
 }
 
-async function loadValidSharedDeck(id: string) {
+const loadValidSharedDeck = cache(async (id: string) => {
   if (!isValidShareId(id)) notFound();
   const deck = await loadSharedDeck(id);
   if (!deck) notFound();
   return deck;
-}
+});
 
 export async function generateMetadata({
   params,

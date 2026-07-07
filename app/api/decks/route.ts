@@ -20,6 +20,28 @@ function hasJsonContentType(request: Request) {
   );
 }
 
+async function readRequestTextWithinLimit(request: Request) {
+  if (!request.body) return "";
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_SHARE_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+
+  return text + decoder.decode();
+}
+
 export async function POST(request: Request) {
   let body: unknown;
 
@@ -39,7 +61,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    body = await request.json();
+    const bodyText = await readRequestTextWithinLimit(request);
+    if (bodyText === null) {
+      return NextResponse.json(
+        { error: "Deck payload is too large." },
+        { status: 413 },
+      );
+    }
+    body = JSON.parse(bodyText);
   } catch {
     return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
   }

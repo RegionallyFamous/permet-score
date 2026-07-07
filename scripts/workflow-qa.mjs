@@ -241,17 +241,39 @@ async function assertShareRejectsIncompleteDecksAndMalformedQuantities() {
 }
 
 async function assertShareRejectsOversizedPayloads() {
+  const oversizedBody = JSON.stringify({
+    ...legalDeck({ name: "Workflow QA Oversized" }),
+    extra: "x".repeat(70_000),
+  });
   const oversizedResponse = await fetch(absoluteUrl("/api/decks"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...legalDeck({ name: "Workflow QA Oversized" }),
-      extra: "x".repeat(70_000),
-    }),
+    body: oversizedBody,
   });
 
   if (oversizedResponse.status !== 413) {
     throw new Error(`Expected oversized share to return 413, got ${oversizedResponse.status}`);
+  }
+
+  const encoder = new TextEncoder();
+  const chunkedBody = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(oversizedBody.slice(0, 2048)));
+      controller.enqueue(encoder.encode(oversizedBody.slice(2048)));
+      controller.close();
+    },
+  });
+  const chunkedOversizedResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: chunkedBody,
+    duplex: "half",
+  });
+
+  if (chunkedOversizedResponse.status !== 413) {
+    throw new Error(
+      `Expected chunked oversized share to return 413, got ${chunkedOversizedResponse.status}`,
+    );
   }
 }
 

@@ -1548,6 +1548,7 @@ export function DeckBuilder({
   const renderCardPanel = renderAllPanels || mobileView === "card";
   const renderStatsPanel = renderAllPanels || mobileView === "stats";
   const renderDeckPanel = renderAllPanels || mobileView === "deck";
+  const eagerDeckThumbnails = statusTimestamp !== null && !mobileTabsEnabled;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
@@ -2815,6 +2816,9 @@ export function DeckBuilder({
                   </h1>
                   <StatusBadge isLegal={isLegal} />
                 </div>
+                <p className="mobile-deck-title-chip mt-1 truncate rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 px-2 py-1 font-display text-sm font-black uppercase text-[#f7f7f2]/76">
+                  {deck.name}
+                </p>
               </div>
             </div>
 
@@ -2838,6 +2842,7 @@ export function DeckBuilder({
                     mobileLabel={`Draw ${OPENING_HAND_SIZE}`}
                     title="Draw opening hand"
                     onClick={drawHand}
+                    showDesktopLabel
                     className="w-full xl:w-auto"
                   >
                     <Shuffle size={16} />
@@ -2847,6 +2852,7 @@ export function DeckBuilder({
                     mobileLabel="Buy"
                     title="Open missing prints buy list"
                     onClick={openBuyList}
+                    showDesktopLabel
                     className="w-full xl:w-auto"
                   >
                     <ShoppingCart size={16} />
@@ -2857,6 +2863,7 @@ export function DeckBuilder({
                     title="Share decklist and selected printings"
                     onClick={copyShareUrl}
                     disabled={shareState === "Saving"}
+                    showDesktopLabel
                     className="w-full xl:w-auto"
                   >
                     <Share2 size={16} />
@@ -3241,7 +3248,7 @@ export function DeckBuilder({
 
             <div className="grid grid-cols-1 gap-2.5 p-2.5 sm:gap-3 sm:p-3">
               {visibleLibraryCards.length ? (
-                visibleLibraryCards.map((card) => (
+                visibleLibraryCards.map((card, index) => (
                   <LibraryCard
                     key={card.number}
                     card={card}
@@ -3253,6 +3260,7 @@ export function DeckBuilder({
                     resourceQuantity={deck.resource[card.number] ?? 0}
                     ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
                     missingQuantity={getMissingCopiesForCard(deck, card)}
+                    eagerImage={statusTimestamp !== null && index < 3}
                     onSelect={() => setSelectedNumber(card.number)}
                     onOpenCard={() => {
                       setSelectedNumber(card.number);
@@ -3397,6 +3405,7 @@ export function DeckBuilder({
               onAdjust={adjustCard}
               onRemove={removeCard}
               onOpenCard={openCardLightbox}
+              eagerImages={eagerDeckThumbnails}
               compact
             />
 
@@ -3410,6 +3419,7 @@ export function DeckBuilder({
               onAdjust={adjustCard}
               onRemove={removeCard}
               onOpenCard={openCardLightbox}
+              eagerImages={eagerDeckThumbnails}
               compact
             />
 
@@ -3428,12 +3438,12 @@ export function DeckBuilder({
         tabsEnabled={mobileTabsEnabled}
         onChange={changeMobileView}
       />
+      </div>
       <ToastViewport
         toast={toast}
         onAction={restoreUndoDeck}
         onDismiss={dismissToast}
       />
-      </div>
       <MobileActionSheet
         open={mobileActionsOpen}
         deckName={deck.name}
@@ -4028,7 +4038,7 @@ function ToastViewport({
         {toast.actionLabel && (
           <button
             type="button"
-            className="interactive-control shrink-0 rounded-sm border border-current/35 bg-current/10 px-3 py-1 font-display text-base font-black uppercase"
+            className="interactive-control inline-flex min-h-11 shrink-0 items-center rounded-sm border border-current/35 bg-current/10 px-3 font-display text-base font-black uppercase"
             onClick={onAction}
           >
             {toast.actionLabel}
@@ -4036,7 +4046,7 @@ function ToastViewport({
         )}
         <button
           type="button"
-          className="interactive-control inline-flex size-8 shrink-0 items-center justify-center rounded-sm border border-current/25 bg-black/16"
+          className="interactive-control inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-current/25 bg-black/16"
           onClick={onDismiss}
           aria-label="Dismiss status"
           title="Dismiss status"
@@ -4648,6 +4658,7 @@ function ToolbarButton({
   disabled = false,
   ariaExpanded,
   ariaControls,
+  showDesktopLabel = false,
   className = "",
 }: {
   children: React.ReactNode;
@@ -4658,12 +4669,15 @@ function ToolbarButton({
   disabled?: boolean;
   ariaExpanded?: boolean;
   ariaControls?: string;
+  showDesktopLabel?: boolean;
   className?: string;
 }) {
   return (
     <button
       type="button"
-      className={`interactive-control inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-base font-black uppercase shadow-sm sm:gap-2 sm:px-3 sm:text-lg xl:px-0 ${className} ${
+      className={`interactive-control inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-base font-black uppercase shadow-sm sm:gap-2 sm:px-3 sm:text-lg ${
+        showDesktopLabel ? "xl:px-0 min-[1400px]:px-3" : "xl:px-0"
+      } ${className} ${
         disabled
           ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
           : "border-[#a7b5c9]/25 bg-[#f7f7f2]/9 text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
@@ -4676,7 +4690,11 @@ function ToolbarButton({
       disabled={disabled}
     >
       {children}
-      <span className="inline whitespace-nowrap xl:hidden">
+      <span
+        className={`inline whitespace-nowrap ${
+          showDesktopLabel ? "xl:hidden min-[1400px]:inline" : "xl:hidden"
+        }`}
+      >
         <span className="sm:hidden">{mobileLabel ?? label}</span>
         <span className="hidden sm:inline">{label}</span>
       </span>
@@ -4957,6 +4975,7 @@ function DeckPanel({
   deck,
   zone,
   compact = false,
+  eagerImages = false,
   onAdjust,
   onRemove,
   onOpenCard,
@@ -4968,6 +4987,7 @@ function DeckPanel({
   deck: DeckState;
   zone: "main" | "resource";
   compact?: boolean;
+  eagerImages?: boolean;
   onAdjust: (zone: "main" | "resource", number: string, delta: number) => void;
   onRemove: (zone: "main" | "resource", number: string) => void;
   onOpenCard: (card: GundamCard, artVariant: CardArtVariant) => void;
@@ -5012,7 +5032,7 @@ function DeckPanel({
                     onOpen={() => onOpenCard(card, artVariant)}
                     size="deck"
                     badge={`${quantity}`}
-                    eager={index < 4}
+                    eager={eagerImages && index < 4}
                     openLabel={`Open large view of ${zoneLabel(zone)} deck card ${card.name} ${card.number}`}
                   />
                   <div className="grid min-w-0 content-start gap-2">
@@ -5047,7 +5067,7 @@ function DeckPanel({
                         </span>
                       ))}
                     </div>
-                    <div className="deck-card-actions grid grid-cols-1 gap-1.5 min-[380px]:grid-cols-[minmax(3.75rem,1fr)_7.75rem_2.75rem]">
+                    <div className="deck-card-actions grid grid-cols-[2.75rem_minmax(7rem,1fr)_2.75rem] gap-1.5 min-[380px]:grid-cols-[minmax(3.75rem,1fr)_7.75rem_2.75rem]">
                       <a
                         href={tcgplayerUrl(card, artVariant)}
                         target="_blank"
@@ -5057,7 +5077,7 @@ function DeckPanel({
                         aria-label={`Search TCGplayer for ${card.name}`}
                       >
                         <ShoppingCart size={15} />
-                        <span>TCG</span>
+                        <span className="deck-tcg-label">TCG</span>
                       </a>
                       <MiniQuantityControl
                         label={card.name}
@@ -5098,6 +5118,7 @@ function LibraryCard({
   resourceQuantity,
   ownedQuantity,
   missingQuantity,
+  eagerImage = false,
   onSelect,
   onOpenCard,
   onAdjustMain,
@@ -5112,6 +5133,7 @@ function LibraryCard({
   resourceQuantity: number;
   ownedQuantity: number;
   missingQuantity: number;
+  eagerImage?: boolean;
   onSelect: () => void;
   onOpenCard: () => void;
   onAdjustMain: (delta: number) => void;
@@ -5161,13 +5183,14 @@ function LibraryCard({
           title={`Open large view of ${cardActionLabel}`}
         >
           <img
+            key={`${card.number}-${artVariant.id}-${eagerImage ? "eager" : "lazy"}`}
             src={cardImagePath(card, artVariant, 1000)}
             srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
             sizes="(min-width: 1536px) 8.75rem, (min-width: 1280px) 8rem, (min-width: 640px) 8.75rem, (min-width: 380px) 8rem, 7.25rem"
             alt={`${card.name} card`}
             className="h-full w-full bg-black object-contain object-top transition duration-200 group-hover:scale-[1.035]"
             decoding="async"
-            loading="lazy"
+            loading={eagerImage ? "eager" : "lazy"}
             referrerPolicy="no-referrer"
             onError={handleCardImageError}
           />
@@ -5209,7 +5232,7 @@ function LibraryCard({
               {formatPrintMoney(card, artVariant)}
             </p>
           </div>
-          <p className="line-clamp-1 text-sm font-semibold leading-5 text-[#f7f7f2]/54 sm:line-clamp-2">
+          <p className="library-card-rules line-clamp-2 text-sm font-semibold leading-5 text-[#f7f7f2]/54">
             {card.text}
           </p>
           <div className="flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
