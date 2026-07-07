@@ -28,7 +28,6 @@ const bridgeConfig = readCodexMarketBridgeConfig();
 const marketOrigin = (
   process.env.TCGPLAYER_BRIDGE_ORIGIN ??
   process.env.JANIE_API_ORIGIN ??
-  process.env.API_ORIGIN ??
   bridgeConfig.TCGPLAYER_BRIDGE_ORIGIN ??
   bridgeConfig.JANIE_API_ORIGIN ??
   "https://janie.up.railway.app"
@@ -37,10 +36,9 @@ const marketToken =
   process.env.TCGPLAYER_BRIDGE_TOKEN ??
   process.env.JANIE_API_TOKEN ??
   process.env.JANIE_BEARER_TOKEN ??
-  process.env.API_KEY ??
-  process.env.ADMIN_API_KEY ??
   bridgeConfig.TCGPLAYER_BRIDGE_TOKEN ??
   bridgeConfig.JANIE_API_TOKEN;
+const existingSyncReport = checkOnly ? readExistingSyncReport() : null;
 
 const curatedByNumber = new Map(CURATED_CARD_POOL.map((card) => [card.number, card]));
 const localVariantsByNumber = CARD_ART_VARIANTS;
@@ -77,6 +75,20 @@ function section(text, name) {
 function readTomlString(block, key) {
   const match = block.match(new RegExp(`^${key}\\s*=\\s*"((?:\\\\.|[^"\\\\])*)"`, "m"));
   return match ? JSON.parse(`"${match[1]}"`) : undefined;
+}
+
+function readExistingSyncReport() {
+  try {
+    return JSON.parse(
+      readFileSync(new URL("../data/tcgplayer-gundam-sync.json", import.meta.url), "utf8"),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function stableCheckTimestamp(current, existing) {
+  return checkOnly && typeof existing === "string" ? existing : current;
 }
 
 function normalize(value) {
@@ -357,8 +369,23 @@ async function mapLimit(items, limit, mapper) {
   return Promise.all(results);
 }
 
-function generateFiles({ releaseAudit, catalogDiscovery, products, searchReports, catalogReports }) {
-  const updatedAt = products.length ? new Date().toISOString() : null;
+function generateFiles({
+  releaseAudit,
+  catalogDiscovery,
+  products,
+  searchReports,
+  catalogReports,
+  existingReport,
+}) {
+  const updatedAt = products.length
+    ? stableCheckTimestamp(new Date().toISOString(), existingReport?.updatedAt)
+    : null;
+  const sortedCatalogReports = [...catalogReports].sort((a, b) =>
+    String(a.setName).localeCompare(String(b.setName)),
+  );
+  const sortedSearchReports = [...searchReports].sort((a, b) =>
+    String(a.query).localeCompare(String(b.query)),
+  );
   const productsByNumber = new Map();
   const unmatchedProducts = [];
 
@@ -494,12 +521,18 @@ export const DECK_VALIDATION_CARDS: Record<string, DeckValidationCard> = ${JSON.
         gameName,
         marketOrigin: marketOrigin,
         releaseAudit: {
-          generatedAt: releaseAudit.generatedAt,
+          generatedAt: stableCheckTimestamp(
+            releaseAudit.generatedAt,
+            existingReport?.releaseAudit?.generatedAt,
+          ),
           status: releaseAudit.status,
           summary: releaseAudit.summary,
         },
         catalogDiscovery: {
-          generatedAt: catalogDiscovery.generatedAt,
+          generatedAt: stableCheckTimestamp(
+            catalogDiscovery.generatedAt,
+            existingReport?.catalogDiscovery?.generatedAt,
+          ),
           status: catalogDiscovery.status,
           summary: catalogDiscovery.summary,
         },
@@ -507,14 +540,16 @@ export const DECK_VALIDATION_CARDS: Record<string, DeckValidationCard> = ${JSON.
         generatedCardCount: generatedCards.length,
         printRecordCount: Object.values(printRecords).reduce((sum, prints) => sum + prints.length, 0),
         cardsWithPrints: Object.keys(printRecords).length,
-        catalogReports,
-        searchReports,
-        unmatchedProducts,
+        catalogReports: sortedCatalogReports,
+        searchReports: sortedSearchReports,
+        unmatchedProducts: unmatchedProducts.sort((a, b) =>
+          String(a.name).localeCompare(String(b.name)),
+        ),
         warnings: [
           products.length === 0
             ? "Market bridge returned zero Gundam product rows. Catalog sets may be inserted, but product/price jobs have not drained yet."
             : "",
-          searchReports.some((report) => report.limitHit)
+          sortedSearchReports.some((report) => report.limitHit)
             ? "One or more Market bridge pricing searches hit the 100-row endpoint limit. Full catalog rows are included from market product search, but some exact prices or product links may require a dedicated market catalog export."
             : "",
         ].filter(Boolean),
@@ -546,7 +581,14 @@ async function main() {
     fetchCatalogDiscovery(),
   ]);
   const { rows: products, searchReports, catalogReports } = await fetchProductRows(releaseAudit);
-  const files = generateFiles({ releaseAudit, catalogDiscovery, products, searchReports, catalogReports });
+  const files = generateFiles({
+    releaseAudit,
+    catalogDiscovery,
+    products,
+    searchReports,
+    catalogReports,
+    existingReport: existingSyncReport,
+  });
 
   await writeGeneratedFile("app/tcgplayer-data.ts", files.dataSource);
   await writeGeneratedFile("app/tcgplayer-card-data.ts", files.cardSource);

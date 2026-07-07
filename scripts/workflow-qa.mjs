@@ -368,6 +368,113 @@ async function assertLibraryRowAddsFromBlankDeck(page) {
   );
 }
 
+async function assertImportRejectsEmptyObject(page) {
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  const startingName = await page.locator("input").first().inputValue();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "empty-object.json",
+    mimeType: "application/json",
+    buffer: Buffer.from("{}"),
+  });
+  await page.getByText("Import failed").waitFor({ timeout: 15000 });
+  const currentName = await page.locator("input").first().inputValue();
+  if (currentName !== startingName) {
+    throw new Error(`Empty object import replaced deck "${startingName}" with "${currentName}"`);
+  }
+}
+
+async function assertEmptyDeckArtButtonsExplainNoOp(page) {
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await page.getByRole("button", { name: "Upgrade deck art budget" }).click();
+  await page.getByText("No prints to tune").waitFor({ timeout: 15000 });
+}
+
+async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
+  const deck = legalDeck({ name: "Workflow QA Shared Preview" });
+  const saveResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deck),
+  });
+  if (!saveResponse.ok) {
+    throw new Error(`POST /api/decks shared-preview probe failed with ${saveResponse.status}`);
+  }
+
+  const saved = await saveResponse.json();
+  await page.goto(absoluteUrl(`/decks/${saved.id}`).toString(), { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await page.getByText("Clone to edit").waitFor({ timeout: 15000 });
+  const name = await page.locator("input").first().inputValue();
+  if (name !== deck.name) {
+    throw new Error(`Shared preview was mutated before clone: ${name}`);
+  }
+  if (!/\/decks\//.test(page.url())) {
+    throw new Error(`Shared preview unexpectedly navigated away: ${page.url()}`);
+  }
+}
+
+async function assertAccessibleControlNames(page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+
+  const desktopAudit = await page.evaluate(() => {
+    const filterButton = Array.from(document.querySelectorAll("button")).find((button) =>
+      /\bFilters\b/i.test(button.textContent ?? ""),
+    );
+    const largeViewButtons = Array.from(
+      document.querySelectorAll('button[aria-label^="Open large view"]'),
+    ).filter((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    const labels = largeViewButtons.map((button) => button.getAttribute("aria-label") ?? "");
+    return {
+      filterControls: filterButton?.getAttribute("aria-controls") ?? null,
+      filterPanelMounted: Boolean(document.querySelector("#library-advanced-filters")),
+      duplicateLabels: labels.filter((label, index) => labels.indexOf(label) !== index),
+    };
+  });
+
+  if (desktopAudit.filterControls || desktopAudit.filterPanelMounted) {
+    throw new Error(
+      `Closed filters should not point at an unmounted panel: ${JSON.stringify(desktopAudit)}`,
+    );
+  }
+  await page.getByRole("button", { name: /Filters/i }).click();
+  const openFilterControls = await page
+    .getByRole("button", { name: /Filters/i })
+    .getAttribute("aria-controls");
+  if (openFilterControls !== "library-advanced-filters") {
+    throw new Error(`Open filters dropped aria-controls: ${openFilterControls}`);
+  }
+  if (desktopAudit.duplicateLabels.length) {
+    throw new Error(
+      `Visible large-card buttons have duplicate labels: ${desktopAudit.duplicateLabels.join(", ")}`,
+    );
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  const closedMobileMoreControls = await page
+    .locator('button[title="More deck actions"]')
+    .getAttribute("aria-controls");
+  if (closedMobileMoreControls) {
+    throw new Error(`Closed mobile More button points at unmounted panel: ${closedMobileMoreControls}`);
+  }
+  await page.locator('button[title="More deck actions"]').click();
+  const mobileMoreControls = await page
+    .locator('button[title="More deck actions"]')
+    .getAttribute("aria-controls");
+  if (mobileMoreControls !== "mobile-action-sheet") {
+    throw new Error(`Mobile More button dropped aria-controls: ${mobileMoreControls}`);
+  }
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector("#mobile-action-sheet"));
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+}
+
 async function assertArtUpgradeKeepsBuyList(page) {
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
   await page.goto(baseUrl, { waitUntil: "networkidle" });
@@ -386,7 +493,7 @@ async function assertMobileActionSheetFocusTrap(page) {
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.locator('button[title="More deck actions"]').click();
   await page.waitForFunction(
-    () => document.activeElement?.getAttribute("title") === "Load sample deck",
+    () => document.activeElement?.getAttribute("title") === "Close more deck actions",
     null,
     { timeout: 15000 },
   );
@@ -486,6 +593,35 @@ async function assertMobileLibraryLayout(page) {
     throw new Error(`320px library TCG button clips by ${tcgClipping}px`);
   }
 
+  const mobileActionAudit = await page.evaluate(() => {
+    const pagerNext = document.querySelector('button[aria-label="Next library page"]');
+    const actionTargets = Array.from(
+      document.querySelectorAll(
+        '.library-card-actions button[aria-label^="Select"], .library-card-actions button[aria-label*="details from action row"], .library-card-actions a[aria-label^="Search TCGplayer"]',
+      ),
+    ).map((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        label: node.getAttribute("aria-label") ?? node.textContent ?? "",
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+    const pagerRect = pagerNext?.getBoundingClientRect();
+    return {
+      pagerVisible: Boolean(pagerRect && pagerRect.width > 0 && pagerRect.height > 0),
+      narrowActions: actionTargets.filter((target) => target.width < 44 || target.height < 44),
+    };
+  });
+  if (!mobileActionAudit.pagerVisible) {
+    throw new Error("320px library pagination next button is not visible");
+  }
+  if (mobileActionAudit.narrowActions.length) {
+    throw new Error(
+      `320px library actions below 44px: ${JSON.stringify(mobileActionAudit.narrowActions)}`,
+    );
+  }
+
   await page.getByRole("button", { name: /Filters/i }).click();
   await page.locator(".library-filters-popover").waitFor({ timeout: 15000 });
   const filterGeometry = await page.evaluate(() => {
@@ -557,6 +693,9 @@ async function assertShortMobileControlsClearNav(page) {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
   await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.locator(".library-card-actions").first().evaluate((node) => {
+    node.scrollIntoView({ block: "center" });
+  });
 
   const libraryOverlap = await page.evaluate(() => {
     const actions = document.querySelector(".library-card-actions");
@@ -596,6 +735,16 @@ async function assertShortMobileControlsClearNav(page) {
 
   await page.setViewportSize({ width: 667, height: 375 });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
+  const landscapePagerVisible = await page
+    .locator('button[aria-label="Next library page"]')
+    .evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+  if (!landscapePagerVisible) {
+    throw new Error("667x375 library pagination next button is not visible");
+  }
+
   const landscapeCardOverlap = await page.evaluate(() => {
     const firstCardButton = document.querySelector('.library-result button[aria-label^="Open large view"]');
     const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
@@ -647,7 +796,7 @@ async function main() {
     await page.goto(baseUrl, { waitUntil: "networkidle" });
     await page.locator('button[title="More deck actions"]').click();
     await page.waitForFunction(
-      () => document.activeElement?.getAttribute("title") === "Load sample deck",
+      () => document.activeElement?.getAttribute("title") === "Close more deck actions",
       null,
       { timeout: 15000 },
     );
@@ -676,6 +825,10 @@ async function main() {
     await assertLocalStorageDropsPendingRulesCards(desktop);
     await assertLocalStorageCapsLongDeckNames(desktop);
     await assertLibraryRowAddsFromBlankDeck(desktop);
+    await assertImportRejectsEmptyObject(desktop);
+    await assertEmptyDeckArtButtonsExplainNoOp(desktop);
+    await assertSharedPreviewRequiresCloneBeforeEditing(desktop);
+    await assertAccessibleControlNames(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
     await assertResourceSearchRanksResourceCards(desktop);
     await assertMarketCatalogOnlyCardsAreLabeled(desktop);

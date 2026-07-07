@@ -99,6 +99,7 @@ type FallbackPanel = {
   content: string;
   href?: string;
   downloadName?: string;
+  copyLabel?: string;
 };
 
 type FocusableElement = HTMLElement & {
@@ -1460,6 +1461,7 @@ export function DeckBuilder({
   const deferredQuery = useDeferredValue(query);
 
   const isDialogOpen = Boolean(fallbackPanel || lightbox || mobileActionsOpen);
+  const sharedPreviewLocked = Boolean(sharedDeckId && sharedStatus === "ready");
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
@@ -1986,6 +1988,7 @@ export function DeckBuilder({
     label: string,
     detail: string,
   ) {
+    if (blockSharedPreviewEdit()) return;
     setDeck((current) => {
       undoDeckRef.current = cloneDeckState(current);
       return cloneDeckState(createNextDeck());
@@ -2011,6 +2014,16 @@ export function DeckBuilder({
     );
   }
 
+  function blockSharedPreviewEdit() {
+    if (!sharedPreviewLocked) return false;
+    showToast(
+      "warn",
+      "Clone to edit",
+      "This shared deck preview is read-only. Clone it before changing cards, prints, or the deck name.",
+    );
+    return true;
+  }
+
   function resetAdvancedFilters() {
     setSetFilter("All");
     setArtFilter("All Art");
@@ -2033,7 +2046,20 @@ export function DeckBuilder({
   }
 
   function openBuyList() {
-    void copyBuyList();
+    rememberFallbackReturnFocus();
+    if (!buyListText) {
+      showToast("good", "Buy list clear", "No missing selected prints to review.");
+      return;
+    }
+
+    setFallbackPanel({
+      title: "Buy List",
+      detail: "Review missing selected prints, then copy or download the list when ready.",
+      content: buyListText,
+      copyLabel: "Copy Buy List",
+      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-buy-list.txt`,
+    });
+    showToast("good", "Buy list ready", "Review panel opened without changing your clipboard.");
   }
 
   function openCardLightbox(card: GundamCard, artVariant?: CardArtVariant) {
@@ -2044,6 +2070,7 @@ export function DeckBuilder({
   }
 
   function stepCardArt(number: string, delta: number) {
+    if (blockSharedPreviewEdit()) return;
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card) return current;
@@ -2088,6 +2115,16 @@ export function DeckBuilder({
   }
 
   function stepDeckArt(delta: number) {
+    if (blockSharedPreviewEdit()) return;
+    if (mainTotal + resourceTotal === 0) {
+      showToast(
+        "warn",
+        "No prints to tune",
+        "Add cards before upgrading or downgrading deck art.",
+      );
+      return;
+    }
+
     setDeck((current) => {
       const cardNumbers = new Set([
         ...Object.keys(current.main),
@@ -2116,6 +2153,7 @@ export function DeckBuilder({
   }
 
   function adjustCard(zone: Zone, number: string, delta: number) {
+    if (blockSharedPreviewEdit()) return;
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card) return current;
@@ -2155,6 +2193,7 @@ export function DeckBuilder({
   }
 
   function removeCard(zone: Zone, number: string) {
+    if (blockSharedPreviewEdit()) return;
     const card = CARD_BY_NUMBER.get(number);
     const quantity = deck[zone][number] ?? 0;
     if (!card || quantity <= 0) return;
@@ -2177,6 +2216,7 @@ export function DeckBuilder({
   }
 
   function adjustCollection(number: string, artId: string, delta: number) {
+    if (blockSharedPreviewEdit()) return;
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card || !validArtId(card, artId)) return current;
@@ -2194,6 +2234,7 @@ export function DeckBuilder({
   }
 
   function markDeckOwned() {
+    if (blockSharedPreviewEdit()) return;
     undoDeckRef.current = cloneDeckState(deck);
     setCanUndo(true);
     setDeck((current) => {
@@ -2419,32 +2460,19 @@ export function DeckBuilder({
       title: "Deck List",
       detail: "Clipboard access was blocked. The deck list is selected below.",
       content: deckList,
+      copyLabel: "Copy Deck List",
       downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-deck.txt`,
     });
     showToast("bad", "Copy failed", "Deck list opened in a manual copy panel.");
     window.setTimeout(() => setCopyState("Copy"), 1200);
   }
 
-  async function copyBuyList() {
-    rememberFallbackReturnFocus();
-    if (!buyListText) {
-      showToast("good", "Buy list clear", "No missing selected prints to copy.");
-      return;
-    }
-
-    const copied = await writeClipboardText(buyListText);
-    setFallbackPanel({
-      title: "Buy List",
-      detail: copied
-        ? "Missing selected prints were copied. Review the buy list below before purchasing."
-        : "Clipboard access was blocked. The missing-print buy list is selected below.",
-      content: buyListText,
-      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-buy-list.txt`,
-    });
+  async function copyFallbackContent(content: string, label: string) {
+    const copied = await writeClipboardText(content);
     showToast(
-      copied ? "good" : "warn",
-      copied ? "Buy list copied" : "Buy list ready",
-      copied ? "Review panel opened." : "Manual copy panel opened.",
+      copied ? "good" : "bad",
+      copied ? `${label} copied` : `${label} copy failed`,
+      copied ? "Text is on your clipboard." : "Select the text manually from the panel.",
     );
   }
 
@@ -2499,6 +2527,7 @@ export function DeckBuilder({
             "Clipboard access was blocked. This URL shares decklist and selected printings only; ownership is not included.",
           content: shareUrl,
           href: shareUrl,
+          copyLabel: "Copy Share Link",
         });
       }
       showToast(
@@ -2544,7 +2573,9 @@ export function DeckBuilder({
     try {
       const text = await file.text();
       const parsed = sanitizeDeck(JSON.parse(text));
-      if (!parsed) throw new Error("Invalid deck");
+      if (!parsed || totalCards(parsed.main) + totalCards(parsed.resource) === 0) {
+        throw new Error("Invalid deck");
+      }
       replaceDeckWithUndo(
         () => parsed,
         "Deck imported",
@@ -2586,6 +2617,15 @@ export function DeckBuilder({
     });
   }
 
+  function handleSkipLink(event: React.MouseEvent<HTMLAnchorElement>, view: MobileView) {
+    if (!mobileTabsEnabled) return;
+    event.preventDefault();
+    changeMobileView(view);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`${view}-panel`)?.scrollIntoView({ block: "start" });
+    });
+  }
+
   return (
     <main className="app-shell min-h-screen bg-[#05060a] text-[#f7f7f2]">
       <div
@@ -2612,10 +2652,18 @@ export function DeckBuilder({
         inert={isDialogOpen || undefined}
       >
         <nav className="skip-links" aria-label="Skip links">
-          <a href="#library-panel">Skip to library</a>
-          <a href="#card-panel">Skip to card inspector</a>
-          <a href="#deck-panel">Skip to deck list</a>
-          <a href="#stats-panel">Skip to stats</a>
+          <a href="#library-panel" onClick={(event) => handleSkipLink(event, "library")}>
+            Skip to library
+          </a>
+          <a href="#card-panel" onClick={(event) => handleSkipLink(event, "card")}>
+            Skip to card inspector
+          </a>
+          <a href="#deck-panel" onClick={(event) => handleSkipLink(event, "deck")}>
+            Skip to deck list
+          </a>
+          <a href="#stats-panel" onClick={(event) => handleSkipLink(event, "stats")}>
+            Skip to stats
+          </a>
         </nav>
         <header className="border-b border-[#a7b5c9]/25 bg-[#05060a]/82 shadow-xl shadow-black/40 backdrop-blur-xl">
         <div className="mx-auto max-w-[1800px] px-3 py-1.5 sm:px-5 sm:py-2">
@@ -2649,9 +2697,11 @@ export function DeckBuilder({
                 <span className="sr-only">Deck name</span>
                 <input
                   value={deck.name}
-                  onChange={(event) =>
-                    setDeck((current) => ({ ...current, name: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    if (blockSharedPreviewEdit()) return;
+                    setDeck((current) => ({ ...current, name: event.target.value }));
+                  }}
+                  readOnly={sharedPreviewLocked}
                   className="control-field short-cockpit-deck-name h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                 />
               </label>
@@ -3247,11 +3297,13 @@ export function DeckBuilder({
       <MobileActionSheet
         open={mobileActionsOpen}
         deckName={deck.name}
+        deckNameReadOnly={sharedPreviewLocked}
         copyState={copyState}
         canUndo={canUndo}
-        onDeckNameChange={(name) =>
-          setDeck((current) => ({ ...current, name }))
-        }
+        onDeckNameChange={(name) => {
+          if (blockSharedPreviewEdit()) return;
+          setDeck((current) => ({ ...current, name }));
+        }}
         onSample={() => runMobileAction(loadSampleDeck)}
         onNew={() => runMobileAction(startNewDeck)}
         onUndo={() => runMobileAction(restoreUndoDeck)}
@@ -3275,6 +3327,7 @@ export function DeckBuilder({
         panel={fallbackPanel}
         returnFocusElement={fallbackReturnFocusElement}
         onClose={closeFallbackPanel}
+        onCopyContent={(content, label) => void copyFallbackContent(content, label)}
       />
       <CardLightbox
         item={lightbox}
@@ -3469,7 +3522,7 @@ function CatalogOnlyBanner({
         <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
           <button
             type="button"
-            className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
+            className="interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
             onClick={onDeckReady}
             disabled={deckReadyCards === 0}
           >
@@ -3477,7 +3530,7 @@ function CatalogOnlyBanner({
           </button>
           <button
             type="button"
-            className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
+            className="interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
             onClick={onCatalogOnly}
           >
             Catalog {catalogCards}
@@ -3642,6 +3695,7 @@ function MobileCockpitNav({
 function MobileActionSheet({
   open,
   deckName,
+  deckNameReadOnly,
   copyState,
   canUndo,
   onDeckNameChange,
@@ -3658,6 +3712,7 @@ function MobileActionSheet({
 }: {
   open: boolean;
   deckName: string;
+  deckNameReadOnly: boolean;
   copyState: string;
   canUndo: boolean;
   onDeckNameChange: (name: string) => void;
@@ -3680,11 +3735,11 @@ function MobileActionSheet({
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     window.setTimeout(() => {
-      const sampleButton = sheetRef.current?.querySelector<HTMLButtonElement>(
-        'button[title="Load sample deck"]',
+      const closeButton = sheetRef.current?.querySelector<HTMLButtonElement>(
+        'button[title="Close more deck actions"]',
       );
       const firstButton = sheetRef.current?.querySelector<HTMLButtonElement>("button");
-      (sampleButton ?? firstButton)?.focus();
+      (closeButton ?? firstButton)?.focus();
     }, 0);
 
     return () => {
@@ -3699,7 +3754,7 @@ function MobileActionSheet({
     <>
       <button
         type="button"
-        className="mobile-action-backdrop fixed inset-0 z-[64] cursor-default bg-black/20 xl:hidden"
+          className="mobile-action-backdrop fixed inset-0 z-[64] cursor-default bg-black/55 xl:hidden"
         onClick={onClose}
         aria-label="Close more deck actions"
         tabIndex={-1}
@@ -3723,6 +3778,8 @@ function MobileActionSheet({
           <input
             value={deckName}
             onChange={(event) => onDeckNameChange(event.target.value)}
+            readOnly={deckNameReadOnly}
+            title={deckNameReadOnly ? "Clone this shared deck before renaming it" : undefined}
             className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/10 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
           />
         </label>
@@ -3846,10 +3903,12 @@ function FallbackPanelView({
   panel,
   returnFocusElement,
   onClose,
+  onCopyContent,
 }: {
   panel: FallbackPanel | null;
   returnFocusElement: HTMLElement | null;
   onClose: () => void;
+  onCopyContent: (content: string, label: string) => void;
 }) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -3920,6 +3979,16 @@ function FallbackPanelView({
             className="control-field min-h-64 w-full resize-y rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono text-sm font-bold leading-6 text-[#f7f7f2] outline-none focus:border-[#f6c542]"
           />
           <div className="grid gap-2 sm:grid-cols-2">
+            {panel.copyLabel && (
+              <button
+                type="button"
+                onClick={() => onCopyContent(panel.content, panel.title)}
+                className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd]"
+              >
+                <Clipboard size={15} />
+                {panel.copyLabel}
+              </button>
+            )}
             {panel.href && (
               <a
                 href={panel.href}
@@ -4405,7 +4474,11 @@ function HandSimulatorPanel({
                   card.color,
                 )}`}
               >
-                <CardThumb card={card} onOpen={() => onOpenCard(card)} />
+                <CardThumb
+                  card={card}
+                  onOpen={() => onOpenCard(card)}
+                  openLabel={`Open large view of opening hand card ${index + 1}: ${card.name} ${card.number}`}
+                />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-base font-black text-[#f7f7f2]">
                     {card.name}
@@ -4438,6 +4511,9 @@ function HandSimulatorPanel({
 function StatusBadge({ isLegal }: { isLegal: boolean }) {
   return (
     <span
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       className={`status-badge inline-flex h-8 w-fit items-center gap-2 rounded-sm border px-2.5 font-display text-base font-black uppercase ${
         isLegal
           ? "border-[#2e8cff]/45 bg-[#1167d8]/18 text-[#d9ecff]"
@@ -4592,6 +4668,14 @@ function QuantityStepper({
         ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
         : "border-current/30 bg-black/22 text-current hover:bg-current/10"
     }`;
+  const decrementLabel =
+    decrementDisabled && decrementReason
+      ? `${decrementReason} for ${label}`
+      : `Remove one ${label} copy`;
+  const incrementLabel =
+    incrementDisabled && incrementReason
+      ? `${incrementReason} for ${label}`
+      : `Add one ${label} copy`;
   const visibleReason = incrementDisabled ? incrementReason : "";
 
   return (
@@ -4618,8 +4702,8 @@ function QuantityStepper({
           type="button"
           className={buttonClass(decrementDisabled)}
           disabled={decrementDisabled}
-          title={decrementDisabled ? decrementReason : `Remove one ${label} copy`}
-          aria-label={decrementDisabled && decrementReason ? decrementReason : `Remove one ${label} copy`}
+          title={decrementLabel}
+          aria-label={decrementLabel}
           onClick={(event) => {
             event.stopPropagation();
             onDecrement();
@@ -4640,8 +4724,8 @@ function QuantityStepper({
           type="button"
           className={buttonClass(incrementDisabled)}
           disabled={incrementDisabled}
-          title={incrementDisabled ? incrementReason : `Add one ${label} copy`}
-          aria-label={incrementDisabled && incrementReason ? incrementReason : `Add one ${label} copy`}
+          title={incrementLabel}
+          aria-label={incrementLabel}
           onClick={(event) => {
             event.stopPropagation();
             onIncrement();
@@ -4810,13 +4894,14 @@ function DeckPanel({
                   card.color,
                 )}`}
               >
-                <div className="grid grid-cols-[4.35rem_minmax(0,1fr)] gap-2.5 sm:grid-cols-[4.85rem_minmax(0,1fr)]">
+                  <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2.5">
                   <CardThumb
                     card={card}
                     artVariant={artVariant}
                     onOpen={() => onOpenCard(card, artVariant)}
                     size="deck"
                     badge={`${quantity}`}
+                    openLabel={`Open large view of ${zoneLabel(zone)} deck card ${card.name} ${card.number}`}
                   />
                   <div className="grid min-w-0 content-start gap-2">
                     <div className="min-w-0">
@@ -5010,7 +5095,7 @@ function LibraryCard({
               {formatPrintMoney(card, artVariant)}
             </p>
           </div>
-          <p className="hidden line-clamp-2 text-sm font-semibold leading-5 text-[#f7f7f2]/54 sm:block">
+          <p className="line-clamp-1 text-sm font-semibold leading-5 text-[#f7f7f2]/54 sm:line-clamp-2">
             {card.text}
           </p>
           <div className="flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
@@ -5054,7 +5139,7 @@ function LibraryCard({
           </div>
         </div>
 
-        <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.5rem_2.5rem_2.5rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.5rem_2.5rem_3.25rem] sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
+        <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_2.75rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.75rem_2.75rem_3.25rem] sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
         {primaryZone && onAdjustPrimary ? (
           <MiniQuantityControl
             label={`${cardActionLabel} ${zoneLabel(primaryZone).toLowerCase()} copy`}
@@ -5182,8 +5267,8 @@ function InspectorPanel({
             type="button"
             className="scan-frame interactive-control relative h-36 w-[103px] shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black text-left shadow-2xl shadow-black/40"
             onClick={onOpenCard}
-            aria-label={`Open large view of ${card.name}`}
-            title={`Open large view of ${card.name}`}
+            aria-label={`Open large view of selected card ${card.name} ${card.number}`}
+            title={`Open large view of selected card ${card.name} ${card.number}`}
           >
             <img
               src={cardImagePath(card, artVariant, 1000)}
@@ -5370,19 +5455,22 @@ function CardThumb({
   onOpen,
   size = "sm",
   badge,
+  openLabel,
 }: {
   card: GundamCard;
   artVariant?: CardArtVariant;
   onOpen?: () => void;
   size?: "sm" | "deck";
   badge?: string;
+  openLabel?: string;
 }) {
   const sizeClass =
     size === "deck"
-      ? "h-24 w-[4.25rem] sm:h-28 sm:w-20"
+      ? "h-28 w-20"
       : "h-16 w-12";
   const thumbClass =
     `relative ${sizeClass} shrink-0 overflow-hidden rounded-sm border border-[#f7f7f2]/15 bg-black shadow-sm`;
+  const cardOpenLabel = openLabel ?? `Open large view of ${card.name} ${card.number}`;
   const image = (
     <img
       src={cardImagePath(card, artVariant, size === "deck" ? 800 : 600)}
@@ -5406,8 +5494,8 @@ function CardThumb({
           event.stopPropagation();
           onOpen();
         }}
-        aria-label={`Open large view of ${card.name}`}
-        title={`Open large view of ${card.name}`}
+        aria-label={cardOpenLabel}
+        title={cardOpenLabel}
       >
         {image}
         {badge && (

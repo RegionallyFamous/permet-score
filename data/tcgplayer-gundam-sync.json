@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-07-07T05:48:13.706Z",
+  "updatedAt": "2026-07-07T06:47:24.740Z",
   "source": "TCGplayer market",
   "gameName": "Gundam Card Game",
   "marketOrigin": "https://janie.up.railway.app",
   "releaseAudit": {
-    "generatedAt": "2026-07-07T05:48:03.417Z",
+    "generatedAt": "2026-07-07T06:47:00.874Z",
     "status": "degraded",
     "summary": {
       "setsReviewed": 20,
@@ -21,7 +21,7 @@
     }
   },
   "catalogDiscovery": {
-    "generatedAt": "2026-07-07T05:48:03.698Z",
+    "generatedAt": "2026-07-07T06:47:01.589Z",
     "status": "warning",
     "summary": {
       "categoriesChecked": 1,
@@ -46,14 +46,14 @@
   "cardsWithPrints": 808,
   "catalogReports": [
     {
-      "setName": "Phantom Aria",
-      "rows": 199,
-      "numberedRows": 190
+      "setName": "Dual Impact",
+      "rows": 192,
+      "numberedRows": 186
     },
     {
-      "setName": "Starter Deck 10: Generation Pulse",
-      "rows": 38,
-      "numberedRows": 35
+      "setName": "Edition Beta",
+      "rows": 85,
+      "numberedRows": 79
     },
     {
       "setName": "Eternal Nexus",
@@ -61,29 +61,9 @@
       "numberedRows": 107
     },
     {
-      "setName": "Starter Deck 07: Celestial Drive",
-      "rows": 36,
-      "numberedRows": 32
-    },
-    {
-      "setName": "Starter Deck 09: Destiny Ignition",
-      "rows": 43,
-      "numberedRows": 39
-    },
-    {
-      "setName": "Starter Deck 06: Clan Unity",
-      "rows": 36,
-      "numberedRows": 32
-    },
-    {
-      "setName": "Steel Requiem",
-      "rows": 207,
-      "numberedRows": 194
-    },
-    {
-      "setName": "Starter Deck 08: Flash of Radiance",
-      "rows": 36,
-      "numberedRows": 32
+      "setName": "Gundam Promotional Cards",
+      "rows": 192,
+      "numberedRows": 169
     },
     {
       "setName": "Newtype Rising",
@@ -91,39 +71,14 @@
       "numberedRows": 181
     },
     {
-      "setName": "Dual Impact",
-      "rows": 192,
-      "numberedRows": 186
+      "setName": "Phantom Aria",
+      "rows": 199,
+      "numberedRows": 190
     },
     {
-      "setName": "Starter Deck 03: Zeon's Rush",
-      "rows": 39,
-      "numberedRows": 32
-    },
-    {
-      "setName": "Starter Deck 05: Iron Bloom",
-      "rows": 36,
-      "numberedRows": 32
-    },
-    {
-      "setName": "Starter Deck 01: Heroic Beginnings",
-      "rows": 39,
-      "numberedRows": 32
-    },
-    {
-      "setName": "Starter Deck 02: Wings of Advance",
-      "rows": 39,
-      "numberedRows": 32
-    },
-    {
-      "setName": "Gundam Promotional Cards",
-      "rows": 192,
-      "numberedRows": 169
-    },
-    {
-      "setName": "Starter Deck 04: SEED Strike",
-      "rows": 39,
-      "numberedRows": 32
+      "setName": "Promotional EX Base Tokens",
+      "rows": 22,
+      "numberedRows": 0
     },
     {
       "setName": "Promotional EX Resource Tokens",
@@ -136,55 +91,135 @@
       "numberedRows": 0
     },
     {
-      "setName": "Promotional EX Base Tokens",
-      "rows": 22,
-      "numberedRows": 0
+      "setName": "Starter Deck 01: Heroic Beginnings",
+      "rows": 39,
+      "numberedRows": 32
     },
     {
-      "setName": "Edition Beta",
-      "rows": 85,
-      "numberedRows": 79
+      "setName": "Starter Deck 02: Wings of Advance",
+      "rows": 39,
+      "numberedRows": 32
+    },
+    {
+      "setName": "Starter Deck 03: Zeon's Rush",
+      "rows": 39,
+      "numberedRows": 32
+    },
+    {
+      "setName": "Starter Deck 04: SEED Strike",
+      "rows": 39,
+      "numberedRows": 32
+    },
+    {
+      "setName": "Starter Deck 05: Iron Bloom",
+      "rows": 36,
+      "numberedRows": 32
+    },
+    {
+      "setName": "Starter Deck 06: Clan Unity",
+      "rows": 36,
+      "numberedRows": 32
+    },
+    {
+      "setName": "Starter Deck 07: Celestial Drive",
+      "rows": 36,
+      "numberedRows": 32
+    },
+    {
+      "setName": "Starter Deck 08: Flash of Radiance",
+      "rows": 36,
+      "numberedRows": 32
+    },
+    {
+      "setName": "Starter Deck 09: Destiny Ignition",
+      "rows": 43,
+      "numberedRows": 39
+    },
+    {
+      "setName": "Starter Deck 10: Generation Pulse",
+      "rows": 38,
+      "numberedRows": 35
+    },
+    {
+      "setName": "Steel Requiem",
+      "rows": 207,
+      "numberedRows": 194
     }
   ],
   "searchReports": [
     {
-      "query": "Eternal Nexus",
-      "rows": 100,
-      "limitHit": true
-    },
-    {
-      "query": "Starter Deck 10: Generation Pulse",
-      "rows": 38,
+      "query": "Aegis Gundam",
+      "rows": 5,
       "limitHit": false
     },
     {
-      "query": "Phantom Aria",
-      "rows": 100,
-      "limitHit": true
-    },
-    {
-      "query": "Starter Deck 09: Destiny Ignition",
-      "rows": 43,
+      "query": "Aegis Gundam (MA Mode)",
+      "rows": 3,
       "limitHit": false
     },
     {
-      "query": "Starter Deck 07: Celestial Drive",
-      "rows": 36,
+      "query": "Aile Strike Gundam",
+      "rows": 9,
       "limitHit": false
     },
     {
-      "query": "Steel Requiem",
-      "rows": 100,
-      "limitHit": true
-    },
-    {
-      "query": "Starter Deck 05: Iron Bloom",
-      "rows": 36,
+      "query": "Amuro Ray",
+      "rows": 4,
       "limitHit": false
     },
     {
-      "query": "Starter Deck 08: Flash of Radiance",
-      "rows": 36,
+      "query": "Angelo's Geara Zulu",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Archangel",
+      "rows": 6,
+      "limitHit": false
+    },
+    {
+      "query": "Aries",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Asticassia School of Technology, Earth House",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Athrun Zala",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Char Aznable",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Char's Zaku II",
+      "rows": 7,
+      "limitHit": false
+    },
+    {
+      "query": "Close Combat",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Corsica Base",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Demi Trainer",
+      "rows": 6,
+      "limitHit": false
+    },
+    {
+      "query": "Dra-C (Sleeves)",
+      "rows": 2,
       "limitHit": false
     },
     {
@@ -193,43 +228,88 @@
       "limitHit": true
     },
     {
-      "query": "Starter Deck 01: Heroic Beginnings",
-      "rows": 39,
+      "query": "Edition Beta",
+      "rows": 87,
       "limitHit": false
     },
     {
-      "query": "Starter Deck 06: Clan Unity",
-      "rows": 36,
-      "limitHit": false
-    },
-    {
-      "query": "Starter Deck 04: SEED Strike",
-      "rows": 39,
-      "limitHit": false
-    },
-    {
-      "query": "Newtype Rising",
+      "query": "Eternal Nexus",
       "rows": 100,
       "limitHit": true
     },
     {
-      "query": "Starter Deck 02: Wings of Advance",
-      "rows": 39,
+      "query": "EX Resource",
+      "rows": 19,
       "limitHit": false
     },
     {
-      "query": "Promotional Resource Tokens",
-      "rows": 54,
+      "query": "EXR-001",
+      "rows": 2,
       "limitHit": false
     },
     {
-      "query": "Starter Deck 03: Zeon's Rush",
-      "rows": 39,
+      "query": "Falmel",
+      "rows": 3,
       "limitHit": false
     },
     {
-      "query": "Edition Beta",
-      "rows": 87,
+      "query": "Full Frontal",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Gaza D (Sleeves)",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Geara Zulu",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Ginn",
+      "rows": 45,
+      "limitHit": false
+    },
+    {
+      "query": "GM",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Gouf",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Guncannon",
+      "rows": 11,
+      "limitHit": false
+    },
+    {
+      "query": "Gundam",
+      "rows": 100,
+      "limitHit": true
+    },
+    {
+      "query": "Gundam (MA Form)",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Gundam Aerial (Bit on Form)",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Gundam Aerial (Permet Score Six)",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Gundam Heavyarms",
+      "rows": 7,
       "limitHit": false
     },
     {
@@ -238,7 +318,77 @@
       "limitHit": true
     },
     {
-      "query": "Gundam",
+      "query": "Gundam Sandrock",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Guntank",
+      "rows": 7,
+      "limitHit": false
+    },
+    {
+      "query": "Hawk of Endymion",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Heero Yuy",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Indignation",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Kai's Resolve",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Kira Yamato",
+      "rows": 6,
+      "limitHit": false
+    },
+    {
+      "query": "Leo",
+      "rows": 9,
+      "limitHit": false
+    },
+    {
+      "query": "Maganac",
+      "rows": 6,
+      "limitHit": false
+    },
+    {
+      "query": "Miguel's Ginn",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Moebius",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Moebius Zero",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Newtype Rising",
+      "rows": 100,
+      "limitHit": true
+    },
+    {
+      "query": "Peaceful Timbre",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Phantom Aria",
       "rows": 100,
       "limitHit": true
     },
@@ -253,13 +403,48 @@
       "limitHit": false
     },
     {
-      "query": "ST01-001",
-      "rows": 8,
+      "query": "Promotional Resource Tokens",
+      "rows": 54,
       "limitHit": false
     },
     {
-      "query": "Guncannon",
-      "rows": 11,
+      "query": "R-001",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
+      "query": "Resource",
+      "rows": 100,
+      "limitHit": true
+    },
+    {
+      "query": "Rewloola",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Saint Gabriel Institute",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Siege Ploy",
+      "rows": 4,
+      "limitHit": false
+    },
+    {
+      "query": "Simultaneous Fire",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Sinanju",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "ST01-001",
+      "rows": 8,
       "limitHit": false
     },
     {
@@ -268,37 +453,12 @@
       "limitHit": false
     },
     {
-      "query": "Gundam (MA Form)",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Guntank",
-      "rows": 7,
-      "limitHit": false
-    },
-    {
       "query": "ST01-003",
       "rows": 2,
       "limitHit": false
     },
     {
-      "query": "GM",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
       "query": "ST01-004",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "ST01-007",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "ST01-006",
       "rows": 2,
       "limitHit": false
     },
@@ -308,23 +468,13 @@
       "limitHit": false
     },
     {
-      "query": "Gundam Aerial (Permet Score Six)",
+      "query": "ST01-006",
       "rows": 2,
       "limitHit": false
     },
     {
-      "query": "Demi Trainer",
-      "rows": 6,
-      "limitHit": false
-    },
-    {
-      "query": "Gundam Aerial (Bit on Form)",
+      "query": "ST01-007",
       "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "ST01-010",
-      "rows": 4,
       "limitHit": false
     },
     {
@@ -333,13 +483,13 @@
       "limitHit": false
     },
     {
-      "query": "Zowort",
+      "query": "ST01-009",
       "rows": 2,
       "limitHit": false
     },
     {
-      "query": "ST01-009",
-      "rows": 2,
+      "query": "ST01-010",
+      "rows": 4,
       "limitHit": false
     },
     {
@@ -348,8 +498,8 @@
       "limitHit": false
     },
     {
-      "query": "Amuro Ray",
-      "rows": 4,
+      "query": "ST01-012",
+      "rows": 3,
       "limitHit": false
     },
     {
@@ -358,32 +508,7 @@
       "limitHit": false
     },
     {
-      "query": "Suletta Mercury",
-      "rows": 8,
-      "limitHit": false
-    },
-    {
-      "query": "ST01-012",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Thoroughly Damaged",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
       "query": "ST01-014",
-      "rows": 7,
-      "limitHit": false
-    },
-    {
-      "query": "Kai's Resolve",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Unforeseen Incident",
       "rows": 7,
       "limitHit": false
     },
@@ -398,8 +523,8 @@
       "limitHit": false
     },
     {
-      "query": "White Base",
-      "rows": 3,
+      "query": "ST02-001",
+      "rows": 4,
       "limitHit": false
     },
     {
@@ -408,38 +533,8 @@
       "limitHit": false
     },
     {
-      "query": "Asticassia School of Technology, Earth House",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "ST02-001",
-      "rows": 4,
-      "limitHit": false
-    },
-    {
-      "query": "Wing Gundam",
-      "rows": 14,
-      "limitHit": false
-    },
-    {
       "query": "ST02-003",
       "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Wing Gundam (Bird Mode)",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "ST02-005",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Gundam Heavyarms",
-      "rows": 7,
       "limitHit": false
     },
     {
@@ -448,8 +543,8 @@
       "limitHit": false
     },
     {
-      "query": "Gundam Sandrock",
-      "rows": 5,
+      "query": "ST02-005",
+      "rows": 3,
       "limitHit": false
     },
     {
@@ -458,22 +553,12 @@
       "limitHit": false
     },
     {
-      "query": "Maganac",
-      "rows": 6,
-      "limitHit": false
-    },
-    {
-      "query": "ST02-008",
+      "query": "ST02-007",
       "rows": 2,
       "limitHit": false
     },
     {
-      "query": "Tallgeese",
-      "rows": 8,
-      "limitHit": false
-    },
-    {
-      "query": "ST02-007",
+      "query": "ST02-008",
       "rows": 2,
       "limitHit": false
     },
@@ -483,52 +568,12 @@
       "limitHit": false
     },
     {
-      "query": "Leo",
-      "rows": 9,
-      "limitHit": false
-    },
-    {
-      "query": "Heero Yuy",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "Aries",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Tragos",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Zechs Merquise",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
       "query": "ST02-010",
       "rows": 5,
       "limitHit": false
     },
     {
-      "query": "ST02-013",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
       "query": "ST02-011",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "ST02-014",
-      "rows": 4,
-      "limitHit": false
-    },
-    {
-      "query": "Simultaneous Fire",
       "rows": 3,
       "limitHit": false
     },
@@ -538,32 +583,17 @@
       "limitHit": false
     },
     {
-      "query": "ST02-015",
+      "query": "ST02-013",
       "rows": 3,
       "limitHit": false
     },
     {
-      "query": "Peaceful Timbre",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Corsica Base",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Siege Ploy",
+      "query": "ST02-014",
       "rows": 4,
       "limitHit": false
     },
     {
-      "query": "Sinanju",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Saint Gabriel Institute",
+      "query": "ST02-015",
       "rows": 3,
       "limitHit": false
     },
@@ -573,17 +603,7 @@
       "limitHit": false
     },
     {
-      "query": "Angelo's Geara Zulu",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
       "query": "ST03-001",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "ST03-004",
       "rows": 2,
       "limitHit": false
     },
@@ -593,7 +613,12 @@
       "limitHit": false
     },
     {
-      "query": "Gaza D (Sleeves)",
+      "query": "ST03-003",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "ST03-004",
       "rows": 2,
       "limitHit": false
     },
@@ -603,23 +628,8 @@
       "limitHit": false
     },
     {
-      "query": "ST03-003",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
       "query": "ST03-006",
       "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Geara Zulu",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "Char's Zaku II",
-      "rows": 7,
       "limitHit": false
     },
     {
@@ -628,57 +638,12 @@
       "limitHit": false
     },
     {
-      "query": "Zaku II",
-      "rows": 20,
-      "limitHit": false
-    },
-    {
-      "query": "Dra-C (Sleeves)",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "ST03-009",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Gouf",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "Full Frontal",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Zaku I",
-      "rows": 24,
-      "limitHit": false
-    },
-    {
-      "query": "ST03-011",
-      "rows": 4,
-      "limitHit": false
-    },
-    {
-      "query": "Char Aznable",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
       "query": "ST03-008",
       "rows": 5,
       "limitHit": false
     },
     {
-      "query": "ST03-012",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Indignation",
+      "query": "ST03-009",
       "rows": 2,
       "limitHit": false
     },
@@ -688,17 +653,27 @@
       "limitHit": false
     },
     {
+      "query": "ST03-011",
+      "rows": 4,
+      "limitHit": false
+    },
+    {
+      "query": "ST03-012",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "ST03-013",
+      "rows": 5,
+      "limitHit": false
+    },
+    {
       "query": "ST03-014",
       "rows": 2,
       "limitHit": false
     },
     {
-      "query": "The Blue Giant",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Rewloola",
+      "query": "ST03-015",
       "rows": 2,
       "limitHit": false
     },
@@ -708,18 +683,8 @@
       "limitHit": false
     },
     {
-      "query": "ST03-013",
+      "query": "ST04-001",
       "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "Close Combat",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "Falmel",
-      "rows": 3,
       "limitHit": false
     },
     {
@@ -728,28 +693,8 @@
       "limitHit": false
     },
     {
-      "query": "Strike Gundam",
-      "rows": 26,
-      "limitHit": false
-    },
-    {
-      "query": "ST03-015",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
       "query": "ST04-003",
       "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Moebius Zero",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "ST04-001",
-      "rows": 5,
       "limitHit": false
     },
     {
@@ -758,37 +703,17 @@
       "limitHit": false
     },
     {
-      "query": "Aile Strike Gundam",
-      "rows": 9,
-      "limitHit": false
-    },
-    {
-      "query": "Strike Dagger",
+      "query": "ST04-005",
       "rows": 3,
       "limitHit": false
     },
     {
-      "query": "Aegis Gundam",
-      "rows": 5,
+      "query": "ST04-006",
+      "rows": 2,
       "limitHit": false
     },
     {
       "query": "ST04-007",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Aegis Gundam (MA Mode)",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
-      "query": "Moebius",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "ST04-005",
       "rows": 3,
       "limitHit": false
     },
@@ -798,12 +723,7 @@
       "limitHit": false
     },
     {
-      "query": "ST04-006",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Miguel's Ginn",
+      "query": "ST04-009",
       "rows": 2,
       "limitHit": false
     },
@@ -818,48 +738,8 @@
       "limitHit": false
     },
     {
-      "query": "Athrun Zala",
-      "rows": 5,
-      "limitHit": false
-    },
-    {
-      "query": "ST04-009",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Ginn",
-      "rows": 45,
-      "limitHit": false
-    },
-    {
-      "query": "Striker Pack",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Hawk of Endymion",
-      "rows": 3,
-      "limitHit": false
-    },
-    {
       "query": "ST04-012",
       "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "ST04-014",
-      "rows": 2,
-      "limitHit": false
-    },
-    {
-      "query": "Kira Yamato",
-      "rows": 6,
-      "limitHit": false
-    },
-    {
-      "query": "ST04-015",
-      "rows": 6,
       "limitHit": false
     },
     {
@@ -868,8 +748,123 @@
       "limitHit": false
     },
     {
+      "query": "ST04-014",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "ST04-015",
+      "rows": 6,
+      "limitHit": false
+    },
+    {
       "query": "ST04-016",
       "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 01: Heroic Beginnings",
+      "rows": 39,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 02: Wings of Advance",
+      "rows": 39,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 03: Zeon's Rush",
+      "rows": 39,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 04: SEED Strike",
+      "rows": 39,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 05: Iron Bloom",
+      "rows": 36,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 06: Clan Unity",
+      "rows": 36,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 07: Celestial Drive",
+      "rows": 36,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 08: Flash of Radiance",
+      "rows": 36,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 09: Destiny Ignition",
+      "rows": 43,
+      "limitHit": false
+    },
+    {
+      "query": "Starter Deck 10: Generation Pulse",
+      "rows": 38,
+      "limitHit": false
+    },
+    {
+      "query": "Steel Requiem",
+      "rows": 100,
+      "limitHit": true
+    },
+    {
+      "query": "Strike Dagger",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Strike Gundam",
+      "rows": 26,
+      "limitHit": false
+    },
+    {
+      "query": "Striker Pack",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Suletta Mercury",
+      "rows": 8,
+      "limitHit": false
+    },
+    {
+      "query": "Tallgeese",
+      "rows": 8,
+      "limitHit": false
+    },
+    {
+      "query": "The Blue Giant",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "The Magic Bullet of Dusk",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Thoroughly Damaged",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Tragos",
+      "rows": 2,
+      "limitHit": false
+    },
+    {
+      "query": "Unforeseen Incident",
+      "rows": 7,
       "limitHit": false
     },
     {
@@ -878,263 +873,52 @@
       "limitHit": false
     },
     {
-      "query": "Resource",
-      "rows": 100,
-      "limitHit": true
-    },
-    {
-      "query": "The Magic Bullet of Dusk",
-      "rows": 2,
+      "query": "White Base",
+      "rows": 3,
       "limitHit": false
     },
     {
-      "query": "Archangel",
-      "rows": 6,
+      "query": "Wing Gundam",
+      "rows": 14,
       "limitHit": false
     },
     {
-      "query": "EX Resource",
-      "rows": 19,
-      "limitHit": false
-    },
-    {
-      "query": "R-001",
+      "query": "Wing Gundam (Bird Mode)",
       "rows": 5,
       "limitHit": false
     },
     {
-      "query": "EXR-001",
+      "query": "Zaku I",
+      "rows": 24,
+      "limitHit": false
+    },
+    {
+      "query": "Zaku II",
+      "rows": 20,
+      "limitHit": false
+    },
+    {
+      "query": "Zechs Merquise",
+      "rows": 3,
+      "limitHit": false
+    },
+    {
+      "query": "Zowort",
       "rows": 2,
       "limitHit": false
     }
   ],
   "unmatchedProducts": [
     {
-      "sourceProductId": 5922779,
-      "tcgProductId": 682302,
-      "name": "Phantom Aria Booster Box",
-      "setName": "Phantom Aria",
+      "sourceProductId": 5924063,
+      "name": "[PB01] Gundam Card Game Premium Accessory Set - Mobile Suit Gundam Wing",
+      "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5922778,
-      "tcgProductId": 682301,
-      "name": "Phantom Aria Booster Pack",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922780,
-      "tcgProductId": 682303,
-      "name": "Phantom Aria Booster Box Case",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922912,
-      "name": "Wire-Guided Arm",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922914,
-      "tcgProductId": 689776,
-      "name": "Alvaaron",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922911,
-      "name": "Parts",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922913,
-      "name": "Zeong (Head)",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922935,
-      "tcgProductId": 691191,
-      "name": "Phantom Aria Sleeved Booster Pack",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922976,
-      "tcgProductId": 693616,
-      "name": "Phantom Aria Sleeved Booster Pack Art Bundle [Set of 4]",
-      "setName": "Phantom Aria",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922740,
-      "tcgProductId": 693099,
-      "name": "Starter Deck 10: Generation Pulse",
-      "setName": "Starter Deck 10: Generation Pulse",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922742,
-      "tcgProductId": 693101,
-      "name": "Starter Deck 10: Generation Pulse Display Case",
-      "setName": "Starter Deck 10: Generation Pulse",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922741,
-      "tcgProductId": 693100,
-      "name": "Starter Deck 10: Generation Pulse Display",
-      "setName": "Starter Deck 10: Generation Pulse",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922628,
-      "tcgProductId": 693102,
-      "name": "Eternal Nexus Booster Pack",
-      "setName": "Eternal Nexus",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922629,
-      "tcgProductId": 693103,
-      "name": "Eternal Nexus Booster Box",
-      "setName": "Eternal Nexus",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922630,
-      "tcgProductId": 693104,
-      "name": "Eternal Nexus Booster Box Case",
-      "setName": "Eternal Nexus",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922631,
-      "tcgProductId": 693105,
-      "name": "Eternal Nexus Sleeved Booster Pack",
-      "setName": "Eternal Nexus",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922722,
-      "tcgProductId": 701025,
-      "name": "Gundam Exia (T-020)",
-      "setName": "Eternal Nexus",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923263,
-      "tcgProductId": 662121,
-      "name": "Starter Deck 07: Celestial Drive",
-      "setName": "Starter Deck 07: Celestial Drive",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923265,
-      "tcgProductId": 662123,
-      "name": "Starter Deck 07: Celestial Drive Display Case",
-      "setName": "Starter Deck 07: Celestial Drive",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923264,
-      "tcgProductId": 662122,
-      "name": "Starter Deck 07: Celestial Drive Display",
-      "setName": "Starter Deck 07: Celestial Drive",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923298,
-      "tcgProductId": 672972,
-      "name": "Starter Deck: Celestial Drive Bonus Pack",
-      "setName": "Starter Deck 07: Celestial Drive",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922977,
-      "tcgProductId": 680468,
-      "name": "Starter Deck 09: Destiny Ignition",
-      "setName": "Starter Deck 09: Destiny Ignition",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922979,
-      "tcgProductId": 680470,
-      "name": "Starter Deck 09: Destiny Ignition Display Case",
-      "setName": "Starter Deck 09: Destiny Ignition",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922978,
-      "tcgProductId": 680469,
-      "name": "Starter Deck 09: Destiny Ignition Display",
-      "setName": "Starter Deck 09: Destiny Ignition",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5922980,
-      "tcgProductId": 680471,
-      "name": "Starter Deck: Destiny Ignition Bonus Pack",
-      "setName": "Starter Deck 09: Destiny Ignition",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923300,
-      "tcgProductId": 650745,
-      "name": "Starter Deck 06: Clan Unity Display",
-      "setName": "Starter Deck 06: Clan Unity",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923334,
-      "tcgProductId": 670920,
-      "name": "Starter Deck: Clan Unity Bonus Pack",
-      "setName": "Starter Deck 06: Clan Unity",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923299,
-      "tcgProductId": 650744,
-      "name": "Starter Deck 06: Clan Unity",
-      "setName": "Starter Deck 06: Clan Unity",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923301,
-      "tcgProductId": 650746,
-      "name": "Starter Deck 06: Clan Unity Display Case",
-      "setName": "Starter Deck 06: Clan Unity",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923021,
-      "tcgProductId": 662114,
-      "name": "Steel Requiem Booster Box",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923023,
-      "tcgProductId": 662117,
-      "name": "Steel Requiem Sleeved Booster Pack",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923020,
-      "tcgProductId": 662113,
-      "name": "Steel Requiem Booster Pack",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923022,
-      "tcgProductId": 662115,
-      "name": "Steel Requiem Booster Box Case",
-      "setName": "Steel Requiem",
+      "sourceProductId": 5924091,
+      "name": "[PB02] Gundam Card Game Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans",
+      "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
     {
@@ -1145,29 +929,17 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923167,
-      "name": "Hy-Gogg (T-013)",
-      "setName": "Steel Requiem",
+      "sourceProductId": 5923703,
+      "tcgProductId": 643287,
+      "name": "Aile Strike Gundam (T-008) Token",
+      "setName": "Newtype Rising",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923169,
-      "tcgProductId": 673534,
-      "name": "Graze Custom",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923171,
-      "name": "Red Gundam (T-018)",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923173,
-      "tcgProductId": 673538,
-      "name": "GFreD (T-020)",
-      "setName": "Steel Requiem",
+      "sourceProductId": 5922914,
+      "tcgProductId": 689776,
+      "name": "Alvaaron",
+      "setName": "Phantom Aria",
       "reason": "no-card-number"
     },
     {
@@ -1178,129 +950,10 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923170,
-      "tcgProductId": 673535,
-      "name": "Gundam Barbatos 4th Form",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923172,
-      "tcgProductId": 673537,
-      "name": "GQuuuuuuX (Omega Psycommu) (T-019)",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923226,
-      "tcgProductId": 678554,
-      "name": "Steel Requiem Sleeved Booster Pack Art Bundle [Set of 4]",
-      "setName": "Steel Requiem",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923228,
-      "tcgProductId": 662119,
-      "name": "Starter Deck 08: Flash of Radiance Display",
-      "setName": "Starter Deck 08: Flash of Radiance",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923262,
-      "tcgProductId": 672971,
-      "name": "Starter Deck: Flash of Radiance Bonus Pack",
-      "setName": "Starter Deck 08: Flash of Radiance",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923227,
-      "tcgProductId": 662118,
-      "name": "Starter Deck 08: Flash of Radiance",
-      "setName": "Starter Deck 08: Flash of Radiance",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923229,
-      "tcgProductId": 662120,
-      "name": "Starter Deck 08: Flash of Radiance Display Case",
-      "setName": "Starter Deck 08: Flash of Radiance",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923564,
-      "tcgProductId": 619072,
-      "name": "Newtype Rising Booster Box",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923563,
-      "tcgProductId": 619067,
-      "name": "Newtype Rising Booster Pack",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923565,
-      "tcgProductId": 619073,
-      "name": "Newtype Rising Booster Box Case",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923696,
-      "tcgProductId": 643280,
-      "name": "Gundam (T-001) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923698,
-      "tcgProductId": 643282,
-      "name": "Guntank (T-003) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923700,
-      "tcgProductId": 643284,
-      "name": "Tallgeese (T-005) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923702,
-      "tcgProductId": 643286,
-      "name": "Zaku II (T-007) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923704,
-      "tcgProductId": 643288,
-      "name": "Launcher Strike Gundam (T-009) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923706,
-      "tcgProductId": 643290,
-      "name": "Fatum-00 (T-011) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923697,
-      "tcgProductId": 643281,
-      "name": "Guncannon (T-002) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923699,
-      "tcgProductId": 643283,
-      "name": "Leo (T-004) Token",
-      "setName": "Newtype Rising",
+      "sourceProductId": 5924042,
+      "tcgProductId": 680675,
+      "name": "CGS Mobile Worker (Premium Card Collection Gundam Assemble)",
+      "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
     {
@@ -1311,44 +964,23 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923703,
-      "tcgProductId": 643287,
-      "name": "Aile Strike Gundam (T-008) Token",
-      "setName": "Newtype Rising",
+      "sourceProductId": 5924276,
+      "tcgProductId": 616675,
+      "name": "Char's Zaku II (Token)",
+      "setName": "Edition Beta",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923705,
-      "tcgProductId": 643289,
-      "name": "Sword Strike Gundam (T-010) Token",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923759,
-      "tcgProductId": 651984,
-      "name": "Newtype Rising Sleeved Booster Pack Art Bundle [Set of 4]",
-      "setName": "Newtype Rising",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923758,
-      "tcgProductId": 651983,
-      "name": "Newtype Rising Sleeved Booster Pack",
-      "setName": "Newtype Rising",
+      "sourceProductId": 5923499,
+      "tcgProductId": 659360,
+      "name": "Daughtress (T-012)",
+      "setName": "Dual Impact",
       "reason": "no-card-number"
     },
     {
       "sourceProductId": 5923336,
       "tcgProductId": 650748,
       "name": "Dual Impact Booster Box",
-      "setName": "Dual Impact",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923335,
-      "tcgProductId": 650747,
-      "name": "Dual Impact Booster Pack",
       "setName": "Dual Impact",
       "reason": "no-card-number"
     },
@@ -1360,9 +992,9 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923499,
-      "tcgProductId": 659360,
-      "name": "Daughtress (T-012)",
+      "sourceProductId": 5923335,
+      "tcgProductId": 650747,
+      "name": "Dual Impact Booster Pack",
       "setName": "Dual Impact",
       "reason": "no-card-number"
     },
@@ -1381,227 +1013,290 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923799,
-      "tcgProductId": 619148,
-      "name": "Starter Deck 03: Zeon's Rush",
-      "setName": "Starter Deck 03: Zeon's Rush",
+      "sourceProductId": 5922629,
+      "tcgProductId": 693103,
+      "name": "Eternal Nexus Booster Box",
+      "setName": "Eternal Nexus",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923801,
-      "tcgProductId": 619157,
-      "name": "Starter Deck 03: Zeon's Rush Display Case",
-      "setName": "Starter Deck 03: Zeon's Rush",
+      "sourceProductId": 5922630,
+      "tcgProductId": 693104,
+      "name": "Eternal Nexus Booster Box Case",
+      "setName": "Eternal Nexus",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923803,
-      "tcgProductId": 619164,
-      "name": "Starter Deck 03: Zeon's Rush - Gundam Assemble Starter Set Display",
-      "setName": "Starter Deck 03: Zeon's Rush",
+      "sourceProductId": 5922628,
+      "tcgProductId": 693102,
+      "name": "Eternal Nexus Booster Pack",
+      "setName": "Eternal Nexus",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923800,
-      "tcgProductId": 619151,
-      "name": "Starter Deck 03: Zeon's Rush Display",
-      "setName": "Starter Deck 03: Zeon's Rush",
+      "sourceProductId": 5922631,
+      "tcgProductId": 693105,
+      "name": "Eternal Nexus Sleeved Booster Pack",
+      "setName": "Eternal Nexus",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923802,
-      "tcgProductId": 619162,
-      "name": "Starter Deck 03: Zeon's Rush - Gundam Assemble Starter Set",
-      "setName": "Starter Deck 03: Zeon's Rush",
+      "sourceProductId": 5924108,
+      "tcgProductId": 634345,
+      "name": "EX Base (EXBP-001) (Edition Beta Early Trial Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923804,
-      "tcgProductId": 619167,
-      "name": "Starter Deck 03: Zeon's Rush - Gundam Assemble Starter Set Display Case",
-      "setName": "Starter Deck 03: Zeon's Rush",
+      "sourceProductId": 5924111,
+      "tcgProductId": 641569,
+      "name": "EX Base (EXBP-002) (Official Card Case Set 01)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923837,
-      "tcgProductId": 643143,
-      "name": "Starter Deck: Zeon's Rush Bonus Pack",
-      "setName": "Starter Deck 03: Zeon's Rush",
+      "sourceProductId": 5924112,
+      "tcgProductId": 646555,
+      "name": "EX Base (EXBP-003) (Gundam Base Pop-Up World Tour)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923528,
-      "tcgProductId": 650742,
-      "name": "Starter Deck 05: Iron Bloom Display",
-      "setName": "Starter Deck 05: Iron Bloom",
+      "sourceProductId": 5924109,
+      "tcgProductId": 641567,
+      "name": "EX Base (EXBP-004) (First Combat)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923562,
-      "tcgProductId": 670919,
-      "name": "Starter Deck: Iron Bloom Bonus Pack",
-      "setName": "Starter Deck 05: Iron Bloom",
+      "sourceProductId": 5924110,
+      "tcgProductId": 641568,
+      "name": "EX Base (EXBP-005) (Bandai Card Games Fest 25-26)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923527,
-      "tcgProductId": 650741,
-      "name": "Starter Deck 05: Iron Bloom",
-      "setName": "Starter Deck 05: Iron Bloom",
+      "sourceProductId": 5924113,
+      "tcgProductId": 653358,
+      "name": "EX Base (EXBP-006) (G Generation Eternal Collaboration Pack)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923529,
-      "tcgProductId": 650743,
-      "name": "Starter Deck 05: Iron Bloom Display Case",
-      "setName": "Starter Deck 05: Iron Bloom",
+      "sourceProductId": 5924114,
+      "tcgProductId": 653359,
+      "name": "EX Base (EXBP-007) (G Generation Eternal Collaboration Pack)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923877,
-      "tcgProductId": 619080,
-      "name": "Starter Deck 01: Heroic Beginnings",
-      "setName": "Starter Deck 01: Heroic Beginnings",
+      "sourceProductId": 5924115,
+      "tcgProductId": 653360,
+      "name": "EX Base (EXBP-008) (G Generation Eternal Collaboration Pack)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923879,
-      "tcgProductId": 619092,
-      "name": "Starter Deck 01: Heroic Beginnings Display",
-      "setName": "Starter Deck 01: Heroic Beginnings",
+      "sourceProductId": 5924116,
+      "tcgProductId": 653361,
+      "name": "EX Base (EXBP-009) (G Generation Eternal Collaboration Pack)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923881,
-      "tcgProductId": 619098,
-      "name": "Starter Deck 01: Heroic Beginnings - Gundam Assemble Starter Set Display Case",
-      "setName": "Starter Deck 01: Heroic Beginnings",
+      "sourceProductId": 5924117,
+      "tcgProductId": 653362,
+      "name": "EX Base (EXBP-010) (G Generation Eternal Collaboration Pack)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923878,
-      "tcgProductId": 619085,
-      "name": "Starter Deck 01: Heroic Beginnings - Gundam Assemble Starter Set",
-      "setName": "Starter Deck 01: Heroic Beginnings",
+      "sourceProductId": 5924118,
+      "tcgProductId": 661897,
+      "name": "EX Base (EXBP-011) (Mobile Suit Gundam: Iron-Blooded Orphans)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923880,
-      "tcgProductId": 619097,
-      "name": "Starter Deck 01: Heroic Beginnings - Gundam Assemble Starter Set Display",
-      "setName": "Starter Deck 01: Heroic Beginnings",
+      "sourceProductId": 5924119,
+      "tcgProductId": 684622,
+      "name": "EX Base (EXBP-013) (ST09 Release Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923882,
-      "tcgProductId": 619102,
-      "name": "Starter Deck 01: Heroic Beginnings Display Case",
-      "setName": "Starter Deck 01: Heroic Beginnings",
+      "sourceProductId": 5924120,
+      "tcgProductId": 684623,
+      "name": "EX Base (EXBP-014) (ST09 Release Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923915,
-      "tcgProductId": 643141,
-      "name": "Starter Deck: Heroic Beginnings Bonus Pack",
-      "setName": "Starter Deck 01: Heroic Beginnings",
+      "sourceProductId": 5924121,
+      "tcgProductId": 684624,
+      "name": "EX Base (EXBP-015) (ST09 Release Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923839,
-      "tcgProductId": 619111,
-      "name": "Starter Deck 02: Wings of Advance - Gundam Assemble Starter Set",
-      "setName": "Starter Deck 02: Wings of Advance",
+      "sourceProductId": 5924122,
+      "tcgProductId": 684626,
+      "name": "EX Base (EXBP-016) (ST09 Release Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923841,
-      "tcgProductId": 619114,
-      "name": "Starter Deck 02: Wings of Advance Display Case",
-      "setName": "Starter Deck 02: Wings of Advance",
+      "sourceProductId": 5924123,
+      "tcgProductId": 684627,
+      "name": "EX Base (EXBP-017) (ST09 Release Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923843,
-      "tcgProductId": 619137,
-      "name": "Starter Deck 02: Wings of Advance - Gundam Assemble Starter Set Display Case",
-      "setName": "Starter Deck 02: Wings of Advance",
+      "sourceProductId": 5924129,
+      "tcgProductId": 696885,
+      "name": "EX Base (EXBP-018) (The Sorcery of Nymph Circe Movie Release)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923838,
-      "tcgProductId": 619107,
-      "name": "Starter Deck 02: Wings of Advance",
-      "setName": "Starter Deck 02: Wings of Advance",
+      "sourceProductId": 5924124,
+      "tcgProductId": 691174,
+      "name": "EX Base (EXBP-020) (Starter Deck Battle Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923840,
-      "tcgProductId": 619112,
-      "name": "Starter Deck 02: Wings of Advance Display",
-      "setName": "Starter Deck 02: Wings of Advance",
+      "sourceProductId": 5924125,
+      "tcgProductId": 691176,
+      "name": "EX Base (EXBP-021) (Starter Deck Battle Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923842,
-      "tcgProductId": 619136,
-      "name": "Starter Deck 02: Wings of Advance - Gundam Assemble Starter Set Display",
-      "setName": "Starter Deck 02: Wings of Advance",
+      "sourceProductId": 5924126,
+      "tcgProductId": 691177,
+      "name": "EX Base (EXBP-022) (Starter Deck Battle Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923876,
-      "tcgProductId": 643142,
-      "name": "Starter Deck: Wings of Advance Bonus Pack",
-      "setName": "Starter Deck 02: Wings of Advance",
+      "sourceProductId": 5924127,
+      "tcgProductId": 691178,
+      "name": "EX Base (EXBP-023) (Starter Deck Battle Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923916,
-      "tcgProductId": 641688,
-      "name": "Gundam Card Game Accessory and Card Set 01 FIRST COMBAT [EVX-01]",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924128,
+      "tcgProductId": 691179,
+      "name": "EX Base (EXBP-024) (Starter Deck Battle Event)",
+      "setName": "Promotional EX Base Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923960,
-      "name": "Store Tournament Winner Pack 01",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924130,
+      "tcgProductId": 634344,
+      "name": "EX Resource (EXRP-001) (GAMA Expo 2025)",
+      "setName": "Promotional EX Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924018,
-      "name": "Store Tournament Participation Pack 02",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924131,
+      "tcgProductId": 641570,
+      "name": "EX Resource (EXRP-002) (Official Card Case Set 01)",
+      "setName": "Promotional EX Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924020,
-      "name": "Store Tournament Winner Pack 02",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924132,
+      "tcgProductId": 653363,
+      "name": "EX Resource (EXRP-003) (Bandai Card Games Fest 25-26)",
+      "setName": "Promotional EX Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924022,
-      "name": "Store Tournament Winner Pack 03",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924133,
+      "tcgProductId": 680936,
+      "name": "EX Resource (EXRP-004) (Premium Card Collection Gundam Assemble - PC01A)",
+      "setName": "Promotional EX Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924032,
-      "name": "Premium Card Collection GUNDAM ASSEMBLE - Mobile Suit Gundam: Iron-Blooded Orphans - [PC01A]",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924134,
+      "tcgProductId": 680937,
+      "name": "EX Resource (EXRP-005) (Premium Card Collection Gundam Assemble - PC01A)",
+      "setName": "Promotional EX Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5923959,
-      "name": "Store Tournament Participation Pack 01",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924135,
+      "tcgProductId": 680938,
+      "name": "EX Resource (EXRP-006) (Premium Card Collection Gundam Assemble - PC01A)",
+      "setName": "Promotional EX Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924017,
-      "name": "Premium Card Collection 01 [EVX05]",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5924136,
+      "tcgProductId": 680939,
+      "name": "EX Resource (EXRP-007) (Premium Card Collection Gundam Assemble - PC01A)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924137,
+      "tcgProductId": 680940,
+      "name": "EX Resource (EXRP-008) (Premium Card Collection Gundam Assemble - PC01A)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924138,
+      "tcgProductId": 680941,
+      "name": "EX Resource (EXRP-009) (Premium Card Collection Gundam Assemble - PC02A)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924139,
+      "tcgProductId": 680942,
+      "name": "EX Resource (EXRP-010) (Premium Card Collection Gundam Assemble - PC02A)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924140,
+      "tcgProductId": 680943,
+      "name": "EX Resource (EXRP-011) (Premium Card Collection Gundam Assemble - PC02A)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924141,
+      "tcgProductId": 680944,
+      "name": "EX Resource (EXRP-012) (Premium Card Collection Gundam Assemble - PC02A)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924142,
+      "tcgProductId": 680945,
+      "name": "EX Resource (EXRP-013) (Premium Card Collection Gundam Assemble - PC02A)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924143,
+      "tcgProductId": 681981,
+      "name": "EX Resource (EXRP-014) (GAMA Expo 2026)",
+      "setName": "Promotional EX Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923706,
+      "tcgProductId": 643290,
+      "name": "Fatum-00 (T-011) Token",
+      "setName": "Newtype Rising",
       "reason": "no-card-number"
     },
     {
@@ -1612,14 +1307,230 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924021,
-      "name": "Store Tournament Participation Pack 03",
+      "sourceProductId": 5923173,
+      "tcgProductId": 673538,
+      "name": "GFreD (T-020)",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924050,
+      "tcgProductId": 680689,
+      "name": "GFreD (T-020) (Premium Card Collection Gundam Assemble)",
       "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924033,
-      "name": "Premium Card Collection GUNDAM ASSEMBLE Display - Mobile Suit Gundam: Iron-Blooded Orphans - [PC01A]",
+      "sourceProductId": 5923172,
+      "tcgProductId": 673537,
+      "name": "GQuuuuuuX (Omega Psycommu) (T-019)",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924049,
+      "tcgProductId": 680688,
+      "name": "GQuuuuuuX (Omega Psycommu) (T-019) (Premium Card Collection Gundam Assemble)",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923169,
+      "tcgProductId": 673534,
+      "name": "Graze Custom",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924043,
+      "tcgProductId": 680677,
+      "name": "Graze Custom (Premium Card Collection Gundam Assemble)",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923697,
+      "tcgProductId": 643281,
+      "name": "Guncannon (T-002) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924274,
+      "tcgProductId": 616673,
+      "name": "Guncannon (Token)",
+      "setName": "Edition Beta",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923696,
+      "tcgProductId": 643280,
+      "name": "Gundam (T-001) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924273,
+      "tcgProductId": 616672,
+      "name": "Gundam (Token)",
+      "setName": "Edition Beta",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923170,
+      "tcgProductId": 673535,
+      "name": "Gundam Barbatos 4th Form",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924044,
+      "tcgProductId": 680679,
+      "name": "Gundam Barbatos 4th Form (T-017) (Premium Card Collection Gundam Assemble)",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923916,
+      "tcgProductId": 641688,
+      "name": "Gundam Card Game Accessory and Card Set 01 FIRST COMBAT [EVX-01]",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924281,
+      "tcgProductId": 617436,
+      "name": "Gundam Card Game Edition Beta Box",
+      "setName": "Edition Beta",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924282,
+      "tcgProductId": 617437,
+      "name": "Gundam Card Game Edition Beta Pack",
+      "setName": "Edition Beta",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922722,
+      "tcgProductId": 701025,
+      "name": "Gundam Exia (T-020)",
+      "setName": "Eternal Nexus",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923698,
+      "tcgProductId": 643282,
+      "name": "Guntank (T-003) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924275,
+      "tcgProductId": 616674,
+      "name": "Guntank (Token)",
+      "setName": "Edition Beta",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923167,
+      "name": "Hy-Gogg (T-013)",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923704,
+      "tcgProductId": 643288,
+      "name": "Launcher Strike Gundam (T-009) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923699,
+      "tcgProductId": 643283,
+      "name": "Leo (T-004) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923564,
+      "tcgProductId": 619072,
+      "name": "Newtype Rising Booster Box",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923565,
+      "tcgProductId": 619073,
+      "name": "Newtype Rising Booster Box Case",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923563,
+      "tcgProductId": 619067,
+      "name": "Newtype Rising Booster Pack",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923758,
+      "tcgProductId": 651983,
+      "name": "Newtype Rising Sleeved Booster Pack",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923759,
+      "tcgProductId": 651984,
+      "name": "Newtype Rising Sleeved Booster Pack Art Bundle [Set of 4]",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922911,
+      "name": "Parts",
+      "setName": "Phantom Aria",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922779,
+      "tcgProductId": 682302,
+      "name": "Phantom Aria Booster Box",
+      "setName": "Phantom Aria",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922780,
+      "tcgProductId": 682303,
+      "name": "Phantom Aria Booster Box Case",
+      "setName": "Phantom Aria",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922778,
+      "tcgProductId": 682301,
+      "name": "Phantom Aria Booster Pack",
+      "setName": "Phantom Aria",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922935,
+      "tcgProductId": 691191,
+      "name": "Phantom Aria Sleeved Booster Pack",
+      "setName": "Phantom Aria",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922976,
+      "tcgProductId": 693616,
+      "name": "Phantom Aria Sleeved Booster Pack Art Bundle [Set of 4]",
+      "setName": "Phantom Aria",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924017,
+      "name": "Premium Card Collection 01 [EVX05]",
       "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
@@ -1630,15 +1541,14 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924037,
-      "name": "Premium Card Collection GUNDAM ASSEMBLE Case - Mobile Suit Gundam: GQuuuuuuX- [PC02A]",
+      "sourceProductId": 5924032,
+      "name": "Premium Card Collection GUNDAM ASSEMBLE - Mobile Suit Gundam: Iron-Blooded Orphans - [PC01A]",
       "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924043,
-      "tcgProductId": 680677,
-      "name": "Graze Custom (Premium Card Collection Gundam Assemble)",
+      "sourceProductId": 5924037,
+      "name": "Premium Card Collection GUNDAM ASSEMBLE Case - Mobile Suit Gundam: GQuuuuuuX- [PC02A]",
       "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
@@ -1655,17 +1565,15 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924042,
-      "tcgProductId": 680675,
-      "name": "CGS Mobile Worker (Premium Card Collection Gundam Assemble)",
+      "sourceProductId": 5924033,
+      "name": "Premium Card Collection GUNDAM ASSEMBLE Display - Mobile Suit Gundam: Iron-Blooded Orphans - [PC01A]",
       "setName": "Gundam Promotional Cards",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924044,
-      "tcgProductId": 680679,
-      "name": "Gundam Barbatos 4th Form (T-017) (Premium Card Collection Gundam Assemble)",
-      "setName": "Gundam Promotional Cards",
+      "sourceProductId": 5923171,
+      "name": "Red Gundam (T-018)",
+      "setName": "Steel Requiem",
       "reason": "no-card-number"
     },
     {
@@ -1675,182 +1583,65 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924050,
-      "tcgProductId": 680689,
-      "name": "GFreD (T-020) (Premium Card Collection Gundam Assemble)",
-      "setName": "Gundam Promotional Cards",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924049,
-      "tcgProductId": 680688,
-      "name": "GQuuuuuuX (Omega Psycommu) (T-019) (Premium Card Collection Gundam Assemble)",
-      "setName": "Gundam Promotional Cards",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924063,
-      "name": "[PB01] Gundam Card Game Premium Accessory Set - Mobile Suit Gundam Wing",
-      "setName": "Gundam Promotional Cards",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924091,
-      "name": "[PB02] Gundam Card Game Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans",
-      "setName": "Gundam Promotional Cards",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923760,
-      "tcgProductId": 619173,
-      "name": "Starter Deck 04: SEED Strike",
-      "setName": "Starter Deck 04: SEED Strike",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923762,
-      "tcgProductId": 619177,
-      "name": "Starter Deck 04: SEED Strike Display Case",
-      "setName": "Starter Deck 04: SEED Strike",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923764,
-      "tcgProductId": 619179,
-      "name": "Starter Deck 04: SEED Strike - Gundam Assemble Starter Set Display",
-      "setName": "Starter Deck 04: SEED Strike",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923798,
-      "tcgProductId": 643144,
-      "name": "Starter Deck: SEED Strike Bonus Pack",
-      "setName": "Starter Deck 04: SEED Strike",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923761,
-      "tcgProductId": 619176,
-      "name": "Starter Deck 04: SEED Strike Display",
-      "setName": "Starter Deck 04: SEED Strike",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923763,
-      "tcgProductId": 619178,
-      "name": "Starter Deck 04: SEED Strike - Gundam Assemble Starter Set",
-      "setName": "Starter Deck 04: SEED Strike",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5923765,
-      "tcgProductId": 619180,
-      "name": "Starter Deck 04: SEED Strike - Gundam Assemble Starter Set Display Case",
-      "setName": "Starter Deck 04: SEED Strike",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924130,
-      "tcgProductId": 634344,
-      "name": "EX Resource (EXRP-001) (GAMA Expo 2025)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924132,
-      "tcgProductId": 653363,
-      "name": "EX Resource (EXRP-003) (Bandai Card Games Fest 25-26)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924134,
-      "tcgProductId": 680937,
-      "name": "EX Resource (EXRP-005) (Premium Card Collection Gundam Assemble - PC01A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924136,
-      "tcgProductId": 680939,
-      "name": "EX Resource (EXRP-007) (Premium Card Collection Gundam Assemble - PC01A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924138,
-      "tcgProductId": 680941,
-      "name": "EX Resource (EXRP-009) (Premium Card Collection Gundam Assemble - PC02A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924140,
-      "tcgProductId": 680943,
-      "name": "EX Resource (EXRP-011) (Premium Card Collection Gundam Assemble - PC02A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924142,
-      "tcgProductId": 680945,
-      "name": "EX Resource (EXRP-013) (Premium Card Collection Gundam Assemble - PC02A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924131,
-      "tcgProductId": 641570,
-      "name": "EX Resource (EXRP-002) (Official Card Case Set 01)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924133,
-      "tcgProductId": 680936,
-      "name": "EX Resource (EXRP-004) (Premium Card Collection Gundam Assemble - PC01A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924135,
-      "tcgProductId": 680938,
-      "name": "EX Resource (EXRP-006) (Premium Card Collection Gundam Assemble - PC01A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924137,
-      "tcgProductId": 680940,
-      "name": "EX Resource (EXRP-008) (Premium Card Collection Gundam Assemble - PC01A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924139,
-      "tcgProductId": 680942,
-      "name": "EX Resource (EXRP-010) (Premium Card Collection Gundam Assemble - PC02A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924141,
-      "tcgProductId": 680944,
-      "name": "EX Resource (EXRP-012) (Premium Card Collection Gundam Assemble - PC02A)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924143,
-      "tcgProductId": 681981,
-      "name": "EX Resource (EXRP-014) (GAMA Expo 2026)",
-      "setName": "Promotional EX Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
       "sourceProductId": 5924144,
       "tcgProductId": 641564,
       "name": "Resource (RP-001) (Edition Beta BANDAI TCG+ Store Trial Event)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924158,
+      "tcgProductId": 646010,
+      "name": "Resource (RP-002) (San Diego Comic-Con 2025)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924159,
+      "tcgProductId": 646548,
+      "name": "Resource (RP-003) (Resource Pack)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924145,
+      "tcgProductId": 641565,
+      "name": "Resource (RP-004) (Anime Expo 2025)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924160,
+      "tcgProductId": 646549,
+      "name": "Resource (RP-005) (Resource Pack)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924161,
+      "tcgProductId": 646550,
+      "name": "Resource (RP-006) (Resource Pack)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924162,
+      "tcgProductId": 646551,
+      "name": "Resource (RP-007) (Resource Pack)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924163,
+      "tcgProductId": 646552,
+      "name": "Resource (RP-008) (Resource Pack)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924147,
+      "tcgProductId": 641571,
+      "name": "Resource (RP-009) (Gen Con 2025)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -1869,23 +1660,9 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924145,
-      "tcgProductId": 641565,
-      "name": "Resource (RP-004) (Anime Expo 2025)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924147,
-      "tcgProductId": 641571,
-      "name": "Resource (RP-009) (Gen Con 2025)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924149,
-      "tcgProductId": 641663,
-      "name": "Resource (RP-020) (Asticassia School of Technology)",
+      "sourceProductId": 5924150,
+      "tcgProductId": 641667,
+      "name": "Resource (RP-012) (Zeon Force)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -1897,72 +1674,16 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924153,
-      "tcgProductId": 641671,
-      "name": "Resource (RP-015) (Vist Foundation)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924155,
-      "tcgProductId": 641674,
-      "name": "Resource (RP-017) (Earth Alliance)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924157,
-      "tcgProductId": 641676,
-      "name": "Resource (RP-019) (United Emirates of Orb)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924159,
-      "tcgProductId": 646548,
-      "name": "Resource (RP-003) (Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924161,
-      "tcgProductId": 646550,
-      "name": "Resource (RP-006) (Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924163,
-      "tcgProductId": 646552,
-      "name": "Resource (RP-008) (Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924165,
-      "tcgProductId": 679243,
-      "name": "Resource (RP-022) (Mobile Suit Gundam 00)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924167,
-      "tcgProductId": 681971,
-      "name": "Resource (RP-025) (Premium Accessory Set - Mobile Suit Gundam Wing)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924150,
-      "tcgProductId": 641667,
-      "name": "Resource (RP-012) (Zeon Force)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
       "sourceProductId": 5924152,
       "tcgProductId": 641670,
       "name": "Resource (RP-014) (Char Aznable Emblem)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924153,
+      "tcgProductId": 641671,
+      "name": "Resource (RP-015) (Vist Foundation)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -1974,6 +1695,13 @@
       "reason": "no-card-number"
     },
     {
+      "sourceProductId": 5924155,
+      "tcgProductId": 641674,
+      "name": "Resource (RP-017) (Earth Alliance)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
       "sourceProductId": 5924156,
       "tcgProductId": 641675,
       "name": "Resource (RP-018) (ZAFT)",
@@ -1981,23 +1709,16 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924158,
-      "tcgProductId": 646010,
-      "name": "Resource (RP-002) (San Diego Comic-Con 2025)",
+      "sourceProductId": 5924157,
+      "tcgProductId": 641676,
+      "name": "Resource (RP-019) (United Emirates of Orb)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924160,
-      "tcgProductId": 646549,
-      "name": "Resource (RP-005) (Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924162,
-      "tcgProductId": 646551,
-      "name": "Resource (RP-007) (Resource Pack)",
+      "sourceProductId": 5924149,
+      "tcgProductId": 641663,
+      "name": "Resource (RP-020) (Asticassia School of Technology)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2009,37 +1730,9 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924166,
-      "tcgProductId": 681970,
-      "name": "Resource (RP-024) (Premium Accessory Set - Mobile Suit Gundam Wing)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924168,
-      "tcgProductId": 681972,
-      "name": "Resource (RP-026) (Premium Accessory Set - Mobile Suit Gundam Wing)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924170,
-      "tcgProductId": 681975,
-      "name": "Resource (RP-028) (Premium Accessory Set - Mobile Suit Gundam Wing)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924172,
-      "tcgProductId": 681977,
-      "name": "Resource (RP-030) (Premium Accessory Set - Mobile Suit Gundam Wing)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924174,
-      "tcgProductId": 681979,
-      "name": "Resource (RP-032) (Premium Accessory Set - Mobile Suit Gundam Wing)",
+      "sourceProductId": 5924165,
+      "tcgProductId": 679243,
+      "name": "Resource (RP-022) (Mobile Suit Gundam 00)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2051,72 +1744,23 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924178,
-      "tcgProductId": 698135,
-      "name": "Resource (RP-034) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
+      "sourceProductId": 5924166,
+      "tcgProductId": 681970,
+      "name": "Resource (RP-024) (Premium Accessory Set - Mobile Suit Gundam Wing)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924180,
-      "tcgProductId": 698137,
-      "name": "Resource (RP-036) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
+      "sourceProductId": 5924167,
+      "tcgProductId": 681971,
+      "name": "Resource (RP-025) (Premium Accessory Set - Mobile Suit Gundam Wing)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924182,
-      "tcgProductId": 698139,
-      "name": "Resource (RP-038) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924184,
-      "tcgProductId": 698141,
-      "name": "Resource (RP-040) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924186,
-      "tcgProductId": 698143,
-      "name": "Resource (RP-042) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924188,
-      "tcgProductId": 698148,
-      "name": "Resource (RP-065) (ST10 / EB01 Release Event)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924190,
-      "tcgProductId": 698150,
-      "name": "Resource (RP-058) (1st Anniversary Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924192,
-      "tcgProductId": 698152,
-      "name": "Resource (RP-060) (1st Anniversary Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924194,
-      "tcgProductId": 698154,
-      "name": "Resource (RP-062) (1st Anniversary Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924196,
-      "tcgProductId": 698156,
-      "name": "Resource (RP-064) (1st Anniversary Resource Pack)",
+      "sourceProductId": 5924168,
+      "tcgProductId": 681972,
+      "name": "Resource (RP-026) (Premium Accessory Set - Mobile Suit Gundam Wing)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2128,9 +1772,23 @@
       "reason": "no-card-number"
     },
     {
+      "sourceProductId": 5924170,
+      "tcgProductId": 681975,
+      "name": "Resource (RP-028) (Premium Accessory Set - Mobile Suit Gundam Wing)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
       "sourceProductId": 5924171,
       "tcgProductId": 681976,
       "name": "Resource (RP-029) (Premium Accessory Set - Mobile Suit Gundam Wing)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924172,
+      "tcgProductId": 681977,
+      "name": "Resource (RP-030) (Premium Accessory Set - Mobile Suit Gundam Wing)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2142,6 +1800,13 @@
       "reason": "no-card-number"
     },
     {
+      "sourceProductId": 5924174,
+      "tcgProductId": 681979,
+      "name": "Resource (RP-032) (Premium Accessory Set - Mobile Suit Gundam Wing)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
       "sourceProductId": 5924175,
       "tcgProductId": 681980,
       "name": "Resource (RP-033) (Premium Accessory Set - Mobile Suit Gundam Wing)",
@@ -2149,9 +1814,9 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924177,
-      "tcgProductId": 684621,
-      "name": "Resource (RP-044) (ST09 Release Event)",
+      "sourceProductId": 5924178,
+      "tcgProductId": 698135,
+      "name": "Resource (RP-034) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2163,9 +1828,23 @@
       "reason": "no-card-number"
     },
     {
+      "sourceProductId": 5924180,
+      "tcgProductId": 698137,
+      "name": "Resource (RP-036) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
       "sourceProductId": 5924181,
       "tcgProductId": 698138,
       "name": "Resource (RP-037) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924182,
+      "tcgProductId": 698139,
+      "name": "Resource (RP-038) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2177,9 +1856,23 @@
       "reason": "no-card-number"
     },
     {
+      "sourceProductId": 5924184,
+      "tcgProductId": 698141,
+      "name": "Resource (RP-040) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
       "sourceProductId": 5924185,
       "tcgProductId": 698142,
       "name": "Resource (RP-041) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
+      "setName": "Promotional Resource Tokens",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924186,
+      "tcgProductId": 698143,
+      "name": "Resource (RP-042) (Premium Accessory Set - Mobile Suit Gundam: Iron-Blooded Orphans)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2191,30 +1884,9 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924189,
-      "tcgProductId": 698149,
-      "name": "Resource (RP-057) (1st Anniversary Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924191,
-      "tcgProductId": 698151,
-      "name": "Resource (RP-059) (1st Anniversary Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924193,
-      "tcgProductId": 698153,
-      "name": "Resource (RP-061) (1st Anniversary Resource Pack)",
-      "setName": "Promotional Resource Tokens",
-      "reason": "no-card-number"
-    },
-    {
-      "sourceProductId": 5924195,
-      "tcgProductId": 698155,
-      "name": "Resource (RP-063) (1st Anniversary Resource Pack)",
+      "sourceProductId": 5924177,
+      "tcgProductId": 684621,
+      "name": "Resource (RP-044) (ST09 Release Event)",
       "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
@@ -2226,199 +1898,527 @@
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924108,
-      "tcgProductId": 634345,
-      "name": "EX Base (EXBP-001) (Edition Beta Early Trial Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924189,
+      "tcgProductId": 698149,
+      "name": "Resource (RP-057) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924110,
-      "tcgProductId": 641568,
-      "name": "EX Base (EXBP-005) (Bandai Card Games Fest 25-26)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924190,
+      "tcgProductId": 698150,
+      "name": "Resource (RP-058) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924112,
-      "tcgProductId": 646555,
-      "name": "EX Base (EXBP-003) (Gundam Base Pop-Up World Tour)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924191,
+      "tcgProductId": 698151,
+      "name": "Resource (RP-059) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924114,
-      "tcgProductId": 653359,
-      "name": "EX Base (EXBP-007) (G Generation Eternal Collaboration Pack)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924192,
+      "tcgProductId": 698152,
+      "name": "Resource (RP-060) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924116,
-      "tcgProductId": 653361,
-      "name": "EX Base (EXBP-009) (G Generation Eternal Collaboration Pack)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924193,
+      "tcgProductId": 698153,
+      "name": "Resource (RP-061) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924118,
-      "tcgProductId": 661897,
-      "name": "EX Base (EXBP-011) (Mobile Suit Gundam: Iron-Blooded Orphans)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924194,
+      "tcgProductId": 698154,
+      "name": "Resource (RP-062) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924120,
-      "tcgProductId": 684623,
-      "name": "EX Base (EXBP-014) (ST09 Release Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924195,
+      "tcgProductId": 698155,
+      "name": "Resource (RP-063) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924122,
-      "tcgProductId": 684626,
-      "name": "EX Base (EXBP-016) (ST09 Release Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924196,
+      "tcgProductId": 698156,
+      "name": "Resource (RP-064) (1st Anniversary Resource Pack)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924124,
-      "tcgProductId": 691174,
-      "name": "EX Base (EXBP-020) (Starter Deck Battle Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5924188,
+      "tcgProductId": 698148,
+      "name": "Resource (RP-065) (ST10 / EB01 Release Event)",
+      "setName": "Promotional Resource Tokens",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924126,
-      "tcgProductId": 691177,
-      "name": "EX Base (EXBP-022) (Starter Deck Battle Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923877,
+      "tcgProductId": 619080,
+      "name": "Starter Deck 01: Heroic Beginnings",
+      "setName": "Starter Deck 01: Heroic Beginnings",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924128,
-      "tcgProductId": 691179,
-      "name": "EX Base (EXBP-024) (Starter Deck Battle Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923878,
+      "tcgProductId": 619085,
+      "name": "Starter Deck 01: Heroic Beginnings - Gundam Assemble Starter Set",
+      "setName": "Starter Deck 01: Heroic Beginnings",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924109,
-      "tcgProductId": 641567,
-      "name": "EX Base (EXBP-004) (First Combat)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923880,
+      "tcgProductId": 619097,
+      "name": "Starter Deck 01: Heroic Beginnings - Gundam Assemble Starter Set Display",
+      "setName": "Starter Deck 01: Heroic Beginnings",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924111,
-      "tcgProductId": 641569,
-      "name": "EX Base (EXBP-002) (Official Card Case Set 01)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923881,
+      "tcgProductId": 619098,
+      "name": "Starter Deck 01: Heroic Beginnings - Gundam Assemble Starter Set Display Case",
+      "setName": "Starter Deck 01: Heroic Beginnings",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924113,
-      "tcgProductId": 653358,
-      "name": "EX Base (EXBP-006) (G Generation Eternal Collaboration Pack)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923879,
+      "tcgProductId": 619092,
+      "name": "Starter Deck 01: Heroic Beginnings Display",
+      "setName": "Starter Deck 01: Heroic Beginnings",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924115,
-      "tcgProductId": 653360,
-      "name": "EX Base (EXBP-008) (G Generation Eternal Collaboration Pack)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923882,
+      "tcgProductId": 619102,
+      "name": "Starter Deck 01: Heroic Beginnings Display Case",
+      "setName": "Starter Deck 01: Heroic Beginnings",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924117,
-      "tcgProductId": 653362,
-      "name": "EX Base (EXBP-010) (G Generation Eternal Collaboration Pack)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923838,
+      "tcgProductId": 619107,
+      "name": "Starter Deck 02: Wings of Advance",
+      "setName": "Starter Deck 02: Wings of Advance",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924119,
-      "tcgProductId": 684622,
-      "name": "EX Base (EXBP-013) (ST09 Release Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923839,
+      "tcgProductId": 619111,
+      "name": "Starter Deck 02: Wings of Advance - Gundam Assemble Starter Set",
+      "setName": "Starter Deck 02: Wings of Advance",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924121,
-      "tcgProductId": 684624,
-      "name": "EX Base (EXBP-015) (ST09 Release Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923842,
+      "tcgProductId": 619136,
+      "name": "Starter Deck 02: Wings of Advance - Gundam Assemble Starter Set Display",
+      "setName": "Starter Deck 02: Wings of Advance",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924123,
-      "tcgProductId": 684627,
-      "name": "EX Base (EXBP-017) (ST09 Release Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923843,
+      "tcgProductId": 619137,
+      "name": "Starter Deck 02: Wings of Advance - Gundam Assemble Starter Set Display Case",
+      "setName": "Starter Deck 02: Wings of Advance",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924125,
-      "tcgProductId": 691176,
-      "name": "EX Base (EXBP-021) (Starter Deck Battle Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923840,
+      "tcgProductId": 619112,
+      "name": "Starter Deck 02: Wings of Advance Display",
+      "setName": "Starter Deck 02: Wings of Advance",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924127,
-      "tcgProductId": 691178,
-      "name": "EX Base (EXBP-023) (Starter Deck Battle Event)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923841,
+      "tcgProductId": 619114,
+      "name": "Starter Deck 02: Wings of Advance Display Case",
+      "setName": "Starter Deck 02: Wings of Advance",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924129,
-      "tcgProductId": 696885,
-      "name": "EX Base (EXBP-018) (The Sorcery of Nymph Circe Movie Release)",
-      "setName": "Promotional EX Base Tokens",
+      "sourceProductId": 5923799,
+      "tcgProductId": 619148,
+      "name": "Starter Deck 03: Zeon's Rush",
+      "setName": "Starter Deck 03: Zeon's Rush",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924273,
-      "tcgProductId": 616672,
-      "name": "Gundam (Token)",
-      "setName": "Edition Beta",
+      "sourceProductId": 5923802,
+      "tcgProductId": 619162,
+      "name": "Starter Deck 03: Zeon's Rush - Gundam Assemble Starter Set",
+      "setName": "Starter Deck 03: Zeon's Rush",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924275,
-      "tcgProductId": 616674,
-      "name": "Guntank (Token)",
-      "setName": "Edition Beta",
+      "sourceProductId": 5923803,
+      "tcgProductId": 619164,
+      "name": "Starter Deck 03: Zeon's Rush - Gundam Assemble Starter Set Display",
+      "setName": "Starter Deck 03: Zeon's Rush",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924281,
-      "tcgProductId": 617436,
-      "name": "Gundam Card Game Edition Beta Box",
-      "setName": "Edition Beta",
+      "sourceProductId": 5923804,
+      "tcgProductId": 619167,
+      "name": "Starter Deck 03: Zeon's Rush - Gundam Assemble Starter Set Display Case",
+      "setName": "Starter Deck 03: Zeon's Rush",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924274,
-      "tcgProductId": 616673,
-      "name": "Guncannon (Token)",
-      "setName": "Edition Beta",
+      "sourceProductId": 5923800,
+      "tcgProductId": 619151,
+      "name": "Starter Deck 03: Zeon's Rush Display",
+      "setName": "Starter Deck 03: Zeon's Rush",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924276,
-      "tcgProductId": 616675,
-      "name": "Char's Zaku II (Token)",
-      "setName": "Edition Beta",
+      "sourceProductId": 5923801,
+      "tcgProductId": 619157,
+      "name": "Starter Deck 03: Zeon's Rush Display Case",
+      "setName": "Starter Deck 03: Zeon's Rush",
       "reason": "no-card-number"
     },
     {
-      "sourceProductId": 5924282,
-      "tcgProductId": 617437,
-      "name": "Gundam Card Game Edition Beta Pack",
-      "setName": "Edition Beta",
+      "sourceProductId": 5923760,
+      "tcgProductId": 619173,
+      "name": "Starter Deck 04: SEED Strike",
+      "setName": "Starter Deck 04: SEED Strike",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923763,
+      "tcgProductId": 619178,
+      "name": "Starter Deck 04: SEED Strike - Gundam Assemble Starter Set",
+      "setName": "Starter Deck 04: SEED Strike",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923764,
+      "tcgProductId": 619179,
+      "name": "Starter Deck 04: SEED Strike - Gundam Assemble Starter Set Display",
+      "setName": "Starter Deck 04: SEED Strike",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923765,
+      "tcgProductId": 619180,
+      "name": "Starter Deck 04: SEED Strike - Gundam Assemble Starter Set Display Case",
+      "setName": "Starter Deck 04: SEED Strike",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923761,
+      "tcgProductId": 619176,
+      "name": "Starter Deck 04: SEED Strike Display",
+      "setName": "Starter Deck 04: SEED Strike",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923762,
+      "tcgProductId": 619177,
+      "name": "Starter Deck 04: SEED Strike Display Case",
+      "setName": "Starter Deck 04: SEED Strike",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923527,
+      "tcgProductId": 650741,
+      "name": "Starter Deck 05: Iron Bloom",
+      "setName": "Starter Deck 05: Iron Bloom",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923528,
+      "tcgProductId": 650742,
+      "name": "Starter Deck 05: Iron Bloom Display",
+      "setName": "Starter Deck 05: Iron Bloom",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923529,
+      "tcgProductId": 650743,
+      "name": "Starter Deck 05: Iron Bloom Display Case",
+      "setName": "Starter Deck 05: Iron Bloom",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923299,
+      "tcgProductId": 650744,
+      "name": "Starter Deck 06: Clan Unity",
+      "setName": "Starter Deck 06: Clan Unity",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923300,
+      "tcgProductId": 650745,
+      "name": "Starter Deck 06: Clan Unity Display",
+      "setName": "Starter Deck 06: Clan Unity",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923301,
+      "tcgProductId": 650746,
+      "name": "Starter Deck 06: Clan Unity Display Case",
+      "setName": "Starter Deck 06: Clan Unity",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923263,
+      "tcgProductId": 662121,
+      "name": "Starter Deck 07: Celestial Drive",
+      "setName": "Starter Deck 07: Celestial Drive",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923264,
+      "tcgProductId": 662122,
+      "name": "Starter Deck 07: Celestial Drive Display",
+      "setName": "Starter Deck 07: Celestial Drive",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923265,
+      "tcgProductId": 662123,
+      "name": "Starter Deck 07: Celestial Drive Display Case",
+      "setName": "Starter Deck 07: Celestial Drive",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923227,
+      "tcgProductId": 662118,
+      "name": "Starter Deck 08: Flash of Radiance",
+      "setName": "Starter Deck 08: Flash of Radiance",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923228,
+      "tcgProductId": 662119,
+      "name": "Starter Deck 08: Flash of Radiance Display",
+      "setName": "Starter Deck 08: Flash of Radiance",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923229,
+      "tcgProductId": 662120,
+      "name": "Starter Deck 08: Flash of Radiance Display Case",
+      "setName": "Starter Deck 08: Flash of Radiance",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922977,
+      "tcgProductId": 680468,
+      "name": "Starter Deck 09: Destiny Ignition",
+      "setName": "Starter Deck 09: Destiny Ignition",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922978,
+      "tcgProductId": 680469,
+      "name": "Starter Deck 09: Destiny Ignition Display",
+      "setName": "Starter Deck 09: Destiny Ignition",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922979,
+      "tcgProductId": 680470,
+      "name": "Starter Deck 09: Destiny Ignition Display Case",
+      "setName": "Starter Deck 09: Destiny Ignition",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922740,
+      "tcgProductId": 693099,
+      "name": "Starter Deck 10: Generation Pulse",
+      "setName": "Starter Deck 10: Generation Pulse",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922741,
+      "tcgProductId": 693100,
+      "name": "Starter Deck 10: Generation Pulse Display",
+      "setName": "Starter Deck 10: Generation Pulse",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922742,
+      "tcgProductId": 693101,
+      "name": "Starter Deck 10: Generation Pulse Display Case",
+      "setName": "Starter Deck 10: Generation Pulse",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923298,
+      "tcgProductId": 672972,
+      "name": "Starter Deck: Celestial Drive Bonus Pack",
+      "setName": "Starter Deck 07: Celestial Drive",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923334,
+      "tcgProductId": 670920,
+      "name": "Starter Deck: Clan Unity Bonus Pack",
+      "setName": "Starter Deck 06: Clan Unity",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922980,
+      "tcgProductId": 680471,
+      "name": "Starter Deck: Destiny Ignition Bonus Pack",
+      "setName": "Starter Deck 09: Destiny Ignition",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923262,
+      "tcgProductId": 672971,
+      "name": "Starter Deck: Flash of Radiance Bonus Pack",
+      "setName": "Starter Deck 08: Flash of Radiance",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923915,
+      "tcgProductId": 643141,
+      "name": "Starter Deck: Heroic Beginnings Bonus Pack",
+      "setName": "Starter Deck 01: Heroic Beginnings",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923562,
+      "tcgProductId": 670919,
+      "name": "Starter Deck: Iron Bloom Bonus Pack",
+      "setName": "Starter Deck 05: Iron Bloom",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923798,
+      "tcgProductId": 643144,
+      "name": "Starter Deck: SEED Strike Bonus Pack",
+      "setName": "Starter Deck 04: SEED Strike",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923876,
+      "tcgProductId": 643142,
+      "name": "Starter Deck: Wings of Advance Bonus Pack",
+      "setName": "Starter Deck 02: Wings of Advance",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923837,
+      "tcgProductId": 643143,
+      "name": "Starter Deck: Zeon's Rush Bonus Pack",
+      "setName": "Starter Deck 03: Zeon's Rush",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923021,
+      "tcgProductId": 662114,
+      "name": "Steel Requiem Booster Box",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923022,
+      "tcgProductId": 662115,
+      "name": "Steel Requiem Booster Box Case",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923020,
+      "tcgProductId": 662113,
+      "name": "Steel Requiem Booster Pack",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923023,
+      "tcgProductId": 662117,
+      "name": "Steel Requiem Sleeved Booster Pack",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923226,
+      "tcgProductId": 678554,
+      "name": "Steel Requiem Sleeved Booster Pack Art Bundle [Set of 4]",
+      "setName": "Steel Requiem",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923959,
+      "name": "Store Tournament Participation Pack 01",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924018,
+      "name": "Store Tournament Participation Pack 02",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924021,
+      "name": "Store Tournament Participation Pack 03",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923960,
+      "name": "Store Tournament Winner Pack 01",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924020,
+      "name": "Store Tournament Winner Pack 02",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5924022,
+      "name": "Store Tournament Winner Pack 03",
+      "setName": "Gundam Promotional Cards",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923705,
+      "tcgProductId": 643289,
+      "name": "Sword Strike Gundam (T-010) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923700,
+      "tcgProductId": 643284,
+      "name": "Tallgeese (T-005) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922912,
+      "name": "Wire-Guided Arm",
+      "setName": "Phantom Aria",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5923702,
+      "tcgProductId": 643286,
+      "name": "Zaku II (T-007) Token",
+      "setName": "Newtype Rising",
+      "reason": "no-card-number"
+    },
+    {
+      "sourceProductId": 5922913,
+      "name": "Zeong (Head)",
+      "setName": "Phantom Aria",
       "reason": "no-card-number"
     }
   ],
