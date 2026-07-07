@@ -31,6 +31,7 @@ import {
   Sparkles,
   Shuffle,
   Trash2,
+  Undo2,
   Upload,
   WalletCards,
   X,
@@ -653,14 +654,25 @@ function formatEstimatedMoney(value: number) {
 }
 
 function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
-  const price = tcgplayerMarketPrice(card, variant);
+  const print = tcgplayerPrint(card, variant);
+  const price =
+    typeof print?.marketPrice === "number" &&
+    Number.isFinite(print.marketPrice) &&
+    print.marketPrice > 0
+      ? print.marketPrice
+      : null;
   return price === null
     ? formatEstimatedMoney(estimatePrintCost(card, variant))
-    : `Market est. ${formatMoney(price)}`;
+    : `${print?.priceSource ?? "TCGplayer market"} ${formatMoney(price)}`;
 }
 
 function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
-  return tcgplayerMarketPrice(card, variant) === null ? "local estimate" : "market estimate";
+  const print = tcgplayerPrint(card, variant);
+  return typeof print?.marketPrice === "number" &&
+    Number.isFinite(print.marketPrice) &&
+    print.marketPrice > 0
+    ? (print.priceSource ?? "TCGplayer market")
+    : "local estimate";
 }
 
 function artDisplayLabel(variant: CardArtVariant) {
@@ -744,7 +756,7 @@ function noticeClass(tone: Notice["tone"]) {
 }
 
 function panelClass(extra = "") {
-  return `gcg-panel rounded-sm shadow-2xl shadow-black/30 backdrop-blur ${extra}`;
+  return `gcg-panel rounded-sm shadow-sm shadow-black/10 ${extra}`;
 }
 
 function buildDeckList(deck: DeckState) {
@@ -1085,6 +1097,26 @@ function cardMatchesCollectionFilter(
   }
 }
 
+function queryMatchRank(card: GundamCard, query: string) {
+  const name = card.name.toLowerCase();
+  const number = card.number.toLowerCase();
+  const type = card.type.toLowerCase();
+  const color = card.color.toLowerCase();
+  const set = card.set.toLowerCase();
+  const trait = card.trait.toLowerCase();
+  const link = card.link.toLowerCase();
+  const source = card.source.toLowerCase();
+  const text = card.text.toLowerCase();
+
+  if (type === query || number === query) return 0;
+  if (name === query || name.startsWith(query)) return 1;
+  if (name.includes(query) || number.includes(query)) return 2;
+  if (type.includes(query) || color.includes(query) || set.includes(query)) return 3;
+  if (trait.includes(query) || link.includes(query) || source.includes(query)) return 4;
+  if (text.includes(query)) return 5;
+  return 6;
+}
+
 function normalizeLinkName(value: string) {
   return value
     .replace(/[[\]().]/g, " ")
@@ -1353,9 +1385,11 @@ export function DeckBuilder({
   const [toast, setToast] = useState<ActionToast | null>(null);
   const [fallbackPanel, setFallbackPanel] = useState<FallbackPanel | null>(null);
   const [lightbox, setLightbox] = useState<CardLightboxState | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
   const [libraryPage, setLibraryPage] = useState(0);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
   const [statusTimestamp, setStatusTimestamp] = useState<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const openingHandRef = useRef<HTMLDivElement | null>(null);
@@ -1366,11 +1400,19 @@ export function DeckBuilder({
   const lastSavedDeckRef = useRef("");
   const deferredQuery = useDeferredValue(query);
 
-  const isDialogOpen = Boolean(fallbackPanel || lightbox);
+  const isDialogOpen = Boolean(fallbackPanel || lightbox || mobileActionsOpen);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 1279px)");
+    const update = () => setMobileTabsEnabled(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
   }, []);
 
   useEffect(() => {
@@ -1546,10 +1588,20 @@ export function DeckBuilder({
   const filteredCards = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
 
-    return CARD_POOL.filter((card) => {
+    const nextCards = CARD_POOL.filter((card) => {
       const matchesQuery =
         !normalizedQuery ||
-        [card.name, card.number, card.text, card.trait, card.link, card.source, card.set]
+        [
+          card.name,
+          card.number,
+          card.type,
+          card.color,
+          card.text,
+          card.trait,
+          card.link,
+          card.source,
+          card.set,
+        ]
           .join(" ")
           .toLowerCase()
           .includes(normalizedQuery);
@@ -1571,6 +1623,15 @@ export function DeckBuilder({
         matchesArt &&
         matchesCollection
       );
+    });
+
+    if (!normalizedQuery) return nextCards;
+
+    return [...nextCards].sort((a, b) => {
+      const rankDelta =
+        queryMatchRank(a, normalizedQuery) - queryMatchRank(b, normalizedQuery);
+      if (rankDelta !== 0) return rankDelta;
+      return a.name.localeCompare(b.name);
     });
   }, [
     artFilter,
@@ -1830,6 +1891,7 @@ export function DeckBuilder({
     if (!previousDeck) return;
 
     undoDeckRef.current = null;
+    setCanUndo(false);
     setDeck(cloneDeckState(previousDeck));
     setOpeningHand([]);
     showToast("good", "Deck restored", "Previous deck is back in the builder.");
@@ -1844,6 +1906,7 @@ export function DeckBuilder({
       undoDeckRef.current = cloneDeckState(current);
       return cloneDeckState(createNextDeck());
     });
+    setCanUndo(true);
     setOpeningHand([]);
     showToast("warn", label, detail, "Undo");
   }
@@ -2011,6 +2074,7 @@ export function DeckBuilder({
     if (!card || quantity <= 0) return;
 
     undoDeckRef.current = cloneDeckState(deck);
+    setCanUndo(true);
     setDeck((current) => {
       const nextTarget = { ...current[zone] };
       const nextPrints = clonePrints(current.prints);
@@ -2045,6 +2109,7 @@ export function DeckBuilder({
 
   function markDeckOwned() {
     undoDeckRef.current = cloneDeckState(deck);
+    setCanUndo(true);
     setDeck((current) => {
       const nextCollection: CollectionMap = { ...current.collection };
       (["main", "resource"] as const).forEach((zone) => {
@@ -2084,7 +2149,9 @@ export function DeckBuilder({
       nextHand.length ? "good" : "warn",
       nextHand.length ? "Opening hand drawn" : "Draw skipped",
       nextHand.length
-        ? `${nextHand.length} cards drawn from ${mainTotal} main deck cards.`
+        ? `${nextHand.length} ${nextHand.length === 1 ? "card" : "cards"} drawn from ${mainTotal} main deck ${
+            mainTotal === 1 ? "card" : "cards"
+          }.`
         : "Add cards to the main deck before drawing.",
     );
   }
@@ -2435,12 +2502,12 @@ export function DeckBuilder({
         inert={isDialogOpen || undefined}
       >
       <header className="border-b border-[#a7b5c9]/25 bg-[#05060a]/82 shadow-xl shadow-black/40 backdrop-blur-xl">
-        <div className="mx-auto max-w-[1800px] px-3 py-2 sm:px-5">
+        <div className="mx-auto max-w-[1800px] px-3 py-1.5 sm:px-5 sm:py-2">
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
-              <div className="flex w-40 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
+              <div className="flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
-                  src="/permet-link-logo.png"
+                  src="/permet-link-logo-header.webp"
                   alt="Permet Link"
                   width={1983}
                   height={793}
@@ -2514,6 +2581,15 @@ export function DeckBuilder({
                     {mobileActionsOpen ? <X size={16} /> : <MoreHorizontal size={16} />}
                   </ToolbarButton>
                   <div className="hidden xl:contents">
+                    {canUndo && (
+                      <ToolbarButton
+                        label="Undo"
+                        title="Restore previous deck state"
+                        onClick={restoreUndoDeck}
+                      >
+                        <Undo2 size={16} />
+                      </ToolbarButton>
+                    )}
                     <ToolbarButton label="Sample" title="Load sample deck" onClick={loadSampleDeck}>
                       <ShieldCheck size={16} />
                     </ToolbarButton>
@@ -2607,16 +2683,17 @@ export function DeckBuilder({
         <div className="workbench-grid grid gap-4 xl:grid-cols-[minmax(430px,1.05fr)_minmax(360px,0.82fr)_minmax(360px,0.9fr)] xl:items-start 2xl:grid-cols-[minmax(540px,1.25fr)_minmax(390px,0.82fr)_minmax(390px,0.9fr)]">
           <section
             id="library-panel"
-            role="region"
-            aria-label="Card library"
+            role={mobileTabsEnabled ? "tabpanel" : "region"}
+            aria-labelledby={mobileTabsEnabled ? "library-tab" : undefined}
+            aria-label={mobileTabsEnabled ? undefined : "Card library"}
             className={panelClass(
               `library-panel min-w-0 ${
                 mobileView === "library" ? "block" : "hidden xl:block"
               }`,
             )}
           >
-            <div className="sticky top-0 z-10 border-b border-[#a7b5c9]/20 bg-[#080a0f]/94 p-2.5 backdrop-blur sm:p-3">
-              <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+            <div className="sticky top-0 z-10 border-b border-[#a7b5c9]/20 bg-[#080a0f]/94 p-2 backdrop-blur sm:p-3">
+              <div className="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="flex shrink-0 items-center gap-2">
                   <Search size={18} className="text-[#f6c542]" />
                   <h2 className="whitespace-nowrap font-display text-xl font-black uppercase text-[#f7f7f2] sm:text-2xl">
@@ -2627,7 +2704,7 @@ export function DeckBuilder({
                   </span>
                 </div>
                 <div className="grid gap-2">
-                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(6.75rem,auto)] gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,auto)] gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
                     <label className="filter-cell relative block">
                       <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
                         Search
@@ -2672,7 +2749,7 @@ export function DeckBuilder({
                     </div>
                     <button
                       type="button"
-                      className="interactive-control inline-flex h-full min-h-12 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:min-h-16"
+                      className="interactive-control inline-flex h-full min-h-11 items-center justify-center gap-1.5 rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-2.5 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:min-h-16 md:px-3"
                       onClick={() => setAdvancedFiltersOpen((open) => !open)}
                       aria-expanded={advancedFiltersOpen}
                     >
@@ -2888,8 +2965,9 @@ export function DeckBuilder({
 
             <div
               id="card-panel"
-              role="region"
-              aria-label="Card inspector"
+              role={mobileTabsEnabled ? "tabpanel" : "region"}
+              aria-labelledby={mobileTabsEnabled ? "card-tab" : undefined}
+              aria-label={mobileTabsEnabled ? undefined : "Card inspector"}
               className={mobileView === "card" ? "block min-w-0" : "hidden min-w-0 xl:block"}
             >
               {selectedCard && selectedArtVariant ? (
@@ -2920,8 +2998,9 @@ export function DeckBuilder({
 
             <div
               id="stats-panel"
-              role="region"
-              aria-label="Deck stats"
+              role={mobileTabsEnabled ? "tabpanel" : "region"}
+              aria-labelledby={mobileTabsEnabled ? "stats-tab" : undefined}
+              aria-label={mobileTabsEnabled ? undefined : "Deck stats"}
               className={
                 mobileView === "stats"
                   ? "grid min-w-0 max-w-full gap-4"
@@ -2962,8 +3041,9 @@ export function DeckBuilder({
 
           <div
             id="deck-panel"
-            role="region"
-            aria-label="Deck list"
+            role={mobileTabsEnabled ? "tabpanel" : "region"}
+            aria-labelledby={mobileTabsEnabled ? "deck-tab" : undefined}
+            aria-label={mobileTabsEnabled ? undefined : "Deck list"}
             className={`min-w-0 max-w-full gap-4 xl:grid ${
               mobileView === "deck" ? "grid" : "hidden"
             }`}
@@ -3002,11 +3082,24 @@ export function DeckBuilder({
           </div>
         </div>
       </section>
+      <MobileCockpitNav
+        activeView={mobileView}
+        tabsEnabled={mobileTabsEnabled}
+        onChange={changeMobileView}
+      />
+      <ToastViewport
+        toast={toast}
+        onAction={restoreUndoDeck}
+        onDismiss={dismissToast}
+      />
+      </div>
       <MobileActionSheet
         open={mobileActionsOpen}
         copyState={copyState}
+        canUndo={canUndo}
         onSample={() => runMobileAction(loadSampleDeck)}
         onNew={() => runMobileAction(startNewDeck)}
+        onUndo={() => runMobileAction(restoreUndoDeck)}
         onArtDown={() => runMobileAction(() => stepDeckArt(-1))}
         onArtUp={() => runMobileAction(() => stepDeckArt(1))}
         onCopy={() =>
@@ -3023,13 +3116,6 @@ export function DeckBuilder({
         onImport={() => runMobileAction(() => importInputRef.current?.click())}
         onClose={() => setMobileActionsOpen(false)}
       />
-      <MobileCockpitNav activeView={mobileView} onChange={changeMobileView} />
-      <ToastViewport
-        toast={toast}
-        onAction={restoreUndoDeck}
-        onDismiss={dismissToast}
-      />
-      </div>
       <FallbackPanelView
         panel={fallbackPanel}
         onClose={() => setFallbackPanel(null)}
@@ -3284,31 +3370,63 @@ function CompositionPanel({
 
 function MobileCockpitNav({
   activeView,
+  tabsEnabled,
   onChange,
 }: {
   activeView: MobileView;
+  tabsEnabled: boolean;
   onChange: (view: MobileView) => void;
 }) {
+  function handleTabKey(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    const lastIndex = mobileViews.length - 1;
+    const nextIndex =
+      event.key === "ArrowRight"
+        ? index === lastIndex
+          ? 0
+          : index + 1
+        : event.key === "ArrowLeft"
+          ? index === 0
+            ? lastIndex
+            : index - 1
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? lastIndex
+              : null;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    const nextView = mobileViews[nextIndex];
+    onChange(nextView.id);
+    document.getElementById(`${nextView.id}-tab`)?.focus();
+  }
+
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-30 border-t border-[#8bdcff]/30 bg-[#05060a]/96 px-2 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2 shadow-[0_-18px_44px_rgba(0,0,0,0.72)] backdrop-blur-xl xl:hidden"
       aria-label="Mobile workspace views"
     >
-      <div className="mx-auto grid max-w-lg grid-cols-4 gap-1.5">
-        {mobileViews.map((view) => (
+      <div
+        className="mx-auto grid max-w-lg grid-cols-4 gap-1.5"
+        role={tabsEnabled ? "tablist" : undefined}
+      >
+        {mobileViews.map((view, index) => (
           <button
             id={`${view.id}-tab`}
             key={view.id}
             type="button"
+            role={tabsEnabled ? "tab" : undefined}
             className={`cockpit-tab grid h-14 place-items-center rounded-sm border font-display text-sm font-black uppercase ${
               activeView === view.id
                 ? "cockpit-tab-active border-[#8bdcff]/55 bg-[#1167d8]/28 text-[#d9ecff] shadow-lg shadow-[#1167d8]/22"
                 : "border-[#a7b5c9]/18 bg-[#f7f7f2]/7 text-[#f7f7f2]/55"
             }`}
             onClick={() => onChange(view.id)}
+            onKeyDown={(event) => handleTabKey(event, index)}
             aria-label={`Show ${view.label}`}
             aria-controls={`${view.id}-panel`}
-            aria-current={activeView === view.id ? "page" : undefined}
+            aria-selected={tabsEnabled ? activeView === view.id : undefined}
+            tabIndex={tabsEnabled && activeView !== view.id ? -1 : 0}
           >
             {view.icon}
             <span className="leading-none">{view.label}</span>
@@ -3322,8 +3440,10 @@ function MobileCockpitNav({
 function MobileActionSheet({
   open,
   copyState,
+  canUndo,
   onSample,
   onNew,
+  onUndo,
   onArtDown,
   onArtUp,
   onCopy,
@@ -3334,8 +3454,10 @@ function MobileActionSheet({
 }: {
   open: boolean;
   copyState: string;
+  canUndo: boolean;
   onSample: () => void;
   onNew: () => void;
+  onUndo: () => void;
   onArtDown: () => void;
   onArtUp: () => void;
   onCopy: () => void;
@@ -3368,15 +3490,19 @@ function MobileActionSheet({
       ref={sheetRef}
       id="mobile-action-sheet"
       className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden"
-      role="group"
-      aria-label="More deck actions"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mobile-action-sheet-title"
+      onKeyDown={(event) => trapDialogFocus(event, sheetRef.current, onClose)}
     >
+      <h2 id="mobile-action-sheet-title" className="sr-only">
+        More deck actions
+      </h2>
+      {canUndo && (
+        <ToolbarButton label="Undo" title="Restore previous deck state" onClick={onUndo} className="w-full">
+          <Undo2 size={16} />
+        </ToolbarButton>
+      )}
       <ToolbarButton label="Sample" title="Load sample deck" onClick={onSample} className="w-full">
         <ShieldCheck size={16} />
       </ToolbarButton>
@@ -3714,7 +3840,7 @@ function CardLightbox({
                 srcSet={cardImageSrcSet(card, artVariant, [640, 1000, 1500])}
                 sizes="(min-width: 1024px) 58vw, 94vw"
                 alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
-                className="mx-auto max-h-[72vh] max-w-full object-contain object-top lg:max-h-[78vh]"
+                className="mx-auto max-h-[58vh] max-w-full object-contain object-top lg:max-h-[66vh]"
                 referrerPolicy="no-referrer"
                 onError={handleCardImageError}
               />
@@ -4095,7 +4221,7 @@ function ToolbarButton({
       className={`interactive-control inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-base font-black uppercase shadow-sm sm:gap-2 sm:px-3 sm:text-lg xl:px-0 ${className} ${
         disabled
           ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
-          : "border-[#a7b5c9]/25 bg-[linear-gradient(90deg,rgba(145,145,145,0.22),rgba(62,112,124,0.28))] text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
+          : "border-[#a7b5c9]/25 bg-[#f7f7f2]/9 text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
       }`}
       onClick={onClick}
       title={title}
@@ -4551,7 +4677,7 @@ function LibraryCard({
         card.color,
       )} ${selected ? "active-scan-card ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
     >
-      <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2.5 sm:grid-cols-[7rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2.5 sm:grid-cols-[8rem_minmax(0,1fr)]">
         <button
           type="button"
           className="scan-frame interactive-control relative aspect-[5/7] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-black text-left shadow-lg shadow-black/35"
@@ -4565,7 +4691,7 @@ function LibraryCard({
           <img
             src={cardImagePath(card, artVariant, 1000)}
             srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
-            sizes="(min-width: 1280px) 7rem, 6rem"
+            sizes="(min-width: 1280px) 8rem, 7rem"
             alt={`${card.name} card`}
             className="h-full w-full bg-black object-contain object-top transition duration-200 group-hover:scale-[1.035]"
             loading="lazy"
@@ -4576,7 +4702,7 @@ function LibraryCard({
             <span className="permet-scanline pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#8bdcff]/0 via-[#8bdcff]/28 to-[#8bdcff]/0" />
           )}
           {quantity > 0 && (
-            <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
+            <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#05070c]/92 font-display text-base font-black leading-none text-[#fff2bd] shadow-lg shadow-black/30">
               {quantity}
             </span>
           )}
@@ -4646,22 +4772,24 @@ function LibraryCard({
           </div>
         </div>
 
-        <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem_3.25rem] gap-1 sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
+        <div className="col-span-2 grid grid-cols-3 gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.5rem_2.5rem_3.25rem] sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
         {primaryZone && onAdjustPrimary ? (
-          <MiniQuantityControl
-            label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
-            quantity={primaryQuantity}
-            tone={primaryZone}
-            dense
-            incrementDisabled={Boolean(primaryConstraint)}
-            decrementDisabled={primaryQuantity <= 0}
-            incrementReason={primaryConstraint}
-            decrementReason={`No ${zoneLabel(primaryZone).toLowerCase()} copies`}
-            onIncrement={() => onAdjustPrimary(1)}
-            onDecrement={() => onAdjustPrimary(-1)}
-          />
+          <div className="col-span-3 min-[380px]:col-span-1">
+            <MiniQuantityControl
+              label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
+              quantity={primaryQuantity}
+              tone={primaryZone}
+              dense
+              incrementDisabled={Boolean(primaryConstraint)}
+              decrementDisabled={primaryQuantity <= 0}
+              incrementReason={primaryConstraint}
+              decrementReason={`No ${zoneLabel(primaryZone).toLowerCase()} copies`}
+              onIncrement={() => onAdjustPrimary(1)}
+              onDecrement={() => onAdjustPrimary(-1)}
+            />
+          </div>
         ) : (
-          <div className="grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2">
+          <div className="col-span-3 grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2 min-[380px]:col-span-1">
             <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/58">
               Locked
             </div>
@@ -4999,7 +5127,7 @@ function CardThumb({
       >
         {image}
         {badge && (
-          <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
+          <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#05070c]/92 font-display text-base font-black leading-none text-[#fff2bd] shadow-lg shadow-black/30">
             {badge}
           </span>
         )}
@@ -5014,7 +5142,7 @@ function CardThumb({
     <div className={thumbClass}>
       {image}
       {badge && (
-        <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
+        <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#05070c]/92 font-display text-base font-black leading-none text-[#fff2bd] shadow-lg shadow-black/30">
           {badge}
         </span>
       )}

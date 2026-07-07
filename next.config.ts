@@ -12,6 +12,9 @@ function canonicalHostRedirect(host: string) {
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   devIndicators: false,
+  outputFileTracingExcludes: {
+    "/*": [".local/**/*", "design-assets/**/*", "qa-screenshots/**/*"],
+  },
   poweredByHeader: false,
   async redirects() {
     return [

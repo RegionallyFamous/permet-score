@@ -28,7 +28,8 @@ export async function GET(_request: Request, context: RouteContext) {
     { id, deck },
     {
       headers: {
-        "Cache-Control": "public, max-age=60, s-maxage=3600",
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        "Vercel-CDN-Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
       },
     },
   );

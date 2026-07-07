@@ -34,6 +34,22 @@ const sourceOnlyProductIds = Object.entries(TCGPLAYER_CARD_PRINTS).flatMap(
       )
       .map((print) => `${number}:${print.variantId}`),
 );
+const directProductPrints = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
+  (sum, prints) =>
+    sum +
+    prints.filter(
+      (print) => print.productId && /tcgplayer\.com\/product\/\d+/i.test(print.url),
+    ).length,
+  0,
+);
+const missingProductIds = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
+  (sum, prints) => sum + prints.filter((print) => !print.productId).length,
+  0,
+);
+const missingMarketPrices = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
+  (sum, prints) => sum + prints.filter((print) => !print.marketPrice).length,
+  0,
+);
 const cardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
 const syncAgeHours = TCGPLAYER_LAST_SYNC
   ? Math.max(0, (Date.now() - new Date(TCGPLAYER_LAST_SYNC).getTime()) / 3_600_000)
@@ -77,12 +93,27 @@ if (sourceOnlyProductIds.length) {
   else warnings.push(`${message} Runtime image guards will ignore those CDN paths until the next sync repairs them.`);
 }
 
+if (missingProductIds) {
+  warnings.push(
+    `${missingProductIds} market print records do not have direct TCGplayer product IDs yet and will use search fallback links.`,
+  );
+}
+
+if (missingMarketPrices) {
+  warnings.push(
+    `${missingMarketPrices} market print records do not have TCGplayer market prices yet and may use local estimates.`,
+  );
+}
+
 const summary = {
   strict,
   curatedCards: CURATED_CARD_POOL.length,
   marketCards: TCGPLAYER_CARD_POOL.length,
   totalCards: cards.length,
   marketPrints: printCount,
+  directProductPrints,
+  missingProductIds,
+  missingMarketPrices,
   sourceOnlyProductIds: sourceOnlyProductIds.length,
   marketCardsWithPrints: cardsWithPrints,
   marketLastSync: TCGPLAYER_LAST_SYNC,

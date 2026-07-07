@@ -102,6 +102,78 @@ async function assertArtUpgradeKeepsBuyList(page) {
   await page.locator('button[aria-label="Close fallback panel"]').click();
 }
 
+async function assertMobileActionSheetFocusTrap(page) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.locator('button[title="More deck actions"]').click();
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute("title") === "Load sample deck",
+    null,
+    { timeout: 15000 },
+  );
+
+  for (let index = 0; index < 12; index += 1) {
+    await page.keyboard.press("Tab");
+    const focusInsideSheet = await page.evaluate(() => {
+      const sheet = document.querySelector("#mobile-action-sheet");
+      return Boolean(sheet?.contains(document.activeElement));
+    });
+    if (!focusInsideSheet) {
+      throw new Error(`Mobile action sheet lost focus after Tab ${index + 1}`);
+    }
+  }
+
+  await page.keyboard.press("Shift+Tab");
+  const reverseFocusInsideSheet = await page.evaluate(() => {
+    const sheet = document.querySelector("#mobile-action-sheet");
+    return Boolean(sheet?.contains(document.activeElement));
+  });
+  if (!reverseFocusInsideSheet) {
+    throw new Error("Mobile action sheet lost focus after Shift+Tab");
+  }
+
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => !document.querySelector("#mobile-action-sheet"));
+}
+
+async function assertResourceSearchRanksResourceCards(page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByPlaceholder("Name, #, text").fill("Resource");
+  try {
+    await page.waitForFunction(
+      () => {
+        const firstCard = document.querySelector(".library-result");
+        if (!firstCard) return false;
+        return Array.from(firstCard.querySelectorAll("span")).some((chip) =>
+          ["RESOURCE", "EX RESOURCE"].includes(chip.textContent?.trim() ?? ""),
+        );
+      },
+      null,
+      { timeout: 15000 },
+    );
+  } catch {
+    // The detailed assertion below reports the stale/non-resource card title.
+  }
+
+  const firstResult = await page.locator(".library-result").first().evaluate((card) => {
+    const chips = Array.from(card.querySelectorAll("span")).map((chip) =>
+      chip.textContent?.trim(),
+    );
+    const typeChip = chips.find((chip) => chip === "RESOURCE" || chip === "EX RESOURCE");
+    return {
+      title: card.querySelector("h3")?.textContent?.trim() ?? "",
+      typeChip,
+    };
+  });
+
+  if (!firstResult.typeChip) {
+    throw new Error(
+      `Resource search first result is not a Resource card: ${firstResult.title}`,
+    );
+  }
+}
+
 async function assertMobileLibraryLayout(page) {
   await page.setViewportSize({ width: 320, height: 680 });
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
@@ -121,17 +193,39 @@ async function assertMobileLibraryLayout(page) {
 
   await page.getByRole("button", { name: /Filters/i }).click();
   await page.locator(".library-filters-popover").waitFor({ timeout: 15000 });
-  const filterOverlap = await page.evaluate(() => {
+  const filterGeometry = await page.evaluate(() => {
     const popover = document.querySelector(".library-filters-popover");
     const nav = document.querySelector("nav");
-    if (!popover || !nav) return 0;
-    return Math.max(0, popover.getBoundingClientRect().bottom - nav.getBoundingClientRect().top);
+    if (!popover || !nav) return { top: 0, navOverlap: 0 };
+    const popoverRect = popover.getBoundingClientRect();
+    const navRect = nav.getBoundingClientRect();
+    return {
+      top: popoverRect.top,
+      navOverlap: Math.max(0, popoverRect.bottom - navRect.top),
+    };
   });
-  if (filterOverlap > 1) {
-    throw new Error(`Mobile filters overlap bottom nav by ${filterOverlap}px`);
+  if (filterGeometry.top < 0) {
+    throw new Error(`320px mobile filters start offscreen: top=${filterGeometry.top}`);
+  }
+  if (filterGeometry.navOverlap > 1) {
+    throw new Error(`Mobile filters overlap bottom nav by ${filterGeometry.navOverlap}px`);
   }
 
   await page.getByRole("button", { name: /Filters/i }).click();
+  await page.setViewportSize({ width: 667, height: 375 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /Filters/i }).click();
+  await page.locator(".library-filters-popover").waitFor({ timeout: 15000 });
+  const landscapeTop = await page.locator(".library-filters-popover").evaluate(
+    (popover) => popover.getBoundingClientRect().top,
+  );
+  if (landscapeTop < 0) {
+    throw new Error(`Landscape mobile filters start offscreen: top=${landscapeTop}`);
+  }
+
+  await page.getByRole("button", { name: /Filters/i }).click();
+  await page.setViewportSize({ width: 320, height: 680 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /Open large view of/i }).first().click();
   await page.locator(".card-lightbox").evaluate((node) => {
     node.scrollTop = node.scrollHeight;
@@ -169,12 +263,13 @@ async function main() {
     );
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => !document.querySelector("#mobile-action-sheet"));
+    await assertMobileActionSheetFocusTrap(page);
 
     await assertMobileLibraryLayout(page);
 
     await page.setViewportSize({ width: 320, height: 680 });
     await page.goto(baseUrl, { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: "Show Deck" }).click();
+    await page.getByRole("tab", { name: "Show Deck" }).click();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
@@ -188,6 +283,7 @@ async function main() {
     });
     await assertInvalidShareBlocked(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
+    await assertResourceSearchRanksResourceCards(desktop);
 
     await desktop.goto(baseUrl, { waitUntil: "networkidle" });
     const downloadPromise = desktop.waitForEvent("download", { timeout: 20000 });

@@ -32,27 +32,29 @@ API, and shared deck page. `perf:lighthouse` expects the app to already be
 running on `http://localhost:3000`, ideally with `npm run build && npm run start`.
 `analyze` uses the Turbopack analyzer built into current Next.js.
 
-## Janie Market Source
+## TCGplayer Market Source
 
-Janie is the bridge to TCGplayer product/catalog data. Permet Link does not
-need its own TCGplayer credentials; it consumes Janie Firehose output into
-generated files so the app stays fast on Vercel:
+Permet Link uses a private bridge to TCGplayer product/catalog data, so the app
+does not need its own public TCGplayer credentials. The sync writes generated
+market files so the app stays fast on Vercel:
 
 ```bash
-JANIE_API_TOKEN=... npm run data:sync:janie
+TCGPLAYER_BRIDGE_TOKEN=... npm run data:sync:tcgplayer
 ```
 
 The sync writes:
 
-- `app/tcgplayer-data.ts`: Janie/TCGplayer product IDs, buy links, image URLs when Janie has them, and market prices.
-- `app/tcgplayer-card-data.ts`: new market rows discovered by Janie that are not in the curated rules file yet.
-- `data/janie-gundam-sync.json`: Janie release coverage, search coverage, warnings, and unmatched products.
+- `app/tcgplayer-data.ts`: TCGplayer product IDs, buy links, image URLs when available, and market prices.
+- `app/tcgplayer-card-data.ts`: new market rows that are not in the curated rules file yet.
+- `data/tcgplayer-gundam-sync.json`: release coverage, search coverage, warnings, and unmatched products.
 
-In GitHub, add repository secret `JANIE_API_TOKEN`. The optional repository
-variables are `JANIE_API_ORIGIN` and `JANIE_GUNDAM_GAME_NAME`; by default they
-point at the hosted Janie Firehose and `Gundam Card Game`. The scheduled
-workflow `.github/workflows/sync-janie.yml` runs daily and commits generated
-updates back to `main` when Janie has new Gundam products or prices.
+In GitHub, add repository secret `TCGPLAYER_BRIDGE_TOKEN`. The optional
+repository variables are `TCGPLAYER_BRIDGE_ORIGIN` and
+`TCGPLAYER_BRIDGE_GAME_NAME`; by default they point at the hosted bridge and
+`Gundam Card Game`. The scheduled workflow `.github/workflows/sync-tcgplayer.yml`
+runs daily and commits generated updates back to `main` when new Gundam
+products or prices are available. Existing `JANIE_*` secrets and variables are
+still supported as fallback aliases.
 
 ## Share Links
 

@@ -22,6 +22,15 @@ function hasBlobCredentials() {
   );
 }
 
+function shouldUseLocalShareStore() {
+  return !process.env.VERCEL;
+}
+
+function assertShareStoreConfigured() {
+  if (hasBlobCredentials() || shouldUseLocalShareStore()) return;
+  throw new Error("Vercel Blob credentials are required for shared decks in production.");
+}
+
 function blobPath(id: string) {
   return `decks/${id}.json`;
 }
@@ -55,6 +64,8 @@ async function loadLocalDeck(id: string) {
 }
 
 export async function saveSharedDeck(id: string, deck: SharedDeckState) {
+  assertShareStoreConfigured();
+
   if (!hasBlobCredentials()) {
     await saveLocalDeck(id, deck);
     return;
@@ -69,6 +80,8 @@ export async function saveSharedDeck(id: string, deck: SharedDeckState) {
 }
 
 export async function loadSharedDeck(id: string) {
+  assertShareStoreConfigured();
+
   if (!hasBlobCredentials()) {
     return loadLocalDeck(id);
   }

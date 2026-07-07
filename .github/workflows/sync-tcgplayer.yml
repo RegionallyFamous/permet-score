@@ -1,0 +1,44 @@
+name: Sync TCGplayer Gundam Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync TCGplayer market snapshot
+        run: npm run data:sync:tcgplayer
+        env:
+          TCGPLAYER_BRIDGE_ORIGIN: ${{ vars.TCGPLAYER_BRIDGE_ORIGIN || vars.JANIE_API_ORIGIN || 'https://janie.up.railway.app' }}
+          TCGPLAYER_BRIDGE_TOKEN: ${{ secrets.TCGPLAYER_BRIDGE_TOKEN || secrets.JANIE_API_TOKEN }}
+          TCGPLAYER_BRIDGE_GAME_NAME: ${{ vars.TCGPLAYER_BRIDGE_GAME_NAME || vars.JANIE_GUNDAM_GAME_NAME || 'Gundam Card Game' }}
+
+      - name: Validate generated app
+        run: |
+          npm run data:audit:strict
+          npm run lint
+          npm run build
+
+      - name: Commit generated data
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: "Sync TCGplayer Gundam card data"
+          file_pattern: "app/tcgplayer-data.ts app/tcgplayer-card-data.ts data/tcgplayer-gundam-sync.json"

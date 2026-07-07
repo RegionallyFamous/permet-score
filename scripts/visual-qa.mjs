@@ -179,7 +179,7 @@ try {
     }
 
     if (viewport.width < 1280) {
-      await page.getByRole("button", { name: "Show Deck" }).click();
+      await page.getByRole("tab", { name: "Show Deck" }).click();
       const deckAudit = await readAudit(page);
       if (deckAudit.overflow > 1 || deckAudit.overflowOffenders.length) {
         throw new Error(
@@ -189,7 +189,7 @@ try {
         );
       }
 
-      await page.getByRole("button", { name: "Show Stats" }).click();
+      await page.getByRole("tab", { name: "Show Stats" }).click();
       const statsAudit = await readAudit(page);
       if (statsAudit.overflow > 1 || statsAudit.overflowOffenders.length) {
         throw new Error(
@@ -199,7 +199,7 @@ try {
         );
       }
 
-      await page.getByRole("button", { name: "Show Library" }).click();
+      await page.getByRole("tab", { name: "Show Library" }).click();
       await page.getByRole("button", { name: /Filters/i }).first().click();
       const filtersAudit = await readAudit(page);
       if (filtersAudit.overflow > 1 || filtersAudit.overflowOffenders.length) {

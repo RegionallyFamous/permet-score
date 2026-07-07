@@ -11,38 +11,54 @@ import { CARD_POOL as CURATED_CARD_POOL } from "../app/card-data.ts";
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const checkOnly = process.argv.includes("--check");
 const allowEmpty = process.argv.includes("--allow-empty");
-const syncConcurrency = clampNumber(process.env.JANIE_SYNC_CONCURRENCY, 4, 1, 8);
-const gameName = process.env.JANIE_GUNDAM_GAME_NAME ?? "Gundam Card Game";
-const maxSyncAgeHours = Number(process.env.JANIE_MAX_SYNC_HOURS ?? 48);
-const janieConfig = readCodexJanieConfig();
-const janieOrigin = (
+const syncConcurrency = clampNumber(
+  process.env.TCGPLAYER_BRIDGE_SYNC_CONCURRENCY ?? process.env.JANIE_SYNC_CONCURRENCY,
+  4,
+  1,
+  8,
+);
+const gameName =
+  process.env.TCGPLAYER_BRIDGE_GAME_NAME ??
+  process.env.JANIE_GUNDAM_GAME_NAME ??
+  "Gundam Card Game";
+const maxSyncAgeHours = Number(
+  process.env.TCGPLAYER_BRIDGE_MAX_SYNC_HOURS ?? process.env.JANIE_MAX_SYNC_HOURS ?? 48,
+);
+const bridgeConfig = readCodexMarketBridgeConfig();
+const marketOrigin = (
+  process.env.TCGPLAYER_BRIDGE_ORIGIN ??
   process.env.JANIE_API_ORIGIN ??
   process.env.API_ORIGIN ??
-  janieConfig.JANIE_API_ORIGIN ??
+  bridgeConfig.TCGPLAYER_BRIDGE_ORIGIN ??
+  bridgeConfig.JANIE_API_ORIGIN ??
   "https://janie.up.railway.app"
 ).replace(/\/$/, "");
-const janieToken =
+const marketToken =
+  process.env.TCGPLAYER_BRIDGE_TOKEN ??
   process.env.JANIE_API_TOKEN ??
   process.env.JANIE_BEARER_TOKEN ??
   process.env.API_KEY ??
   process.env.ADMIN_API_KEY ??
-  janieConfig.JANIE_API_TOKEN;
+  bridgeConfig.TCGPLAYER_BRIDGE_TOKEN ??
+  bridgeConfig.JANIE_API_TOKEN;
 
 const curatedByNumber = new Map(CURATED_CARD_POOL.map((card) => [card.number, card]));
 const localVariantsByNumber = CARD_ART_VARIANTS;
 
-if (!janieToken) {
+if (!marketToken) {
   throw new Error(
-    "Missing Janie credentials. Set JANIE_API_TOKEN, or run locally with mcp_servers.janie-firehose configured in ~/.codex/config.toml.",
+    "Missing market bridge credentials. Set TCGPLAYER_BRIDGE_TOKEN or JANIE_API_TOKEN, or run locally with the configured market bridge MCP in ~/.codex/config.toml.",
   );
 }
 
-function readCodexJanieConfig() {
+function readCodexMarketBridgeConfig() {
   const configPath = `${homedir()}/.codex/config.toml`;
   if (!existsSync(configPath)) return {};
   const text = readFileSync(configPath, "utf8");
   const block = section(text, "mcp_servers.janie-firehose.env");
   return {
+    TCGPLAYER_BRIDGE_ORIGIN: readTomlString(block, "TCGPLAYER_BRIDGE_ORIGIN"),
+    TCGPLAYER_BRIDGE_TOKEN: readTomlString(block, "TCGPLAYER_BRIDGE_TOKEN"),
     JANIE_API_ORIGIN: readTomlString(block, "JANIE_API_ORIGIN"),
     JANIE_API_TOKEN: readTomlString(block, "JANIE_API_TOKEN"),
   };
@@ -166,15 +182,15 @@ function generatedCardFromProduct(row) {
   };
 }
 
-async function janieGet(path) {
-  const url = new URL(path, janieOrigin);
+async function marketBridgeGet(path) {
+  const url = new URL(path, marketOrigin);
   const maxAttempts = 5;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const response = await fetch(url, {
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${janieToken}`,
+        Authorization: `Bearer ${marketToken}`,
       },
     });
     const text = await response.text();
@@ -183,7 +199,7 @@ async function janieGet(path) {
 
     const retryable = response.status === 429 || response.status >= 500;
     if (!retryable || attempt === maxAttempts) {
-      throw new Error(`Janie GET ${url.pathname} failed (${response.status}): ${JSON.stringify(json)}`);
+      throw new Error(`Market bridge GET ${url.pathname} failed (${response.status}): ${JSON.stringify(json)}`);
     }
 
     const retryAfterSeconds = Number(response.headers.get("retry-after"));
@@ -193,7 +209,7 @@ async function janieGet(path) {
     await sleep(delayMs);
   }
 
-  throw new Error(`Janie GET ${url.pathname} failed after ${maxAttempts} attempts.`);
+  throw new Error(`Market bridge GET ${url.pathname} failed after ${maxAttempts} attempts.`);
 }
 
 function sleep(ms) {
@@ -213,7 +229,7 @@ async function fetchReleaseAudit() {
     days: "3650",
     includeJobs: "false",
   });
-  return janieGet(`/api/firehose/release-audit?${params.toString()}`);
+  return marketBridgeGet(`/api/firehose/release-audit?${params.toString()}`);
 }
 
 async function fetchCatalogDiscovery() {
@@ -222,7 +238,7 @@ async function fetchCatalogDiscovery() {
     maxPages: "50",
     maxMissingGroups: "50",
   });
-  return janieGet(`/api/diagnostics/catalog-discovery?${params.toString()}`).catch((error) => ({
+  return marketBridgeGet(`/api/diagnostics/catalog-discovery?${params.toString()}`).catch((error) => ({
     status: "unavailable",
     error: error instanceof Error ? error.message : String(error),
   }));
@@ -234,7 +250,7 @@ async function firehoseSearch(query, limit = 100) {
     game: gameName,
     limit: String(limit),
   });
-  const payload = await janieGet(`/api/firehose/search?${params.toString()}`);
+  const payload = await marketBridgeGet(`/api/firehose/search?${params.toString()}`);
   return Array.isArray(payload.results) ? payload.results : [];
 }
 
@@ -245,7 +261,7 @@ async function productSearch(query, setName, limit = 2000) {
     set: setName,
     limit: String(limit),
   });
-  const payload = await janieGet(`/api/v1/products/search?${params.toString()}`);
+  const payload = await marketBridgeGet(`/api/v1/products/search?${params.toString()}`);
   return Array.isArray(payload.products) ? payload.products : [];
 }
 
@@ -446,7 +462,7 @@ export const MARKET_CARD_POOL = TCGPLAYER_CARD_POOL;
         updatedAt,
         source: "TCGplayer market",
         gameName,
-        marketOrigin: janieOrigin,
+        marketOrigin: marketOrigin,
         releaseAudit: {
           generatedAt: releaseAudit.generatedAt,
           status: releaseAudit.status,
@@ -466,10 +482,10 @@ export const MARKET_CARD_POOL = TCGPLAYER_CARD_POOL;
         unmatchedProducts,
         warnings: [
           products.length === 0
-            ? "Janie returned zero Gundam product rows. Catalog sets may be inserted, but product/price jobs have not drained yet."
+            ? "Market bridge returned zero Gundam product rows. Catalog sets may be inserted, but product/price jobs have not drained yet."
             : "",
           searchReports.some((report) => report.limitHit)
-            ? "One or more Janie Firehose pricing searches hit the 100-row endpoint limit. Full catalog rows are included from Janie product search, but some exact prices or product links may require a dedicated Janie catalog export."
+            ? "One or more Market bridge pricing searches hit the 100-row endpoint limit. Full catalog rows are included from market product search, but some exact prices or product links may require a dedicated market catalog export."
             : "",
         ].filter(Boolean),
         maxSyncAgeHours,
@@ -485,7 +501,7 @@ async function writeGeneratedFile(path, content) {
   if (checkOnly) {
     const existing = await readFile(absolutePath, "utf8").catch(() => "");
     if (existing !== content) {
-      throw new Error(`${path} is out of date. Run npm run data:sync:janie.`);
+      throw new Error(`${path} is out of date. Run npm run data:sync:tcgplayer.`);
     }
     return;
   }
@@ -504,15 +520,15 @@ async function main() {
 
   await writeGeneratedFile("app/tcgplayer-data.ts", files.dataSource);
   await writeGeneratedFile("app/tcgplayer-card-data.ts", files.cardSource);
-  await writeGeneratedFile("data/janie-gundam-sync.json", files.reportSource);
+  await writeGeneratedFile("data/tcgplayer-gundam-sync.json", files.reportSource);
 
   if (!products.length && !allowEmpty) {
     throw new Error(
-      "Janie is connected, but returned zero Gundam products. Let Janie's queued fetchProductDetails jobs drain, then rerun npm run data:sync:janie.",
+      "The market bridge returned zero Gundam products. Let queued product-detail jobs drain, then rerun npm run data:sync:tcgplayer.",
     );
   }
 
-  console.log(`Synced ${products.length} Janie Gundam products from ${janieOrigin}.`);
+  console.log(`Synced ${products.length} TCGplayer Gundam products from ${marketOrigin}.`);
 }
 
 await main();
