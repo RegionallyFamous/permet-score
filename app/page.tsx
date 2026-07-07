@@ -29,7 +29,6 @@ import {
   ShoppingCart,
   ShieldCheck,
   Sparkles,
-  Shuffle,
   Trash2,
   Undo2,
   Upload,
@@ -192,16 +191,15 @@ const typeFilters = [
   "UNIT TOKEN",
 ] as const;
 const artFilters = [
-  "All Art",
-  "Has Parallel Art",
-  "Standard Art Only",
-  "Parallel Art P1",
-  "Parallel Art P2",
-  "Premium Parallel",
+  "All Prints",
+  "Has Parallel Print",
+  "Base Print Only",
+  "P1 Print",
+  "P2 Print",
+  "Premium Print",
 ] as const;
 const collectionFilters = ["All", "Owned", "Budget"] as const;
 const buildStatusFilters = ["All", "Deck Ready", "Catalog Only"] as const;
-const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
 const LIBRARY_PAGE_SIZE = 6;
 const MAX_IMPORT_BYTES = 64 * 1024;
@@ -1140,27 +1138,18 @@ function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
   return hasDirectMarketProduct(print) ? "TCGplayer product; local estimate" : "local estimate";
 }
 
-function artDisplayLabel(variant: CardArtVariant) {
-  if (variant.id === "standard" || variant.tier <= 0) return "Standard Art";
-
-  const suffix = variant.officialId.split("_")[1] ?? variant.id;
-  const parallelCode = /^p\d+$/i.test(suffix) ? suffix.toUpperCase() : "";
-  if (parallelCode) {
-    return variant.tier >= 3
-      ? `Premium Parallel ${parallelCode}`
-      : `Parallel Art ${parallelCode}`;
-  }
-
-  return variant.tier >= 3
-    ? `Premium Market Variant ${variant.tier}`
-    : `Market Variant ${variant.tier}`;
-}
-
 function printDisplayId(variant: CardArtVariant) {
   const printSuffix = variant.officialId.split("_")[1] ?? "";
-  return printSuffix && !/^p\d+$/i.test(printSuffix)
-    ? `Market Print ${Math.max(1, variant.tier)}`
-    : variant.officialId;
+  const baseNumber = variant.officialId.split("_")[0] ?? variant.officialId;
+  if (!printSuffix) return variant.officialId;
+  if (/^p\d+$/i.test(printSuffix)) return `${baseNumber} ${printSuffix.toUpperCase()}`;
+
+  const marketIndex = printSuffix.match(/^market(\d+)$/i)?.[1];
+  return marketIndex ? `${baseNumber} Market ${marketIndex}` : variant.officialId.replaceAll("_", " ");
+}
+
+function artDisplayLabel(variant: CardArtVariant) {
+  return printDisplayId(variant);
 }
 
 function tcgplayerSearchUrl(card: GundamCard, variant?: CardArtVariant) {
@@ -1679,18 +1668,18 @@ function variantMatchesArtFilter(
   card: GundamCard,
   filter: (typeof artFilters)[number],
 ) {
-  if (filter === "All Art") return true;
+  if (filter === "All Prints") return true;
   const variants = cardArtVariants(card);
   switch (filter) {
-    case "Has Parallel Art":
+    case "Has Parallel Print":
       return variants.length > 1;
-    case "Standard Art Only":
+    case "Base Print Only":
       return variants.length === 1 && variants[0]?.id === "standard";
-    case "Parallel Art P1":
+    case "P1 Print":
       return variants.some((variant) => variant.tier === 1);
-    case "Parallel Art P2":
+    case "P2 Print":
       return variants.some((variant) => variant.tier === 2);
-    case "Premium Parallel":
+    case "Premium Print":
       return variants.some((variant) => variant.tier >= 3);
     default:
       return true;
@@ -2050,23 +2039,6 @@ function removePrintCopies(
   }
 }
 
-function drawOpeningHandNumbers(quantities: QuantityMap) {
-  const deckNumbers = Object.entries(quantities).flatMap(([number, quantity]) =>
-    Array.from({ length: quantity }, () => number),
-  );
-
-  for (let index = deckNumbers.length - 1; index > 0; index -= 1) {
-    const random = crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
-    const swapIndex = Math.floor(random * (index + 1));
-    [deckNumbers[index], deckNumbers[swapIndex]] = [
-      deckNumbers[swapIndex],
-      deckNumbers[index],
-    ];
-  }
-
-  return deckNumbers.slice(0, OPENING_HAND_SIZE);
-}
-
 type DeckBuilderProps = {
   sharedDeckId?: string;
   initialSharedDeck?: unknown;
@@ -2123,18 +2095,16 @@ export function DeckBuilder({
     useState<(typeof typeFilters)[number]>("All");
   const [setFilter, setSetFilter] = useState("All");
   const [artFilter, setArtFilter] =
-    useState<(typeof artFilters)[number]>("All Art");
+    useState<(typeof artFilters)[number]>("All Prints");
   const [collectionFilter, setCollectionFilter] =
     useState<(typeof collectionFilters)[number]>("All");
   const [buildStatusFilter, setBuildStatusFilter] =
     useState<(typeof buildStatusFilters)[number]>("All");
   const [budgetLimit, setBudgetLimit] = useState(DEFAULT_BUDGET_LIMIT);
-  const [openingHand, setOpeningHand] = useState<string[]>([]);
   const [selectedNumber, setSelectedNumber] = useState("ST01-001");
   const [copyState, setCopyState] = useState("Copy");
   const [shareState, setShareState] = useState("Share");
   const [feedbackPulse, setFeedbackPulse] = useState<FeedbackPulse | null>(null);
-  const [handDrawId, setHandDrawId] = useState(0);
   const [toast, setToast] = useState<ActionToast | null>(null);
   const [fallbackPanel, setFallbackPanel] = useState<FallbackPanel | null>(null);
   const [lightbox, setLightbox] = useState<CardLightboxState | null>(null);
@@ -2154,7 +2124,6 @@ export function DeckBuilder({
   const advancedFiltersRef = useRef<HTMLDivElement | null>(null);
   const advancedFiltersTriggerRef = useRef<HTMLButtonElement | null>(null);
   const advancedFiltersDoneRef = useRef<HTMLButtonElement | null>(null);
-  const openingHandRef = useRef<HTMLDivElement | null>(null);
   const libraryPanelRef = useRef<HTMLElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
@@ -2422,9 +2391,7 @@ export function DeckBuilder({
         .map((entry) => {
           const priceSummary = printPriceSummary(entry.card, entry.variant);
           const url = tcgplayerUrl(entry.card, entry.variant);
-          return `${entry.openQuantity}x ${printDisplayId(entry.variant)} ${entry.card.name} (${artDisplayLabel(
-            entry.variant,
-          )}) - ${priceSummary.full} each / ${formatMoney(
+          return `${entry.openQuantity}x ${printDisplayId(entry.variant)} ${entry.card.name} - ${priceSummary.full} each / ${formatMoney(
             entry.totalCost,
           )} total - ${url}`;
         })
@@ -2437,13 +2404,6 @@ export function DeckBuilder({
   const setOptions = useMemo(
     () => ["All", ...Array.from(new Set(CARD_POOL.map((card) => card.set)))],
     [],
-  );
-  const openingHandEntries = useMemo(
-    () =>
-      openingHand
-        .map((number) => CARD_BY_NUMBER.get(number))
-        .filter((card): card is GundamCard => Boolean(card)),
-    [openingHand],
   );
   const deckArtSignature = useMemo(() => artChoiceSignature(deck.art), [deck.art]);
   const deckCollectionSignature = useMemo(
@@ -2647,12 +2607,6 @@ export function DeckBuilder({
         return;
       }
 
-      if (event.key.toLowerCase() === "d") {
-        event.preventDefault();
-        drawHand();
-        return;
-      }
-
       if (event.key.toLowerCase() === "s") {
         event.preventDefault();
         void copyShareUrl();
@@ -2820,7 +2774,7 @@ export function DeckBuilder({
     colorFilter !== "All",
     typeFilter !== "All",
     setFilter !== "All",
-    artFilter !== "All Art",
+    artFilter !== "All Prints",
     buildStatusFilter !== "All",
     collectionFilter !== "All",
     budgetLimit !== DEFAULT_BUDGET_LIMIT,
@@ -2886,7 +2840,6 @@ export function DeckBuilder({
     setCanUndo(false);
     queueDeckStorage(nextDeck, "immediate");
     setDeck(nextDeck);
-    setOpeningHand([]);
     showToast("good", "Deck restored", "Previous deck is back in the builder.");
   }
 
@@ -2903,7 +2856,6 @@ export function DeckBuilder({
     });
     queueDeckStorage(nextDeck, "immediate");
     setCanUndo(true);
-    setOpeningHand([]);
     showToast("warn", label, detail, "Undo");
   }
 
@@ -2942,7 +2894,7 @@ export function DeckBuilder({
     setColorFilter("All");
     setTypeFilter("All");
     setSetFilter("All");
-    setArtFilter("All Art");
+    setArtFilter("All Prints");
     setBuildStatusFilter("All");
     setCollectionFilter("All");
     setBudgetLimit(DEFAULT_BUDGET_LIMIT);
@@ -2974,7 +2926,7 @@ export function DeckBuilder({
     setColorFilter("All");
     setTypeFilter("All");
     setSetFilter("All");
-    setArtFilter("All Art");
+    setArtFilter("All Prints");
     setBuildStatusFilter("All");
     setCollectionFilter("All");
     setBudgetLimit(DEFAULT_BUDGET_LIMIT);
@@ -3466,35 +3418,6 @@ export function DeckBuilder({
       "Deck prints marked owned",
       "Owned counts were set to this deck's selected print quantities.",
       "Undo",
-    );
-  }
-
-  function drawHand() {
-    const nextHand = drawOpeningHandNumbers(deck.main);
-    setOpeningHand(nextHand);
-    if (nextHand.length) {
-      setHandDrawId((id) => id + 1);
-      triggerFeedback("hand", `${nextHand.length} card opening hand drawn.`);
-    }
-    setMobileView("stats");
-    if (nextHand.length && mobileTabsEnabled) {
-      window.setTimeout(() => {
-        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        openingHandRef.current?.focus({ preventScroll: true });
-        openingHandRef.current?.scrollIntoView({
-          behavior: reducedMotion ? "auto" : "smooth",
-          block: "start",
-        });
-      }, 0);
-    }
-    showToast(
-      nextHand.length ? "good" : "warn",
-      nextHand.length ? "Opening hand drawn" : "Draw skipped",
-      nextHand.length
-        ? `${nextHand.length} ${nextHand.length === 1 ? "card" : "cards"} drawn from ${mainTotal} main deck ${
-            mainTotal === 1 ? "card" : "cards"
-          }.`
-        : "Add cards to the main deck before drawing.",
     );
   }
 
@@ -4108,18 +4031,8 @@ export function DeckBuilder({
                   className="control-field short-cockpit-deck-name h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                 />
               </label>
-              <div className="relative short-cockpit-actions">
-                <div className="grid grid-cols-4 gap-2 xl:flex xl:flex-wrap xl:justify-end">
-                  <ToolbarButton
-                    label={`Draw ${OPENING_HAND_SIZE}`}
-                    mobileLabel={`Draw ${OPENING_HAND_SIZE}`}
-                    title="Draw opening hand"
-                    onClick={drawHand}
-                    showDesktopLabel
-                    className="w-full xl:w-auto"
-                  >
-                    <Shuffle size={16} />
-                  </ToolbarButton>
+              <div className="relative short-cockpit-actions min-w-0">
+                <div className="toolbar-action-rail grid grid-cols-3 gap-2 xl:flex xl:flex-nowrap xl:justify-end xl:overflow-x-auto xl:pb-1">
                   <ToolbarButton
                     label="TCG List"
                     mobileLabel="TCG"
@@ -4177,7 +4090,6 @@ export function DeckBuilder({
                         ariaLabel="Load sample deck"
                         onClick={loadSampleDeck}
                         disabled={sharedPreviewLocked}
-                        showDesktopLabel
                       >
                         <ShieldCheck size={16} />
                       </ToolbarButton>
@@ -4187,7 +4099,6 @@ export function DeckBuilder({
                         ariaLabel="Start a new deck"
                         onClick={startNewDeck}
                         disabled={sharedPreviewLocked}
-                        showDesktopLabel
                       >
                         <RotateCcw size={16} />
                       </ToolbarButton>
@@ -4282,7 +4193,6 @@ export function DeckBuilder({
             deckName={deck.name}
             isStarterTemplate={isStarterTemplate}
             selectedCard={selectedCard}
-            openingHandCards={openingHandEntries}
             marketTotal={costSummary.artTotal}
           />
         </div>
@@ -4422,7 +4332,7 @@ export function DeckBuilder({
                       {colorFilter !== "All" && <FilterChip label={`Color: ${colorFilter}`} />}
                       {typeFilter !== "All" && <FilterChip label={`Type: ${typeFilter}`} />}
                       {setFilter !== "All" && <FilterChip label={`Set: ${setFilter}`} />}
-                      {artFilter !== "All Art" && <FilterChip label={`Art: ${artFilter}`} />}
+                      {artFilter !== "All Prints" && <FilterChip label={`Print: ${artFilter}`} />}
                       {buildStatusFilter !== "All" && (
                         <FilterChip label={`Card Data: ${buildStatusFilter}`} />
                       )}
@@ -4663,7 +4573,6 @@ export function DeckBuilder({
                     card={card}
                     deck={deck}
                     artVariant={getArtVariant(card, deck.art)}
-                    artVariants={cardArtVariants(card)}
                     selected={selectedCard?.number === card.number}
                     mainQuantity={deck.main[card.number] ?? 0}
                     resourceQuantity={deck.resource[card.number] ?? 0}
@@ -4783,21 +4692,6 @@ export function DeckBuilder({
               <LegalityPanel notices={notices} onFixNotice={focusLegalityFix} />
 
               <SynergyPanel notices={synergyNotices} />
-
-              <div
-                ref={openingHandRef}
-                className="scroll-mt-24"
-                tabIndex={-1}
-                aria-label="Opening hand results"
-              >
-                <HandSimulatorPanel
-                  cards={openingHandEntries}
-                  drawId={handDrawId}
-                  onDraw={drawHand}
-                  onClear={() => setOpeningHand([])}
-                  onOpenCard={(card) => openCardLightbox(card)}
-                />
-              </div>
 
               <div className="xl:hidden">
                 <CompositionPanel
@@ -4947,7 +4841,6 @@ function HudStrip({
   deckName,
   isStarterTemplate,
   selectedCard,
-  openingHandCards,
   marketTotal,
 }: {
   isLegal: boolean;
@@ -4955,7 +4848,6 @@ function HudStrip({
   deckName: string;
   isStarterTemplate: boolean;
   selectedCard: GundamCard | null;
-  openingHandCards: readonly GundamCard[];
   marketTotal: number;
 }) {
   const statusLabel =
@@ -4966,19 +4858,6 @@ function HudStrip({
         : sharedStatus === "unavailable"
           ? "Offline"
           : "Local";
-  const handTitle = openingHandCards
-    .map((card) => `${card.name} ${card.number}`)
-    .join(", ");
-  const handLabel =
-    openingHandCards.length > 0
-      ? `Hand ${openingHandCards
-          .slice(0, 2)
-          .map((card) => card.name)
-          .join(" / ")}${
-          openingHandCards.length > 2 ? ` +${openingHandCards.length - 2}` : ""
-        }`
-      : "";
-
   return (
     <div className="hud-strip mt-1 hidden overflow-hidden rounded-sm border border-[#2e8cff]/25 bg-[#07111d]/70 shadow-lg shadow-[#03111f]/30 backdrop-blur xl:block">
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-1.5">
@@ -5010,14 +4889,6 @@ function HudStrip({
           {isStarterTemplate && (
             <span className="rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 py-1 text-[#d9ecff]">
               Starter Template
-            </span>
-          )}
-          {openingHandCards.length > 0 && (
-            <span
-              className="max-w-[24rem] truncate rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 py-1 text-[#d9ecff]"
-              title={`Opening hand: ${handTitle}`}
-            >
-              {handLabel}
             </span>
           )}
           <span className="rounded-sm border border-[#a7b5c9]/20 bg-black/24 px-2 py-1 text-[#f7f7f2]/70">
@@ -5827,9 +5698,6 @@ function FallbackPanelView({
                         <span className={`rounded-sm border px-1.5 py-0.5 text-xs font-black leading-none ${colorChipClass(entry.card.color)}`}>
                           {entry.card.color}
                         </span>
-                        <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 text-xs font-black leading-none text-[#fff2bd]">
-                          {artDisplayLabel(entry.variant)}
-                        </span>
                       </div>
                       <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {entry.card.name}
@@ -5994,9 +5862,6 @@ function CardLightbox({
               <div className="flex min-w-0 flex-wrap gap-1.5">
                 <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
                   {printDisplayId(artVariant)}
-                </span>
-                <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
-                  {artDisplayLabel(artVariant)}
                 </span>
               </div>
               <h2
@@ -6300,99 +6165,6 @@ function SynergyPanel({ notices }: { notices: SynergyNotice[] }) {
               </div>
             </div>
           ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function HandSimulatorPanel({
-  cards,
-  drawId,
-  onDraw,
-  onClear,
-  onOpenCard,
-}: {
-  cards: GundamCard[];
-  drawId: number;
-  onDraw: () => void;
-  onClear: () => void;
-  onOpenCard: (card: GundamCard) => void;
-}) {
-  const typeSummary = MAIN_TYPES.map((type) => ({
-    type,
-    count: cards.filter((card) => card.type === type).length,
-  })).filter((item) => item.count > 0);
-  const handSummary = cards.length
-    ? `Opening hand: ${cards.map((card) => `${card.name}, ${card.type}`).join("; ")}.`
-    : "No opening hand drawn.";
-
-  return (
-    <section className={panelClass("min-w-0 max-w-full overflow-hidden")}>
-      <PanelTitle icon={<Shuffle size={18} />} title="Opening Hand" />
-      <div className="grid min-w-0 gap-3 p-3">
-        <p className="sr-only" aria-live="polite">
-          {handSummary}
-        </p>
-        <div className="grid min-w-0 grid-cols-2 gap-2">
-          <button
-            type="button"
-            className="interactive-control inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
-            onClick={onDraw}
-          >
-            <Shuffle size={16} />
-            Draw {OPENING_HAND_SIZE}
-          </button>
-          <button
-            type="button"
-            className="interactive-control inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/8 font-display text-base font-black uppercase text-[#f7f7f2] hover:bg-[#f7f7f2]/12"
-            onClick={onClear}
-          >
-            Clear
-          </button>
-        </div>
-        <div className="grid min-w-0 gap-2">
-          {cards.length === 0 ? (
-            <div className="rounded-sm border border-dashed border-[#f7f7f2]/15 p-3 text-center font-display text-lg font-black uppercase text-[#f7f7f2]/58">
-              No hand drawn
-            </div>
-          ) : (
-            cards.map((card, index) => (
-              <div
-                key={`${drawId}-${card.number}-${index}`}
-                className={`hand-strip interactive-row flex min-w-0 items-center gap-2 rounded-sm border bg-black/24 p-2 ${colorAccentClass(
-                  card.color,
-                )}`}
-                style={{ animationDelay: `${index * 45}ms` }}
-              >
-                <CardThumb
-                  card={card}
-                  onOpen={() => onOpenCard(card)}
-                  openLabel={`Open large view of opening hand card ${index + 1}: ${card.name} ${card.number}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-base font-black text-[#f7f7f2]">
-                    {card.name}
-                  </div>
-                  <div className="text-sm font-bold text-[#f7f7f2]/55">
-                    {card.type} · Lv {card.level} · C {card.cost}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        {typeSummary.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {typeSummary.map((item) => (
-              <span
-                key={item.type}
-                className="rounded border border-[#a7b5c9]/18 bg-[#f7f7f2]/8 px-2 py-1 text-sm font-black text-[#f7f7f2]/75"
-              >
-                {item.type} {item.count}
-              </span>
-            ))}
-          </div>
         )}
       </div>
     </section>
@@ -6939,7 +6711,6 @@ function LibraryCard({
   card,
   deck,
   artVariant,
-  artVariants,
   selected,
   mainQuantity,
   resourceQuantity,
@@ -6955,7 +6726,6 @@ function LibraryCard({
   card: GundamCard;
   deck: DeckState;
   artVariant: CardArtVariant;
-  artVariants: readonly CardArtVariant[];
   selected: boolean;
   mainQuantity: number;
   resourceQuantity: number;
@@ -7072,7 +6842,7 @@ function LibraryCard({
             <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/8 px-1.5 py-0.5 leading-none text-[#f7f7f2]/78">
               {card.type}
             </span>
-            {artVariants.length > 1 && (
+            {artVariant.id !== "standard" && (
               <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 leading-none text-[#fff2bd]">
                 {artDisplayLabel(artVariant)}
               </span>
@@ -7319,9 +7089,11 @@ function InspectorPanel({
               <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/10 px-2 py-1 text-sm font-black text-[#f7f7f2]">
                 {card.type}
               </span>
-              <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
-                {artDisplayLabel(artVariant)}
-              </span>
+              {artVariant.id !== "standard" && (
+                <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
+                  {artDisplayLabel(artVariant)}
+                </span>
+              )}
             </div>
             <h2 className="mt-3 font-display text-3xl font-black uppercase leading-none text-[#f7f7f2]">
               {card.name}

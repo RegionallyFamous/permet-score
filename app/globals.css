@@ -287,10 +287,6 @@ textarea {
   mix-blend-mode: normal;
 }
 
-.hand-strip {
-  animation: hand-lock 360ms var(--ease-dock) both;
-}
-
 .virtual-card {
   contain: layout paint style;
   contain-intrinsic-size: 290px 430px;
@@ -521,6 +517,15 @@ textarea {
   box-shadow:
     0 0 0 5px rgba(246, 197, 66, 0.12),
     0 0 24px rgba(246, 197, 66, 0.16);
+}
+
+.toolbar-action-rail {
+  min-width: 0;
+  scrollbar-width: none;
+}
+
+.toolbar-action-rail::-webkit-scrollbar {
+  display: none;
 }
 
 .control-field {
@@ -1381,17 +1386,6 @@ textarea {
   }
 }
 
-@keyframes hand-lock {
-  from {
-    opacity: 0.55;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @keyframes quantity-pulse {
   0% {
     transform: scale(1);
@@ -1542,7 +1536,7 @@ textarea {
   .virtual-card:active,
   .cockpit-tab:active,
   .quantity-readout[data-pulse],
-  .hand-strip {
+  .art-print-dot[data-pulse] {
     transform: none;
     translate: 0;
     scale: 1;

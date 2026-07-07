@@ -21,7 +21,7 @@ Manifest: https://permetlink.com/manifest.webmanifest
 - Open large card lightboxes for readable card art.
 - Track owned print quantities locally; ownership is not included in shared deck URLs.
 - Generate TCGplayer print lists and outbound TCGplayer links.
-- Draw opening hands and export decklist images.
+- Export decklist images.
 - Share decklists through compact URLs backed by the app's share API.
 
 ## Data Notes

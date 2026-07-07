@@ -479,7 +479,7 @@ async function assertPlainTextImportPreservesPrintIds(page) {
   await page.getByRole("button", { name: "Start a new deck" }).click();
   await writeClipboard(
     page,
-    "Name: Parallel Text Import\nMain\n1 ST01-001 Gundam [Parallel Art P1] [print:p1]\nResource\n1 R-001 Resource [print:standard]",
+    "Name: Parallel Text Import\nMain\n1 ST01-001 Gundam [ST01-001 P1] [print:p1]\nResource\n1 R-001 Resource [print:standard]",
   );
   await page.getByRole("button", { name: "Paste decklist" }).click();
   await page.waitForFunction(
@@ -1039,20 +1039,6 @@ async function assertMarketCatalogOnlyCardsAreLabeled(page) {
   await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
 }
 
-async function assertDesktopDrawStaysPutAndReportsHand(page) {
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await gotoApp(page);
-  await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
-  await reloadApp(page);
-  const beforeScrollY = await page.evaluate(() => window.scrollY);
-  await page.getByRole("button", { name: "Draw opening hand" }).click();
-  await page.locator("header").getByText(/^Hand /).waitFor({ timeout: 15000 });
-  const afterScrollY = await page.evaluate(() => window.scrollY);
-  if (Math.abs(afterScrollY - beforeScrollY) > 5) {
-    throw new Error(`Desktop draw changed scroll from ${beforeScrollY} to ${afterScrollY}`);
-  }
-}
-
 async function assertMobileLibraryLayout(page) {
   await page.setViewportSize({ width: 320, height: 680 });
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
@@ -1523,7 +1509,6 @@ async function main() {
     await assertArtUpgradeKeepsBuyList(desktop);
     await assertResourceSearchRanksResourceCards(desktop);
     await assertMarketCatalogOnlyCardsAreLabeled(desktop);
-    await assertDesktopDrawStaysPutAndReportsHand(desktop);
     await assertMobileTouchTargets(desktop);
 
     await gotoApp(desktop);
