@@ -1224,6 +1224,47 @@ function colorChipClass(color: CardColor) {
   }
 }
 
+function colorSwatchStyle(color: CardColor) {
+  switch (color) {
+    case "Blue":
+      return {
+        backgroundColor: "#2e8cff",
+        borderColor: "rgba(217,236,255,0.9)",
+        boxShadow: "0 0 14px rgba(46,140,255,0.5)",
+      };
+    case "Green":
+      return {
+        backgroundColor: "#28d17c",
+        borderColor: "rgba(217,255,233,0.9)",
+        boxShadow: "0 0 14px rgba(40,209,124,0.46)",
+      };
+    case "Red":
+      return {
+        backgroundColor: "#e31b23",
+        borderColor: "rgba(255,227,227,0.9)",
+        boxShadow: "0 0 14px rgba(227,27,35,0.48)",
+      };
+    case "White":
+      return {
+        backgroundColor: "#f7f7f2",
+        borderColor: "rgba(255,255,255,0.95)",
+        boxShadow: "0 0 14px rgba(247,247,242,0.38)",
+      };
+    case "Purple":
+      return {
+        backgroundColor: "#8f7bff",
+        borderColor: "rgba(238,234,255,0.95)",
+        boxShadow: "0 0 14px rgba(143,123,255,0.46)",
+      };
+    default:
+      return {
+        backgroundColor: "#8b8f99",
+        borderColor: "rgba(214,216,221,0.8)",
+        boxShadow: "0 0 10px rgba(139,143,153,0.28)",
+      };
+  }
+}
+
 function noticeClass(tone: Notice["tone"]) {
   switch (tone) {
     case "good":
@@ -4031,6 +4072,9 @@ export function DeckBuilder({
                     Permet Link
                   </h1>
                   <StatusBadge isLegal={isLegal} issue={primaryDeckIssue} />
+                  <span className="hidden sm:inline-flex">
+                    <DeckColorRail colors={deckColors} compact />
+                  </span>
                   {isStarterTemplate && (
                     <span className="inline-flex h-8 items-center rounded-sm border border-[#8bdcff]/34 bg-[#1167d8]/14 px-2.5 font-display text-sm font-black uppercase text-[#d9ecff]">
                       Starter Template
@@ -4216,6 +4260,7 @@ export function DeckBuilder({
             isLegal={isLegal}
             sharedStatus={sharedStatus}
             deckName={deck.name}
+            deckColors={deckColors}
             isStarterTemplate={isStarterTemplate}
             selectedCard={selectedCard}
             issue={primaryDeckIssue}
@@ -4789,7 +4834,7 @@ export function DeckBuilder({
         tabsEnabled={mobileTabsEnabled}
         mainTotal={mainTotal}
         resourceTotal={resourceTotal}
-        colorCount={deckColors.length}
+        deckColors={deckColors}
         isLegal={isLegal}
         pulseIdFor={pulseIdFor}
         onChange={changeMobileView}
@@ -4862,6 +4907,7 @@ function HudStrip({
   isLegal,
   sharedStatus,
   deckName,
+  deckColors,
   isStarterTemplate,
   selectedCard,
   issue,
@@ -4870,6 +4916,7 @@ function HudStrip({
   isLegal: boolean;
   sharedStatus: SharedStatus;
   deckName: string;
+  deckColors: readonly CardColor[];
   isStarterTemplate: boolean;
   selectedCard: GundamCard | null;
   issue: Notice | null;
@@ -4911,6 +4958,7 @@ function HudStrip({
           <span className="rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-2 py-1 text-[#fff2bd]">
             {deckName}
           </span>
+          <DeckColorRail colors={deckColors} compact />
           {isStarterTemplate && (
             <span className="rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 py-1 text-[#d9ecff]">
               Starter Template
@@ -4979,9 +5027,7 @@ function SharedDeckBanner({
             <span className="rounded-sm border border-[#2e8cff]/30 bg-[#1167d8]/14 px-2 py-1 text-[#d9ecff]">
               {resourceTotal}/{RESOURCE_TARGET} Resource
             </span>
-            <span className="rounded-sm border border-[#a7b5c9]/22 bg-black/30 px-2 py-1 text-[#f7f7f2]/75">
-              {deckColors.length ? deckColors.join(" / ") : "No Colors"}
-            </span>
+            <DeckColorRail colors={deckColors} />
             <span className="rounded-sm border border-[#28d17c]/30 bg-[#28d17c]/12 px-2 py-1 text-[#d9ffe9]">
               {formatMoney(artTotal)} prints
             </span>
@@ -5013,6 +5059,88 @@ function SharedDeckBanner({
         </div>
       </div>
     </section>
+  );
+}
+
+function colorName(color: CardColor) {
+  return color === "-" ? "Colorless" : color;
+}
+
+function ColorChip({
+  color,
+  compact = false,
+}: {
+  color: CardColor;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-sm border font-black uppercase ${colorChipClass(
+        color,
+      )} ${compact ? "px-1.5 py-1 text-[0.65rem] leading-none" : "px-2 py-1 text-xs leading-none"}`}
+      title={colorName(color)}
+      aria-label={`Color ${colorName(color)}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`${compact ? "size-3" : "size-3.5"} shrink-0 rounded-full border`}
+        style={colorSwatchStyle(color)}
+      />
+      {!compact && <span>{colorName(color)}</span>}
+    </span>
+  );
+}
+
+function DeckColorRail({
+  colors,
+  compact = false,
+}: {
+  colors: readonly CardColor[];
+  compact?: boolean;
+}) {
+  const label = colors.length
+    ? `Deck colors: ${colors.map(colorName).join(", ")}`
+    : "Deck colors: none";
+
+  if (!colors.length) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-sm border border-[#e31b23]/35 bg-[#e31b23]/12 font-black uppercase text-[#ffe3e3] ${
+          compact ? "px-1.5 py-1 text-[0.65rem]" : "px-2 py-1 text-xs"
+        }`}
+        aria-label={label}
+        title="No deck colors"
+      >
+        <span
+          aria-hidden="true"
+          className={`${compact ? "size-3" : "size-3.5"} rounded-full border border-[#ffe3e3]/80 bg-[#e31b23] shadow-[0_0_12px_rgba(227,27,35,0.42)]`}
+        />
+        No colors
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-sm border border-[#a7b5c9]/18 bg-black/28 font-black uppercase text-[#f7f7f2]/78 ${
+        compact ? "px-1.5 py-1 text-[0.65rem]" : "px-2 py-1 text-xs"
+      }`}
+      aria-label={label}
+      title={colors.map(colorName).join(" / ")}
+    >
+      <span className="text-[#f7f7f2]/58">Colors</span>
+      <span className="inline-flex items-center gap-1">
+        {colors.map((color) => (
+          <span
+            key={color}
+            aria-hidden="true"
+            className={`${compact ? "size-3" : "size-3.5"} rounded-full border`}
+            style={colorSwatchStyle(color)}
+          />
+        ))}
+      </span>
+      {!compact && <span>{colors.map(colorName).join(" / ")}</span>}
+    </span>
   );
 }
 
@@ -5229,7 +5357,7 @@ function MobileCockpitNav({
   tabsEnabled,
   mainTotal,
   resourceTotal,
-  colorCount,
+  deckColors,
   isLegal,
   pulseIdFor,
   onChange,
@@ -5238,7 +5366,7 @@ function MobileCockpitNav({
   tabsEnabled: boolean;
   mainTotal: number;
   resourceTotal: number;
-  colorCount: number;
+  deckColors: readonly CardColor[];
   isLegal: boolean;
   pulseIdFor?: (key: string) => number | undefined;
   onChange: (view: MobileView, options?: MobileViewChangeOptions) => void;
@@ -5288,7 +5416,24 @@ function MobileCockpitNav({
           <i style={{ transform: `scaleX(${Math.min(1, resourceTotal / RESOURCE_TARGET)})` }} />
         </span>
         <span className="rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/8 px-1.5 py-0.5 text-center font-display text-[11px] font-black uppercase text-[#f7f7f2]/72">
-          Colors {colorCount}
+          <span className="inline-flex h-full items-center justify-center gap-1" aria-label={`Deck colors ${deckColors.length ? deckColors.map(colorName).join(", ") : "none"}`}>
+            {deckColors.length ? (
+              deckColors.map((color) => (
+                <span
+                  key={color}
+                  aria-hidden="true"
+                  className="size-2.5 rounded-full border"
+                  style={colorSwatchStyle(color)}
+                />
+              ))
+            ) : (
+              <span
+                aria-hidden="true"
+                className="size-2.5 rounded-full border border-[#ffe3e3]/80 bg-[#e31b23] shadow-[0_0_10px_rgba(227,27,35,0.38)]"
+              />
+            )}
+            {deckColors.length ? `Colors ${deckColors.length}` : "No colors"}
+          </span>
         </span>
         <span
           className={`rounded-sm border px-1.5 py-0.5 text-center font-display text-[11px] font-black uppercase ${
@@ -5720,9 +5865,7 @@ function FallbackPanelView({
                         <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black leading-none text-black">
                           {printDisplayId(entry.variant)}
                         </span>
-                        <span className={`rounded-sm border px-1.5 py-0.5 text-xs font-black leading-none ${colorChipClass(entry.card.color)}`}>
-                          {entry.card.color}
-                        </span>
+                        <ColorChip color={entry.card.color} />
                       </div>
                       <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {entry.card.name}
@@ -6018,9 +6161,7 @@ function CardLightbox({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap gap-1.5">
-                  <span className={`rounded-sm border px-2 py-1 text-sm font-black ${colorChipClass(card.color)}`}>
-                    {card.color}
-                  </span>
+                  <ColorChip color={card.color} />
                   <span className="rounded-sm border border-[#f7f7f2]/14 bg-[#f7f7f2]/9 px-2 py-1 text-sm font-black text-[#f7f7f2]">
                     {card.type}
                   </span>
@@ -6663,9 +6804,7 @@ function DeckPanel({
                   <div className="grid min-w-0 content-start gap-2">
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <span className={`rounded-sm border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
-                          {card.color}
-                        </span>
+                        <ColorChip color={card.color} />
                         <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/8 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/78">
                           {card.type}
                         </span>
@@ -6868,9 +7007,7 @@ function LibraryCard({
             <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 leading-none text-black">
               {card.number}
             </span>
-            <span className={`rounded-sm border px-1.5 py-0.5 leading-none ${colorChipClass(card.color)}`}>
-              {card.color}
-            </span>
+            <ColorChip color={card.color} />
             <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/8 px-1.5 py-0.5 leading-none text-[#f7f7f2]/78">
               {card.type}
             </span>
@@ -7115,9 +7252,7 @@ function InspectorPanel({
                 <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
                   {card.number}
                 </span>
-              <span className={`rounded-sm border px-2 py-1 text-sm font-black ${colorChipClass(card.color)}`}>
-                {card.color}
-              </span>
+              <ColorChip color={card.color} />
               <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/10 px-2 py-1 text-sm font-black text-[#f7f7f2]">
                 {card.type}
               </span>
