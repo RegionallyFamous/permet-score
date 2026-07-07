@@ -267,13 +267,18 @@ function sanitizeQuantities(value: unknown): QuantityMap {
   );
 }
 
+function tcgplayerProductImageUrl(productId: number, size = 1500) {
+  const clampedSize = Math.max(size, 1000);
+  return `https://product-images.tcgplayer.com/fit-in/${clampedSize}x${clampedSize}/${productId}.jpg`;
+}
+
 function cardArtVariants(card: GundamCard) {
   const localVariants = CARD_ARTS_BY_NUMBER[card.number];
   const tcgPrints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
   const tcgVariants = tcgPrints.map((print, index) => ({
     id: print.variantId,
     label: print.variantId === "standard" ? "Standard" : `Market Print ${index + 1}`,
-    image: print.imageUrl ?? `/card-images/${card.number}.webp`,
+    image: print.imageUrl ?? tcgplayerProductImageUrl(print.productId),
     tier: index,
     officialId: print.officialId,
   }));
@@ -470,8 +475,22 @@ function getArtVariant(card: GundamCard, choices: ArtChoiceMap) {
   );
 }
 
-function cardImagePath(card: GundamCard, variant?: CardArtVariant) {
-  return variant?.image ?? cardArtVariants(card)[0].image;
+function cardImagePath(card: GundamCard, variant?: CardArtVariant, size = 1500) {
+  const selectedVariant = variant ?? cardArtVariants(card)[0];
+  const print = tcgplayerImagePrint(card, selectedVariant);
+  if (print?.imageUrl) return print.imageUrl;
+  if (print?.productId) return tcgplayerProductImageUrl(print.productId, size);
+  return selectedVariant.image;
+}
+
+function cardImageSrcSet(card: GundamCard, variant?: CardArtVariant) {
+  const selectedVariant = variant ?? cardArtVariants(card)[0];
+  const print = tcgplayerImagePrint(card, selectedVariant);
+  if (!print?.productId || print.imageUrl) return undefined;
+
+  return [1000, 1500, 2000]
+    .map((size) => `${tcgplayerProductImageUrl(print.productId, size)} ${size}w`)
+    .join(", ");
 }
 
 function handleCardImageError(event: SyntheticEvent<HTMLImageElement>) {
@@ -505,6 +524,18 @@ function artTierMultiplier(tier: number) {
 function estimatePrintCost(card: GundamCard, variant: CardArtVariant) {
   const value = printCostBase(card) * artTierMultiplier(variant.tier);
   return Math.max(0.05, Math.round(value * 100) / 100);
+}
+
+function tcgplayerImagePrint(card: GundamCard, variant: CardArtVariant): TcgplayerPrint | null {
+  const prints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
+  return (
+    prints.find((print) => print.variantId === variant.id) ??
+    prints.find((print) => print.officialId === variant.officialId) ??
+    (variant.id === "standard"
+      ? prints.find((print) => print.variantId === "standard") ?? prints[0]
+      : undefined) ??
+    null
+  );
 }
 
 function tcgplayerPrint(card: GundamCard, variant: CardArtVariant): TcgplayerPrint | null {
@@ -2821,9 +2852,12 @@ function SharedDeckBanner({
             {previewCards.map((card) => (
               <img
                 key={card.number}
-                src={cardImagePath(card)}
+                src={cardImagePath(card, undefined, 600)}
+                srcSet={cardImageSrcSet(card)}
+                sizes="3.5rem"
                 alt=""
                 className="preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
+                referrerPolicy="no-referrer"
                 onError={handleCardImageError}
               />
             ))}
@@ -3187,9 +3221,12 @@ function CardLightbox({
           <div className="grid min-w-0 gap-3">
             <div className="lightbox-card-stage scan-frame relative grid place-items-center overflow-hidden rounded-sm border border-[#8bdcff]/38 bg-black/88 p-2 shadow-2xl shadow-black/60">
               <img
-                src={cardImagePath(card, artVariant)}
+                src={cardImagePath(card, artVariant, 2000)}
+                srcSet={cardImageSrcSet(card, artVariant)}
+                sizes="(min-width: 1024px) 58vw, 94vw"
                 alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
                 className="mx-auto max-h-[72vh] max-w-full object-contain object-top lg:max-h-[78vh]"
+                referrerPolicy="no-referrer"
                 onError={handleCardImageError}
               />
               <div className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1.5">
@@ -3223,10 +3260,13 @@ function CardLightbox({
                       title={`${artDisplayLabel(variant)} · ${formatPrintMoney(card, variant)}`}
                     >
                       <img
-                        src={cardImagePath(card, variant)}
+                        src={cardImagePath(card, variant, 600)}
+                        srcSet={cardImageSrcSet(card, variant)}
+                        sizes="4.5rem"
                         alt=""
                         className="aspect-[5/7] w-full object-cover object-top"
                         loading="lazy"
+                        referrerPolicy="no-referrer"
                         onError={handleCardImageError}
                       />
                     </button>
@@ -4019,10 +4059,13 @@ function LibraryCard({
         title={`Open large view of ${card.name}`}
       >
         <img
-          src={cardImagePath(card, artVariant)}
+          src={cardImagePath(card, artVariant, 1000)}
+          srcSet={cardImageSrcSet(card, artVariant)}
+          sizes="(min-width: 1280px) 20vw, (min-width: 640px) 44vw, 92vw"
           alt={`${card.name} card`}
           className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.035]"
           loading="lazy"
+          referrerPolicy="no-referrer"
           onError={handleCardImageError}
         />
         <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#06080d]/95 via-[#06080d]/28 to-transparent" />
@@ -4183,10 +4226,13 @@ function InspectorPanel({
             title={`Open large view of ${card.name}`}
           >
             <img
-              src={cardImagePath(card, artVariant)}
+              src={cardImagePath(card, artVariant, 1000)}
+              srcSet={cardImageSrcSet(card, artVariant)}
+              sizes="7rem"
               alt={`${card.name} card`}
               className="h-full w-full object-cover object-top"
               loading="lazy"
+              referrerPolicy="no-referrer"
               onError={handleCardImageError}
             />
             <span className="absolute inset-x-0 bottom-0 z-10 inline-flex h-7 items-center justify-center gap-1 bg-black/72 font-display text-sm font-black uppercase text-[#d9ecff]">
@@ -4375,10 +4421,13 @@ function CardThumb({
     `relative ${sizeClass} shrink-0 overflow-hidden rounded-sm border border-[#f7f7f2]/15 bg-black shadow-sm`;
   const image = (
     <img
-      src={cardImagePath(card, artVariant)}
+      src={cardImagePath(card, artVariant, size === "deck" ? 800 : 600)}
+      srcSet={cardImageSrcSet(card, artVariant)}
+      sizes={size === "deck" ? "5rem" : "3rem"}
       alt={`${card.name} card`}
       className="h-full w-full object-cover object-top"
       loading="lazy"
+      referrerPolicy="no-referrer"
       onError={handleCardImageError}
     />
   );
