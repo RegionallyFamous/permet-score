@@ -174,6 +174,15 @@ async function readAudit(page) {
 try {
   for (const viewport of viewports) {
     const page = await browser.newPage({ viewport });
+    const consoleErrors = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on("pageerror", (error) => {
+      consoleErrors.push(error.message);
+    });
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "Permet Link", exact: true }).waitFor({
       state: "visible",
@@ -205,6 +214,14 @@ try {
     }
     if (audit.visibleButtons < 4) {
       throw new Error(`${viewport.name}: expected visible controls`);
+    }
+    const blockingConsoleErrors = consoleErrors.filter((message) =>
+      /(hydration|Minified React error #418|did not match|Text content does not match)/i.test(message),
+    );
+    if (blockingConsoleErrors.length) {
+      throw new Error(
+        `${viewport.name}: hydration console errors ${JSON.stringify(blockingConsoleErrors.slice(0, 3))}`,
+      );
     }
 
     if (viewport.width <= 360) {

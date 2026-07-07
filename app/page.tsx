@@ -687,15 +687,19 @@ function printPriceSummary(card: GundamCard, variant: CardArtVariant) {
     print.marketPrice > 0
       ? print.marketPrice
       : null;
-  const estimatedAmount = formatMoney(estimatePrintCost(card, variant));
+  const estimatedPrice = estimatePrintCost(card, variant);
+  const estimatedAmount = formatMoney(estimatedPrice);
 
   if (price !== null) {
-    const source = print?.priceSource ?? "TCGplayer market";
+    const isVolatilePrice = price >= Math.max(250, estimatedPrice * 25);
+    const source = isVolatilePrice
+      ? "TCGplayer volatile"
+      : (print?.priceSource ?? "TCGplayer market");
     const amount = formatMoney(price);
     return {
       source,
       amount,
-      full: `${source} ${amount}`,
+      full: isVolatilePrice ? `${source} · verify ${amount}` : `${source} ${amount}`,
     };
   }
 
@@ -724,13 +728,17 @@ function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
 
 function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
   const print = tcgplayerPrint(card, variant);
-  return typeof print?.marketPrice === "number" &&
+  if (
+    typeof print?.marketPrice === "number" &&
     Number.isFinite(print.marketPrice) &&
     print.marketPrice > 0
-    ? (print.priceSource ?? "TCGplayer market")
-    : hasDirectMarketProduct(print)
-      ? "TCGplayer pending price"
-    : "local estimate";
+  ) {
+    return print.marketPrice >= Math.max(250, estimatePrintCost(card, variant) * 25)
+      ? "TCGplayer volatile price"
+      : (print.priceSource ?? "TCGplayer market");
+  }
+
+  return hasDirectMarketProduct(print) ? "TCGplayer pending price" : "local estimate";
 }
 
 function artDisplayLabel(variant: CardArtVariant) {
@@ -1034,7 +1042,7 @@ function databaseStatus(now?: number) {
   const isSynced = Boolean(TCGPLAYER_LAST_SYNC && tcgPrints > 0);
   const isMarketCoverageLimited = tcgPrints > 0 && pricedPrints < tcgPrints;
   const isFresh =
-    isSynced && syncAgeHours !== null && syncAgeHours <= TCGPLAYER_FRESH_HOURS;
+    isSynced && (syncAgeHours === null || syncAgeHours <= TCGPLAYER_FRESH_HOURS);
   const coverageTone: Notice["tone"] =
     totalCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
   const syncTone: Notice["tone"] = isFresh
@@ -1592,7 +1600,7 @@ export function DeckBuilder({
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
-  const [statusTimestamp, setStatusTimestamp] = useState(() => Date.now());
+  const [statusTimestamp, setStatusTimestamp] = useState<number | null>(null);
   const [fallbackReturnFocusElement, setFallbackReturnFocusElement] =
     useState<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -2820,7 +2828,12 @@ export function DeckBuilder({
         focusWorkspacePanel(view);
         return;
       }
-      window.scrollTo({ top: 0, behavior: "auto" });
+      const workspaceScroller = document.querySelector(".app-content-shell > section");
+      if (workspaceScroller instanceof HTMLElement) {
+        workspaceScroller.scrollTo({ top: 0, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      }
     });
   }
 
@@ -2904,7 +2917,7 @@ export function DeckBuilder({
               </div>
             </div>
 
-            <div className="grid min-w-0 flex-1 gap-2 xl:grid-cols-[minmax(220px,1fr)_auto]">
+            <div className="grid min-w-0 flex-1 gap-2 xl:grid-cols-1 min-[1500px]:grid-cols-[minmax(220px,1fr)_auto]">
               <label className="block min-w-0 md:col-span-1">
                 <span className="sr-only">Deck name</span>
                 <input
@@ -3355,7 +3368,7 @@ export function DeckBuilder({
                   />
                 ))
               ) : (
-                <div className="col-span-full rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/7 p-5 text-center">
+                <div className="relative z-[60] col-span-full mb-24 rounded-sm border border-[#a7b5c9]/18 bg-[#07090d]/96 p-5 text-center shadow-2xl shadow-black/30 xl:mb-0">
                   <p className="font-display text-lg font-black uppercase text-[#f7f7f2]">
                     No cards found
                   </p>
@@ -3488,6 +3501,7 @@ export function DeckBuilder({
               onRemove={removeCard}
               onOpenCard={openCardLightbox}
               eagerImages={eagerDeckThumbnails}
+              onBrowseLibrary={() => changeMobileView("library")}
               compact
             />
 
@@ -3502,6 +3516,7 @@ export function DeckBuilder({
               onRemove={removeCard}
               onOpenCard={openCardLightbox}
               eagerImages={false}
+              onBrowseLibrary={() => changeMobileView("library")}
               compact
             />
 
@@ -3600,8 +3615,8 @@ function HudStrip({
           : "Local";
 
   return (
-    <div className="mt-2 hidden overflow-hidden rounded-sm border border-[#2e8cff]/25 bg-[#07111d]/70 shadow-lg shadow-[#03111f]/30 backdrop-blur 2xl:block">
-      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-2">
+    <div className="mt-1 hidden overflow-hidden rounded-sm border border-[#2e8cff]/25 bg-[#07111d]/70 shadow-lg shadow-[#03111f]/30 backdrop-blur xl:block">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-1.5">
         <div className="flex items-center gap-2 text-[#8bdcff]">
           <Radar size={16} />
           <span className="font-display text-base font-black uppercase">
@@ -4761,7 +4776,7 @@ function ToolbarButton({
     <button
       type="button"
       className={`interactive-control inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-base font-black uppercase shadow-sm sm:gap-2 sm:px-3 sm:text-lg ${
-        showDesktopLabel ? "xl:px-0 min-[1400px]:px-3" : "xl:px-0"
+        showDesktopLabel ? "xl:px-3" : "xl:px-0"
       } ${className} ${
         disabled
           ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -4776,8 +4791,9 @@ function ToolbarButton({
     >
       {children}
       <span
+        aria-hidden="true"
         className={`inline whitespace-nowrap ${
-          showDesktopLabel ? "xl:hidden min-[1400px]:inline" : "xl:hidden"
+          showDesktopLabel ? "xl:inline" : "xl:hidden"
         }`}
       >
         <span className="sm:hidden">{mobileLabel ?? label}</span>
@@ -5062,6 +5078,7 @@ function DeckPanel({
   onAdjust,
   onRemove,
   onOpenCard,
+  onBrowseLibrary,
 }: {
   title: string;
   total: number;
@@ -5074,6 +5091,7 @@ function DeckPanel({
   onAdjust: (zone: "main" | "resource", number: string, delta: number) => void;
   onRemove: (zone: "main" | "resource", number: string) => void;
   onOpenCard: (card: GundamCard, artVariant: CardArtVariant) => void;
+  onBrowseLibrary?: () => void;
 }) {
   return (
     <section className={panelClass()}>
@@ -5100,6 +5118,16 @@ function DeckPanel({
             <span className="text-sm font-black text-[#8bdcff]/70">
               0/{target} occupied
             </span>
+            {onBrowseLibrary && (
+              <button
+                type="button"
+                className="interactive-control mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff] xl:hidden"
+                onClick={onBrowseLibrary}
+              >
+                <LayoutGrid size={14} />
+                Library
+              </button>
+            )}
           </div>
         ) : (
           entries.map(({ card, quantity }, index) => {

@@ -879,7 +879,24 @@ async function assertShortMobileControlsClearNav(page) {
   }
   await page.getByRole("button", { name: /Filters/i }).click();
 
+  await page.getByRole("tab", { name: "Show Library" }).click();
+  await page.evaluate(() => {
+    const scroller = document.querySelector(".app-content-shell > section");
+    if (scroller) scroller.scrollTop = 760;
+  });
   await page.getByRole("tab", { name: "Show Deck" }).click();
+  const deckTabScroll = await page.evaluate(() => {
+    const scroller = document.querySelector(".app-content-shell > section");
+    const heading = document.querySelector("#deck-panel h2");
+    return {
+      scrollTop: scroller?.scrollTop ?? -1,
+      headingTop: heading?.getBoundingClientRect().top ?? -999,
+    };
+  });
+  if (deckTabScroll.scrollTop > 2 || deckTabScroll.headingTop < 0) {
+    throw new Error(`320x568 deck tab preserved stale scroll: ${JSON.stringify(deckTabScroll)}`);
+  }
+
   const deckOverlap = await page.evaluate(() => {
     const actions = document.querySelector(".deck-card-actions");
     const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
@@ -888,6 +905,37 @@ async function assertShortMobileControlsClearNav(page) {
   });
   if (deckOverlap > 1) {
     throw new Error(`320x568 deck actions overlap bottom nav by ${deckOverlap}px`);
+  }
+  const deckActionChildOverlap = await page.evaluate(() => {
+    const actions = document.querySelector(".deck-card-actions");
+    if (!actions) return [];
+    const children = Array.from(actions.children)
+      .map((node, index) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          index,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          label: node.getAttribute("aria-label") ?? node.textContent?.trim() ?? "",
+        };
+      })
+      .filter((rect) => rect.right > rect.left && rect.bottom > rect.top);
+    const overlaps = [];
+    for (let first = 0; first < children.length; first += 1) {
+      for (let second = first + 1; second < children.length; second += 1) {
+        const a = children[first];
+        const b = children[second];
+        const xOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+        const yOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        if (xOverlap * yOverlap > 1) overlaps.push([a.label, b.label, xOverlap, yOverlap]);
+      }
+    }
+    return overlaps;
+  });
+  if (deckActionChildOverlap.length) {
+    throw new Error(`320x568 deck action children overlap: ${JSON.stringify(deckActionChildOverlap)}`);
   }
 
   await page.setViewportSize({ width: 667, height: 375 });
@@ -950,6 +998,11 @@ async function main() {
     if (missingPageResponse?.status() !== 404) {
       throw new Error(`Missing shared deck page returned ${missingPageResponse?.status()}`);
     }
+    await page.getByText("Shared Deck Not Found").waitFor({ timeout: 15000 });
+    await page.getByRole("link", { name: /Open Builder/i }).waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
 
     await page.goto(baseUrl, { waitUntil: "networkidle" });
     await page.locator('button[title="More deck actions"]').click();
