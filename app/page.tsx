@@ -7060,10 +7060,10 @@ function LibraryCard({
       }}
       aria-label={`${card.name} ${card.number} library row`}
     >
-      <div className="library-card-body grid grid-cols-[7.25rem_minmax(0,1fr)] gap-2.5 min-[380px]:grid-cols-[8rem_minmax(0,1fr)] sm:grid-cols-[8.75rem_minmax(0,1fr)] xl:grid-cols-[8rem_minmax(0,1fr)] 2xl:grid-cols-[8.75rem_minmax(0,1fr)]">
+      <div className="library-card-body grid items-stretch grid-cols-[6.75rem_minmax(0,1fr)] gap-2 min-[380px]:grid-cols-[7.5rem_minmax(0,1fr)] min-[420px]:grid-cols-[minmax(9.5rem,37%)_minmax(0,1fr)] min-[760px]:grid-cols-[minmax(15rem,34%)_minmax(0,1fr)]">
         <button
           type="button"
-          className="scan-frame interactive-control relative aspect-[5/7] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-black text-left shadow-lg shadow-black/35"
+          className="library-card-art scan-frame interactive-control relative aspect-[5/7] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-black text-left shadow-lg shadow-black/35 min-[420px]:row-span-2 min-[420px]:h-full"
           onClick={(event) => {
             event.stopPropagation();
             onOpenCard();
@@ -7076,8 +7076,8 @@ function LibraryCard({
             card={card}
             artVariant={artVariant}
             imageSize={1000}
-            srcSetSizes={[320, 480, 640]}
-            sizes="(min-width: 1536px) 8.75rem, (min-width: 1280px) 8rem, (min-width: 640px) 8.75rem, (min-width: 380px) 8rem, 7.25rem"
+            srcSetSizes={[320, 480, 640, 1000]}
+            sizes="(min-width: 760px) 34vw, (min-width: 420px) 37vw, (min-width: 380px) 7.5rem, 6.75rem"
             alt={`${card.name} card`}
             className="library-card-image card-image-surface h-full w-full object-contain object-top transition duration-200"
             eager={eagerImage}
@@ -7168,7 +7168,7 @@ function LibraryCard({
           </div>
         </div>
 
-        <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_2.75rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.75rem_2.75rem_3.25rem] sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
+        <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_2.75rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.75rem_2.75rem_3.25rem] min-[420px]:col-span-1 min-[420px]:col-start-2 min-[420px]:grid-cols-[minmax(6.5rem,1fr)_2.75rem_2.75rem_3.25rem] sm:grid-cols-[minmax(7rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
         {primaryZone && onAdjustPrimary ? (
           <MiniQuantityControl
             label={`${cardActionLabel} ${zoneLabel(primaryZone).toLowerCase()} copy`}

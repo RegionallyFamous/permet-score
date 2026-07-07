@@ -2374,7 +2374,7 @@ textarea {
     padding-bottom: 0.125rem;
   }
 
-  .library-result > div {
+  .library-card-body {
     grid-template-columns: 5.5rem minmax(0, 1fr);
     gap: 0.5rem;
   }
