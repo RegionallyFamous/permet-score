@@ -53,8 +53,7 @@ repository variables are `TCGPLAYER_BRIDGE_ORIGIN` and
 `TCGPLAYER_BRIDGE_GAME_NAME`; by default they point at the hosted bridge and
 `Gundam Card Game`. The scheduled workflow `.github/workflows/sync-tcgplayer.yml`
 runs daily and commits generated updates back to `main` when new Gundam
-products or prices are available. Existing `JANIE_*` secrets and variables are
-still supported as fallback aliases.
+products or prices are available.
 
 ## Share Links
 

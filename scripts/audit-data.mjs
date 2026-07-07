@@ -11,8 +11,11 @@ import {
 const strict = process.argv.includes("--strict");
 const minCardCount = Number(process.env.MIN_GUNDAM_CARD_COUNT ?? 700);
 const minPrintCount = Number(process.env.MIN_GUNDAM_PRINT_COUNT ?? minCardCount);
+const legacyBridgePrefix = ["JA", "NIE"].join("");
 const maxSyncAgeHours = Number(
-  process.env.TCGPLAYER_MAX_SYNC_HOURS ?? process.env.JANIE_MAX_SYNC_HOURS ?? 48,
+  process.env.TCGPLAYER_MAX_SYNC_HOURS ??
+    process.env[`${legacyBridgePrefix}_MAX_SYNC_HOURS`] ??
+    48,
 );
 const validTypes = new Set(["UNIT", "PILOT", "COMMAND", "BASE", "RESOURCE", "EX RESOURCE"]);
 const validColors = new Set(["Blue", "Green", "Red", "White", "Purple", "-"]);

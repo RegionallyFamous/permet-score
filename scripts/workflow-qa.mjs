@@ -448,6 +448,24 @@ async function assertSampleDeckClearsLibraryFilters(page) {
   });
 }
 
+async function assertNoResultSearchShowsRecovery(page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.locator("#card-panel h2", { hasText: "Gundam" }).first().waitFor({
+    timeout: 15000,
+  });
+  await page.getByPlaceholder("Name, #, text").fill("definitely-not-a-real-card");
+  await page.getByText("No cards found").waitFor({ timeout: 15000 });
+  await page.locator("#card-panel h2", { hasText: "No Card Selected" }).waitFor({
+    timeout: 15000,
+  });
+  await page.locator("#card-panel").getByRole("button", { name: "Clear All" }).click();
+  await page.getByText("Showing 1-6 of 808 cards").waitFor({ timeout: 15000 });
+  if (!(await page.locator("#card-panel h2", { hasText: "Gundam" }).first().isVisible())) {
+    throw new Error("Clear All from empty inspector did not restore the selected card");
+  }
+}
+
 async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   const deck = legalDeck({ name: "Workflow QA Shared Preview" });
   const saveResponse = await fetch(absoluteUrl("/api/decks"), {
@@ -643,6 +661,20 @@ async function assertMarketCatalogOnlyCardsAreLabeled(page) {
 
   await page.getByLabel("Build").selectOption("Catalog Only");
   await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
+}
+
+async function assertDesktopDrawStaysPutAndReportsHand(page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
+  await page.reload({ waitUntil: "networkidle" });
+  const beforeScrollY = await page.evaluate(() => window.scrollY);
+  await page.getByRole("button", { name: "Draw opening hand" }).click();
+  await page.locator("header").getByText(/^Hand /).waitFor({ timeout: 15000 });
+  const afterScrollY = await page.evaluate(() => window.scrollY);
+  if (Math.abs(afterScrollY - beforeScrollY) > 5) {
+    throw new Error(`Desktop draw changed scroll from ${beforeScrollY} to ${afterScrollY}`);
+  }
 }
 
 async function assertMobileLibraryLayout(page) {
@@ -1040,11 +1072,13 @@ async function main() {
     await assertEmptyDeckArtButtonsExplainNoOp(desktop);
     await assertSelectedCardArtButtonsTrackMixedPrints(desktop);
     await assertSampleDeckClearsLibraryFilters(desktop);
+    await assertNoResultSearchShowsRecovery(desktop);
     await assertSharedPreviewRequiresCloneBeforeEditing(desktop);
     await assertAccessibleControlNames(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
     await assertResourceSearchRanksResourceCards(desktop);
     await assertMarketCatalogOnlyCardsAreLabeled(desktop);
+    await assertDesktopDrawStaysPutAndReportsHand(desktop);
     await assertMobileTouchTargets(desktop);
 
     await desktop.goto(baseUrl, { waitUntil: "networkidle" });

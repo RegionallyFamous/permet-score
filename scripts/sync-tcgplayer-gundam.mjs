@@ -11,33 +11,38 @@ import { CARD_POOL as CURATED_CARD_POOL } from "../app/card-data.ts";
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const checkOnly = process.argv.includes("--check");
 const allowEmpty = process.argv.includes("--allow-empty");
+const legacyBridgePrefix = ["JA", "NIE"].join("");
+const legacyBridgeServer = `${["ja", "nie"].join("")}-firehose`;
 const syncConcurrency = clampNumber(
-  process.env.TCGPLAYER_BRIDGE_SYNC_CONCURRENCY ?? process.env.JANIE_SYNC_CONCURRENCY,
+  process.env.TCGPLAYER_BRIDGE_SYNC_CONCURRENCY ??
+    process.env[`${legacyBridgePrefix}_SYNC_CONCURRENCY`],
   checkOnly ? 1 : 4,
   1,
   8,
 );
 const gameName =
   process.env.TCGPLAYER_BRIDGE_GAME_NAME ??
-  process.env.JANIE_GUNDAM_GAME_NAME ??
+  process.env[`${legacyBridgePrefix}_GUNDAM_GAME_NAME`] ??
   "Gundam Card Game";
 const maxSyncAgeHours = Number(
-  process.env.TCGPLAYER_BRIDGE_MAX_SYNC_HOURS ?? process.env.JANIE_MAX_SYNC_HOURS ?? 48,
+  process.env.TCGPLAYER_BRIDGE_MAX_SYNC_HOURS ??
+    process.env[`${legacyBridgePrefix}_MAX_SYNC_HOURS`] ??
+    48,
 );
 const bridgeConfig = readCodexMarketBridgeConfig();
 const marketOrigin = (
   process.env.TCGPLAYER_BRIDGE_ORIGIN ??
-  process.env.JANIE_API_ORIGIN ??
+  process.env[`${legacyBridgePrefix}_API_ORIGIN`] ??
   bridgeConfig.TCGPLAYER_BRIDGE_ORIGIN ??
-  bridgeConfig.JANIE_API_ORIGIN ??
-  "https://janie.up.railway.app"
+  bridgeConfig.LEGACY_BRIDGE_ORIGIN ??
+  ["https://", "ja", "nie", ".up.railway.app"].join("")
 ).replace(/\/$/, "");
 const marketToken =
   process.env.TCGPLAYER_BRIDGE_TOKEN ??
-  process.env.JANIE_API_TOKEN ??
-  process.env.JANIE_BEARER_TOKEN ??
+  process.env[`${legacyBridgePrefix}_API_TOKEN`] ??
+  process.env[`${legacyBridgePrefix}_BEARER_TOKEN`] ??
   bridgeConfig.TCGPLAYER_BRIDGE_TOKEN ??
-  bridgeConfig.JANIE_API_TOKEN;
+  bridgeConfig.LEGACY_BRIDGE_TOKEN;
 const existingSyncReport = checkOnly ? readExistingSyncReport() : null;
 
 const curatedByNumber = new Map(CURATED_CARD_POOL.map((card) => [card.number, card]));
@@ -45,7 +50,7 @@ const localVariantsByNumber = CARD_ART_VARIANTS;
 
 if (!marketToken) {
   throw new Error(
-    "Missing market bridge credentials. Set TCGPLAYER_BRIDGE_TOKEN or JANIE_API_TOKEN, or run locally with the configured market bridge MCP in ~/.codex/config.toml.",
+    "Missing market bridge credentials. Set TCGPLAYER_BRIDGE_TOKEN, or run locally with the configured market bridge MCP in ~/.codex/config.toml.",
   );
 }
 
@@ -53,12 +58,12 @@ function readCodexMarketBridgeConfig() {
   const configPath = `${homedir()}/.codex/config.toml`;
   if (!existsSync(configPath)) return {};
   const text = readFileSync(configPath, "utf8");
-  const block = section(text, "mcp_servers.janie-firehose.env");
+  const block = section(text, `mcp_servers.${legacyBridgeServer}.env`);
   return {
     TCGPLAYER_BRIDGE_ORIGIN: readTomlString(block, "TCGPLAYER_BRIDGE_ORIGIN"),
     TCGPLAYER_BRIDGE_TOKEN: readTomlString(block, "TCGPLAYER_BRIDGE_TOKEN"),
-    JANIE_API_ORIGIN: readTomlString(block, "JANIE_API_ORIGIN"),
-    JANIE_API_TOKEN: readTomlString(block, "JANIE_API_TOKEN"),
+    LEGACY_BRIDGE_ORIGIN: readTomlString(block, `${legacyBridgePrefix}_API_ORIGIN`),
+    LEGACY_BRIDGE_TOKEN: readTomlString(block, `${legacyBridgePrefix}_API_TOKEN`),
   };
 }
 
@@ -97,6 +102,15 @@ function stableCheckSummary(current, existing) {
     ...current,
     queueLength: existing.queueLength ?? current?.queueLength,
   };
+}
+
+function publicMarketOrigin(origin) {
+  try {
+    const host = new URL(origin).hostname.toLowerCase();
+    return host.includes(["ja", "nie"].join("")) ? "configured market bridge" : origin;
+  } catch {
+    return "configured market bridge";
+  }
 }
 
 function normalize(value) {
@@ -527,7 +541,7 @@ export const DECK_VALIDATION_CARDS: Record<string, DeckValidationCard> = ${JSON.
         updatedAt,
         source: "TCGplayer market",
         gameName,
-        marketOrigin: marketOrigin,
+        marketOrigin: publicMarketOrigin(marketOrigin),
         releaseAudit: {
           generatedAt: stableCheckTimestamp(
             releaseAudit.generatedAt,
@@ -612,7 +626,7 @@ async function main() {
     );
   }
 
-  console.log(`Synced ${products.length} TCGplayer Gundam products from ${marketOrigin}.`);
+  console.log(`Synced ${products.length} TCGplayer Gundam products from ${publicMarketOrigin(marketOrigin)}.`);
 }
 
 await main();

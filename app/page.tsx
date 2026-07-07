@@ -659,11 +659,21 @@ function tcgplayerPrint(card: GundamCard, variant: CardArtVariant): TcgplayerPri
   );
 }
 
-function tcgplayerMarketPrice(card: GundamCard, variant: CardArtVariant) {
+function rawTcgplayerMarketPrice(card: GundamCard, variant: CardArtVariant) {
   const price = tcgplayerPrint(card, variant)?.marketPrice;
   return typeof price === "number" && Number.isFinite(price) && price > 0
     ? price
     : null;
+}
+
+function isVolatileMarketPrice(price: number, estimatedPrice: number) {
+  return price >= Math.max(250, estimatedPrice * 25);
+}
+
+function tcgplayerMarketPrice(card: GundamCard, variant: CardArtVariant) {
+  const price = rawTcgplayerMarketPrice(card, variant);
+  if (price === null) return null;
+  return isVolatileMarketPrice(price, estimatePrintCost(card, variant)) ? null : price;
 }
 
 function printCost(card: GundamCard, variant: CardArtVariant) {
@@ -681,33 +691,30 @@ function formatMoney(value: number) {
 
 function printPriceSummary(card: GundamCard, variant: CardArtVariant) {
   const print = tcgplayerPrint(card, variant);
-  const price =
-    typeof print?.marketPrice === "number" &&
-    Number.isFinite(print.marketPrice) &&
-    print.marketPrice > 0
-      ? print.marketPrice
-      : null;
+  const price = rawTcgplayerMarketPrice(card, variant);
   const estimatedPrice = estimatePrintCost(card, variant);
   const estimatedAmount = formatMoney(estimatedPrice);
 
   if (price !== null) {
-    const isVolatilePrice = price >= Math.max(250, estimatedPrice * 25);
+    const isVolatilePrice = isVolatileMarketPrice(price, estimatedPrice);
     const source = isVolatilePrice
       ? "TCGplayer volatile"
       : (print?.priceSource ?? "TCGplayer market");
-    const amount = formatMoney(price);
+    const amount = isVolatilePrice ? `est. ${estimatedAmount}` : formatMoney(price);
     return {
       source,
       amount,
-      full: isVolatilePrice ? `${source} · verify ${amount}` : `${source} ${amount}`,
+      full: isVolatilePrice
+        ? `${source} · verify ${formatMoney(price)} · using local est. ${estimatedAmount}`
+        : `${source} ${amount}`,
     };
   }
 
   if (hasDirectMarketProduct(print)) {
     return {
-      source: "TCGplayer pending",
+      source: "TCGplayer product",
       amount: `est. ${estimatedAmount}`,
-      full: `TCGplayer pending · est. ${estimatedAmount}`,
+      full: `TCGplayer product · local est. ${estimatedAmount}`,
     };
   }
 
@@ -728,17 +735,14 @@ function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
 
 function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
   const print = tcgplayerPrint(card, variant);
-  if (
-    typeof print?.marketPrice === "number" &&
-    Number.isFinite(print.marketPrice) &&
-    print.marketPrice > 0
-  ) {
-    return print.marketPrice >= Math.max(250, estimatePrintCost(card, variant) * 25)
-      ? "TCGplayer volatile price"
-      : (print.priceSource ?? "TCGplayer market");
+  const price = rawTcgplayerMarketPrice(card, variant);
+  if (price !== null) {
+    return isVolatileMarketPrice(price, estimatePrintCost(card, variant))
+      ? "TCGplayer volatile; local estimate used"
+      : (print?.priceSource ?? "TCGplayer market");
   }
 
-  return hasDirectMarketProduct(print) ? "TCGplayer pending price" : "local estimate";
+  return hasDirectMarketProduct(print) ? "TCGplayer product; local estimate" : "local estimate";
 }
 
 function artDisplayLabel(variant: CardArtVariant) {
@@ -751,7 +755,7 @@ function artDisplayLabel(variant: CardArtVariant) {
 function printDisplayId(variant: CardArtVariant) {
   const printSuffix = variant.officialId.split("_")[1] ?? "";
   return printSuffix && !/^p\d+$/i.test(printSuffix)
-    ? `Market Print ${variant.tier + 1}`
+    ? `Market Print ${Math.max(1, variant.tier)}`
     : variant.officialId;
 }
 
@@ -2455,7 +2459,7 @@ export function DeckBuilder({
     const nextHand = drawOpeningHandNumbers(deck.main);
     setOpeningHand(nextHand);
     setMobileView("stats");
-    if (nextHand.length) {
+    if (nextHand.length && mobileTabsEnabled) {
       window.setTimeout(() => {
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         openingHandRef.current?.focus({ preventScroll: true });
@@ -2895,8 +2899,8 @@ export function DeckBuilder({
                 <img
                   src="/permet-link-logo-header.webp"
                   alt="Permet Link"
-                  width={640}
-                  height={256}
+                  width={960}
+                  height={384}
                   decoding="async"
                   className="h-auto w-full object-contain object-left"
                 />
@@ -3059,6 +3063,7 @@ export function DeckBuilder({
             sharedStatus={sharedStatus}
             deckName={deck.name}
             selectedCard={selectedCard}
+            openingHandCards={openingHandEntries}
             missingCost={costSummary.missingCost}
           />
         </div>
@@ -3424,7 +3429,7 @@ export function DeckBuilder({
                   onOpenCard={() => openCardLightbox(selectedCard, selectedArtVariant)}
                 />
               ) : (
-                <EmptyInspectorPanel />
+                <EmptyInspectorPanel onClear={clearLibraryFilters} />
               )}
                 </>
               )}
@@ -3597,12 +3602,14 @@ function HudStrip({
   sharedStatus,
   deckName,
   selectedCard,
+  openingHandCards,
   missingCost,
 }: {
   isLegal: boolean;
   sharedStatus: SharedStatus;
   deckName: string;
   selectedCard: GundamCard | null;
+  openingHandCards: readonly GundamCard[];
   missingCost: number;
 }) {
   const statusLabel =
@@ -3642,6 +3649,14 @@ function HudStrip({
           <span className="rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-2 py-1 text-[#fff2bd]">
             {deckName}
           </span>
+          {openingHandCards.length > 0 && (
+            <span
+              className="max-w-[24rem] truncate rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 py-1 text-[#d9ecff]"
+              title={`Opening hand: ${openingHandCards.map((card) => card.number).join(", ")}`}
+            >
+              Hand {openingHandCards.map((card) => card.number).join(" / ")}
+            </span>
+          )}
           <span className="rounded-sm border border-[#a7b5c9]/20 bg-black/24 px-2 py-1 text-[#f7f7f2]/70">
             {selectedCard ? `Card ${selectedCard.number}` : "No card"}
           </span>
@@ -4060,7 +4075,7 @@ function MobileActionSheet({
           <RotateCcw size={16} />
         </ToolbarButton>
         <ToolbarButton
-          label="Art -"
+          label="Cheaper Prints"
           title="Downgrade deck art budget"
           onClick={onArtDown}
           className="w-full"
@@ -4068,7 +4083,7 @@ function MobileActionSheet({
           <ChevronDown size={16} />
         </ToolbarButton>
         <ToolbarButton
-          label="Art +"
+          label="Fancier Prints"
           title="Upgrade deck art budget"
           onClick={onArtUp}
           className="w-full"
@@ -4078,10 +4093,10 @@ function MobileActionSheet({
         <ToolbarButton label={copyState} title="Copy deck list" onClick={onCopy} className="w-full">
           <Clipboard size={16} />
         </ToolbarButton>
-        <ToolbarButton label="Backup" title="Export backup JSON" onClick={onExport} className="w-full">
+        <ToolbarButton label="JSON Backup" title="Export backup JSON" onClick={onExport} className="w-full">
           <Download size={16} />
         </ToolbarButton>
-        <ToolbarButton label="Sheet" title="Export deck image" onClick={onSheet} className="w-full">
+        <ToolbarButton label="Deck Image" title="Export deck image" onClick={onSheet} className="w-full">
           <Layers size={16} />
         </ToolbarButton>
         <ToolbarButton label="Import" title="Import JSON" onClick={onImport} className="w-full">
@@ -4895,7 +4910,7 @@ function QuantityStepper({
   const buttonClass = (disabled: boolean) =>
     `interactive-control inline-flex size-11 items-center justify-center rounded-sm border ${
       disabled
-        ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
+        ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
         : "border-current/30 bg-black/22 text-current hover:bg-current/10"
     }`;
   const decrementLabel =
@@ -5004,7 +5019,7 @@ function MiniQuantityControl({
   const controlClass = (disabled: boolean) =>
     `interactive-control grid h-11 place-items-center ${
       disabled
-        ? "cursor-not-allowed bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
+        ? "cursor-not-allowed bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
         : "bg-black/22 text-current hover:bg-current/10"
     }`;
   const disabledIncrementLabel = incrementReason?.toLowerCase().includes("rules")
@@ -5169,7 +5184,7 @@ function DeckPanel({
                       <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {card.name}
                       </h3>
-                      <p className="text-sm font-bold leading-5 text-[#f7f7f2]/58">
+                      <p className="text-sm font-bold leading-5 text-[#f7f7f2]/66">
                         <span className="font-black text-[#f7f7f2]/66">{card.number}</span>
                         <span aria-hidden="true"> · </span>
                         <span>{formatPrintMoney(card, artVariant)}</span>
@@ -5362,7 +5377,7 @@ function LibraryCard({
               </span>
             </p>
           </div>
-          <p className="library-card-rules line-clamp-2 text-sm font-semibold leading-5 text-[#f7f7f2]/54">
+          <p className="library-card-rules line-clamp-2 text-sm font-semibold leading-5 text-[#f7f7f2]/66">
             {card.text}
           </p>
           <div className="flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
@@ -5374,17 +5389,17 @@ function LibraryCard({
             {ownedQuantity > 0 && (
               <span
                 className="rounded-sm border border-[#28d17c]/24 bg-[#28d17c]/10 px-1.5 py-0.5 text-[#d9ffe9]"
-                title={`${ownedQuantity} owned across all prints`}
+                title={`${ownedQuantity} owned across any print`}
               >
-                Owned {ownedQuantity}
+                Any Owned {ownedQuantity}
               </span>
             )}
             {missingQuantity > 0 && (
               <span
                 className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 text-[#fff2bd]"
-                title={`${missingQuantity} missing selected-print copies`}
+                title={`${missingQuantity} missing across selected deck printings`}
               >
-                Need {missingQuantity}
+                Missing {missingQuantity}
               </span>
             )}
             {rulesPending && (
@@ -5471,7 +5486,7 @@ function LibraryCard({
   );
 }
 
-function EmptyInspectorPanel() {
+function EmptyInspectorPanel({ onClear }: { onClear: () => void }) {
   return (
     <section className={panelClass("overflow-hidden")}>
       <div className="grid min-h-72 place-items-center p-5 text-center">
@@ -5483,6 +5498,14 @@ function EmptyInspectorPanel() {
           <p className="mt-2 max-w-xs text-base font-bold leading-6 text-[#f7f7f2]/62">
             Clear a filter or broaden the search to bring the card inspector back online.
           </p>
+          <button
+            type="button"
+            className="interactive-control mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-4 font-display text-base font-black uppercase text-[#fff2bd]"
+            onClick={onClear}
+          >
+            <RotateCcw size={15} />
+            Clear All
+          </button>
         </div>
       </div>
     </section>
@@ -5817,7 +5840,7 @@ function IconButton({
       type="button"
       className={`interactive-control inline-flex size-11 items-center justify-center rounded-sm border ${
         disabled
-          ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
+          ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
           : "border-[#f7f7f2]/12 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#f6c542]/35 hover:bg-[#f6c542]/12"
       }`}
       onClick={onClick}

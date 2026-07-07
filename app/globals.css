@@ -357,7 +357,7 @@ textarea {
 }
 
 .permet-sweep {
-  animation: permet-sweep 2.8s ease-in-out infinite;
+  animation: permet-sweep 4.5s ease-in-out infinite;
   will-change: transform;
 }
 
@@ -552,7 +552,7 @@ textarea {
   z-index: 65;
   top: auto;
   right: 0.75rem;
-  bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+  bottom: calc(env(safe-area-inset-bottom) + 4.25rem);
   left: 0.75rem;
   width: auto;
   max-height: min(76dvh, 32rem);
@@ -1085,6 +1085,10 @@ textarea {
 }
 
 @media (max-width: 767px) {
+  .cockpit-grid {
+    animation: none;
+  }
+
   .ambient-field {
     display: none;
   }
