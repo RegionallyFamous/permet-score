@@ -5,7 +5,6 @@
 import {
   Activity,
   AlertTriangle,
-  BadgeDollarSign,
   BarChart3,
   ChevronDown,
   ChevronLeft,
@@ -102,6 +101,7 @@ type FallbackPanel = {
   title: string;
   detail: string;
   content: string;
+  mode?: "text" | "link";
   href?: string;
   downloadName?: string;
   csvContent?: string;
@@ -3280,79 +3280,6 @@ export function DeckBuilder({
     });
   }
 
-  function optimizeDeckPrints(mode: "standard" | "cheapest" | "owned" | "bling") {
-    if (blockSharedPreviewEdit()) return;
-    if (mainTotal + resourceTotal === 0) {
-      showToast("warn", "No prints to tune", "Add cards before optimizing print choices.");
-      return;
-    }
-
-    undoDeckRef.current = cloneDeckState(deck);
-    setCanUndo(true);
-    setDeck((current) => {
-      const nextPrints = clonePrints(current.prints);
-      const nextArt = { ...current.art };
-
-      (["main", "resource"] as const).forEach((zone) => {
-        deckEntries(current[zone]).forEach(({ card, quantity }) => {
-          const variants = cardArtVariants(card);
-          if (!variants.length || quantity <= 0) return;
-          let nextMap: QuantityMap = {};
-
-          if (mode === "owned") {
-            let remaining = quantity;
-            variants.forEach((variant) => {
-              if (remaining <= 0) return;
-              const owned = getOwnedPrintCount(current.collection, card, variant.id);
-              const used = Math.min(owned, remaining);
-              if (used > 0) {
-                nextMap[variant.id] = used;
-                remaining -= used;
-              }
-            });
-            if (remaining > 0) {
-              const cheapest = [...variants].sort(
-                (a, b) => printCost(card, a) - printCost(card, b),
-              )[0];
-              nextMap[cheapest.id] = (nextMap[cheapest.id] ?? 0) + remaining;
-            }
-          } else {
-            const target =
-              mode === "bling"
-                ? variants[variants.length - 1]
-                : mode === "cheapest"
-                  ? [...variants].sort((a, b) => printCost(card, a) - printCost(card, b))[0]
-                  : variants.find((variant) => variant.id === "standard") ?? variants[0];
-            nextMap = { [target.id]: quantity };
-          }
-
-          nextPrints[zone][card.number] = cleanQuantityMap(nextMap);
-          const featured =
-            variants.find(
-              (variant) =>
-                (nextMap[variant.id] ?? 0) > 0 && variant.id !== "standard",
-            ) ?? variants.find((variant) => (nextMap[variant.id] ?? 0) > 0);
-          if (!featured || featured.id === "standard") delete nextArt[card.number];
-          else nextArt[card.number] = featured.id;
-        });
-      });
-
-      return { ...current, art: nextArt, prints: nextPrints };
-    });
-    showToast(
-      "warn",
-      "Prints optimized",
-      mode === "standard"
-        ? "All deck copies moved to standard prints."
-        : mode === "cheapest"
-          ? "Deck copies moved to the lowest available print estimates."
-          : mode === "owned"
-            ? "Owned prints were used first, then cheapest open copies."
-            : "Deck copies moved to the highest available print tiers.",
-      "Undo",
-    );
-  }
-
   function adjustCard(zone: Zone, number: string, delta: number) {
     if (blockSharedPreviewEdit()) return;
     const currentDeck = deckRef.current;
@@ -3493,7 +3420,7 @@ export function DeckBuilder({
 
   function markDeckOwned() {
     if (blockSharedPreviewEdit()) return;
-    if (costSummary.deckCopies <= 0) {
+    if (mainTotal + resourceTotal <= 0) {
       showToast("warn", "No prints to mark", "Add cards before marking deck prints owned.");
       return;
     }
@@ -3749,6 +3676,18 @@ export function DeckBuilder({
     );
   }
 
+  function showDeckLinkPanel(shareUrl: string, copied: boolean, detail: string) {
+    setFallbackPanel({
+      title: "Deck Link",
+      detail,
+      content: shareUrl,
+      mode: "link",
+      href: shareUrl,
+      copyLabel: "Copy Link",
+      autoSelectContent: !copied,
+    });
+  }
+
   async function copyShareUrl() {
     rememberFallbackReturnFocus();
     if (shareState === "Saving" || shareState === "Copying") return;
@@ -3757,15 +3696,11 @@ export function DeckBuilder({
       const copied = await writeClipboardText(shareUrl);
       setShareState(copied ? "Copied" : "Link Ready");
       if (!copied) {
-        setFallbackPanel({
-          title: "Share Link",
-          detail:
-            "Clipboard access was blocked. This read-only link shares decklist and selected printings only; ownership is not included.",
-          content: shareUrl,
-          href: shareUrl,
-          copyLabel: "Copy Share Link",
-          autoSelectContent: true,
-        });
+        showDeckLinkPanel(
+          shareUrl,
+          copied,
+          "Current short deck link is ready. Use Copy Link if the browser blocked clipboard access.",
+        );
       }
       showToast(
         copied ? "good" : "warn",
@@ -3783,17 +3718,13 @@ export function DeckBuilder({
       setShareState("Copying");
       const copied = await writeClipboardText(shareCacheRef.current.url);
       setShareState(copied ? "Copied" : "Link Ready");
-      if (!copied) {
-        setFallbackPanel({
-          title: "Share Link",
-          detail:
-            "Clipboard access was blocked. This URL shares decklist and selected printings only; ownership is not included.",
-          content: shareCacheRef.current.url,
-          href: shareCacheRef.current.url,
-          copyLabel: "Copy Share Link",
-          autoSelectContent: true,
-        });
-      }
+      showDeckLinkPanel(
+        shareCacheRef.current.url,
+        copied,
+        copied
+          ? "Saved short deck link copied. Ownership data is private and not included."
+          : "Saved short deck link is ready. Use Copy Link if the browser blocked clipboard access.",
+      );
       showToast(
         copied ? "good" : "warn",
         copied ? "Share link copied" : "Share link ready",
@@ -3852,17 +3783,13 @@ export function DeckBuilder({
       setShareState("Copying");
       const copied = await writeClipboardText(shareUrl);
       setShareState(copied ? "Copied" : "Link Ready");
-      if (!copied) {
-        setFallbackPanel({
-          title: "Share Link",
-          detail:
-            "Clipboard access was blocked. This URL shares decklist and selected printings only; ownership is not included.",
-          content: shareUrl,
-          href: shareUrl,
-          copyLabel: "Copy Share Link",
-          autoSelectContent: true,
-        });
-      }
+      showDeckLinkPanel(
+        shareUrl,
+        copied,
+        copied
+          ? "Saved short deck link copied. Ownership data is private and not included."
+          : "Saved short deck link is ready. Use Copy Link if the browser blocked clipboard access.",
+      );
       showToast(
         copied ? "good" : "warn",
         copied ? "Share link copied" : "Share link ready",
@@ -4290,7 +4217,6 @@ export function DeckBuilder({
             <Metric label="Colors" value={deckColors.length ? deckColors.join(" / ") : "-"} />
             <Metric label="Cards" value={`${CARD_POOL.length} loaded`} />
             <Metric label="Alt Selected" value={`${selectedAltTotal}`} />
-            <Metric label="Market / Est." value={formatMoney(costSummary.artTotal)} />
             <Metric label="TCG List" value={formatMoney(tcgListTotal)} />
             <Metric label="Showing" value={`${filteredCards.length}`} />
           </div>
@@ -4302,7 +4228,6 @@ export function DeckBuilder({
             isStarterTemplate={isStarterTemplate}
             selectedCard={selectedCard}
             issue={primaryDeckIssue}
-            marketTotal={costSummary.artTotal}
           />
         </div>
       </header>
@@ -4315,7 +4240,6 @@ export function DeckBuilder({
             mainTotal={mainTotal}
             resourceTotal={resourceTotal}
             deckColors={deckColors}
-            artTotal={costSummary.artTotal}
             previewCards={mainEntries.slice(0, 5).map((entry) => entry.card)}
             onClone={cloneSharedDeck}
           />
@@ -4788,10 +4712,9 @@ export function DeckBuilder({
             >
               {renderStatsPanel && (
                 <>
-              <CostPanel
+              <CollectionPanel
                 summary={costSummary}
                 onMarkOwned={markDeckOwned}
-                onOptimizePrints={optimizeDeckPrints}
                 readOnly={sharedPreviewLocked}
               />
 
@@ -4949,7 +4872,6 @@ function HudStrip({
   isStarterTemplate,
   selectedCard,
   issue,
-  marketTotal,
 }: {
   isLegal: boolean;
   sharedStatus: SharedStatus;
@@ -4958,7 +4880,6 @@ function HudStrip({
   isStarterTemplate: boolean;
   selectedCard: GundamCard | null;
   issue: Notice | null;
-  marketTotal: number;
 }) {
   const statusLabel =
     sharedStatus === "ready"
@@ -5005,9 +4926,6 @@ function HudStrip({
           <span className="rounded-sm border border-[#a7b5c9]/20 bg-black/24 px-2 py-1 text-[#f7f7f2]/70">
             {selectedCard ? `Card ${selectedCard.number}` : "No card"}
           </span>
-          <span className="rounded-sm border border-[#f6c542]/30 bg-black/24 px-2 py-1 text-[#fff2bd]">
-            TCG Est. {formatMoney(marketTotal)}
-          </span>
         </div>
       </div>
     </div>
@@ -5020,7 +4938,6 @@ function SharedDeckBanner({
   mainTotal,
   resourceTotal,
   deckColors,
-  artTotal,
   previewCards,
   onClone,
 }: {
@@ -5029,7 +4946,6 @@ function SharedDeckBanner({
   mainTotal: number;
   resourceTotal: number;
   deckColors: CardColor[];
-  artTotal: number;
   previewCards: GundamCard[];
   onClone: () => void;
 }) {
@@ -5066,9 +4982,6 @@ function SharedDeckBanner({
               {resourceTotal}/{RESOURCE_TARGET} Resource
             </span>
             <DeckColorRail colors={deckColors} />
-            <span className="rounded-sm border border-[#28d17c]/30 bg-[#28d17c]/12 px-2 py-1 text-[#d9ffe9]">
-              {formatMoney(artTotal)} prints
-            </span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -5895,6 +5808,7 @@ function FallbackPanelView({
       ? `data:text/csv;charset=utf-8,${encodeURIComponent(panel.csvContent)}`
       : "";
   const hasTcgEntries = Boolean(panel.buyEntries?.length);
+  const isLinkPanel = panel.mode === "link";
 
   return (
     <div
@@ -5993,7 +5907,12 @@ function FallbackPanelView({
             value={panel.content}
             aria-label={`${panel.title} content`}
             onFocus={(event) => event.currentTarget.select()}
-            className="fallback-panel-textarea control-field min-h-64 w-full resize-y rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono text-sm font-bold leading-6 text-[#f7f7f2] outline-none focus:border-[#f6c542]"
+            rows={isLinkPanel ? 1 : undefined}
+            className={`fallback-panel-textarea control-field w-full rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] ${
+              isLinkPanel
+                ? "min-h-14 resize-none text-base leading-7"
+                : "min-h-64 resize-y text-sm leading-6"
+            }`}
           />
           <div className="grid gap-2 sm:grid-cols-2">
             {panel.copyLabel && (
@@ -6261,9 +6180,6 @@ function CardLightbox({
                   <span className="rounded-sm border border-[#f7f7f2]/14 bg-[#f7f7f2]/9 px-2 py-1 text-sm font-black text-[#f7f7f2]">
                     {card.type}
                   </span>
-                  <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
-                    {formatPrintMoney(card, artVariant)}
-                  </span>
                 </div>
                 <h2
                   className="mt-3 font-display text-3xl font-black uppercase leading-none text-[#f7f7f2] sm:text-4xl"
@@ -6314,57 +6230,27 @@ function CardLightbox({
   );
 }
 
-function CostPanel({
+function CollectionPanel({
   summary,
   onMarkOwned,
-  onOptimizePrints,
   readOnly = false,
 }: {
   summary: CostSummary;
   onMarkOwned: () => void;
-  onOptimizePrints: (mode: "standard" | "cheapest" | "owned" | "bling") => void;
   readOnly?: boolean;
 }) {
   return (
     <section className={panelClass()}>
-      <PanelTitle icon={<BadgeDollarSign size={18} />} title="Market Cost" />
+      <PanelTitle icon={<WalletCards size={18} />} title="Collection" />
       <div className="grid gap-2 p-3">
-        <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
-        <CostRow label="Alt-art premium" value={formatMoney(summary.altPremium)} />
-        <CostRow label="Owned prints" value={formatMoney(summary.ownedValue)} />
-        <CostRow label="TCG print total" value={formatMoney(summary.artTotal)} hot />
-        <div className="mt-1 grid grid-cols-3 gap-2 text-center">
-          <Spec label="Deck" value={`${summary.deckCopies}`} />
-          <Spec label="Owned" value={`${summary.ownedCopies}`} />
-          <Spec label="Open" value={`${summary.unownedCopies}`} />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            ["standard", "Standard"],
-            ["cheapest", "Cheapest"],
-            ["owned", "Owned First"],
-            ["bling", "Full Bling"],
-          ].map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              className={`interactive-control inline-flex h-11 items-center justify-center rounded-sm border px-2 font-display text-sm font-black uppercase ${
-                readOnly
-                  ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
-                  : "border-[#8bdcff]/28 bg-[#1167d8]/10 text-[#d9ecff] hover:bg-[#1167d8]/16"
-              }`}
-              onClick={() =>
-                onOptimizePrints(mode as "standard" | "cheapest" | "owned" | "bling")
-              }
-              disabled={readOnly}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="grid grid-cols-3 gap-2">
+          <Spec label="Deck" value={`${summary.deckCopies}`} compact />
+          <Spec label="Owned" value={`${summary.ownedCopies}`} compact />
+          <Spec label="Open" value={`${summary.unownedCopies}`} compact />
         </div>
         <button
           type="button"
-          className={`interactive-control mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
+          className={`interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
             readOnly
               ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
               : "border-[#28d17c]/35 bg-[#28d17c]/12 text-[#d9ffe9] hover:bg-[#28d17c]/18"
@@ -6378,29 +6264,6 @@ function CostPanel({
         </button>
       </div>
     </section>
-  );
-}
-
-function CostRow({
-  label,
-  value,
-  hot = false,
-}: {
-  label: string;
-  value: string;
-  hot?: boolean;
-}) {
-  return (
-    <div
-      className={`interactive-row flex items-center justify-between gap-3 rounded-sm border p-2 ${
-        hot
-          ? "border-[#f6c542]/32 bg-[#f6c542]/10 text-[#fff2bd]"
-          : "border-[#a7b5c9]/16 bg-black/24 text-[#f7f7f2]"
-      }`}
-    >
-      <span className="text-base font-black">{label}</span>
-      <span className="text-base font-black">{value}</span>
-    </div>
   );
 }
 
@@ -6683,13 +6546,11 @@ function QuantityStepper({
           <Plus size={compact ? 13 : 15} />
         </button>
       </div>
-      <div
-        className={`mt-1 min-h-4 truncate font-bold opacity-70 ${
-          compact ? "text-[11px]" : "text-xs"
-        }`}
-      >
-        {visibleReason}
-      </div>
+      {!compact && (
+        <div className="mt-1 min-h-4 truncate text-xs font-bold opacity-70">
+          {visibleReason}
+        </div>
+      )}
     </div>
   );
 }
@@ -6889,7 +6750,7 @@ function DeckPanel({
                 )}`}
                 data-pulse={rowPulseId}
               >
-                <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2.5">
+                <div className="deck-entry-body grid items-stretch gap-2.5">
                   <CardThumb
                     card={card}
                     artVariant={artVariant}
@@ -6898,8 +6759,9 @@ function DeckPanel({
                     badge={`${quantity}`}
                     eager={eagerImages && index === 0}
                     openLabel={`Open large view of ${zoneLabel(zone)} deck card ${card.name} ${card.number}`}
+                    className="deck-card-thumb"
                   />
-                  <div className="grid min-w-0 content-start gap-2">
+                  <div className="deck-entry-content grid min-w-0 content-start gap-2">
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                         <ColorChip color={card.color} compact />
@@ -6912,31 +6774,38 @@ function DeckPanel({
                           </span>
                         )}
                       </div>
-                      <h3 className="mt-2 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
+                      <h3 className="deck-entry-title mt-2 line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {card.name}
                       </h3>
-                      <p className="text-sm font-bold leading-5 text-[#f7f7f2]/66">
+                      <p
+                        className="deck-entry-meta truncate text-sm font-bold leading-5 text-[#f7f7f2]/66"
+                        title={card.number}
+                      >
                         <span className="font-black text-[#f7f7f2]/66">{card.number}</span>
-                        <span aria-hidden="true"> · </span>
-                        <span>{formatPrintMoney(card, artVariant)}</span>
                       </p>
                     </div>
-                    <div className="deck-print-chips flex min-w-0 flex-wrap gap-1">
-                      {printEntries.map((entry) => (
-                        <span
-                          key={entry.variant.id}
-                          className="rounded-sm border border-[#a7b5c9]/18 bg-black/24 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/68"
-                        >
-                          {entry.quantity} {artDisplayLabel(entry.variant)}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="deck-card-actions grid grid-cols-[2.75rem_minmax(7rem,1fr)_2.75rem] gap-1.5 min-[380px]:grid-cols-[minmax(3.75rem,1fr)_7.75rem_2.75rem]">
+                    {printEntries.length > 1 && (
+                      <div className="deck-print-chips flex min-w-0 flex-wrap gap-1">
+                        {printEntries.map((entry) => (
+                          <span
+                            key={entry.variant.id}
+                            className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-sm border border-[#a7b5c9]/18 bg-black/24 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/68"
+                            title={`${printDisplayId(entry.variant)} x${entry.quantity}`}
+                          >
+                            <span className="truncate">{printDisplayId(entry.variant)}</span>
+                            <span className="shrink-0 rounded-[1px] border border-[#f6c542]/24 bg-[#f6c542]/10 px-1 text-[10px] leading-4 text-[#fff2bd]">
+                              x{entry.quantity}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="deck-card-actions grid gap-1.5">
                       <a
                         href={tcgplayerUrl(card, artVariant)}
                         target="_blank"
                         rel="noopener noreferrer nofollow"
-                        className="interactive-control inline-flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/34 bg-[#f6c542]/10 px-2 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/16"
+                        className="interactive-control deck-tcg-action inline-flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/34 bg-[#f6c542]/10 px-2 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/16"
                         title={`${tcgplayerLabel} for ${card.name}`}
                         aria-label={`${tcgplayerLabel} for ${card.name}`}
                       >
@@ -6956,11 +6825,13 @@ function DeckPanel({
                         pulseId={rowPulseId}
                         onIncrement={() => onAdjust(zone, card.number, 1)}
                         onDecrement={() => onAdjust(zone, card.number, -1)}
+                        className="deck-card-stepper"
                       />
                       <IconButton
                         label={`Remove ${card.name}`}
                         disabled={readOnly}
                         onClick={() => onRemove(zone, card.number)}
+                        className="deck-remove-action"
                       >
                         <Trash2 size={14} />
                       </IconButton>
@@ -7370,13 +7241,13 @@ function InspectorPanel({
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-4 gap-2 p-3">
-        <Spec label="Lv" value={card.level} />
-        <Spec label="Cost" value={card.cost} />
-        <Spec label="AP" value={card.ap} />
-        <Spec label="HP" value={card.hp} />
+      <div className="grid grid-cols-4 gap-1.5 p-2">
+        <Spec label="Lv" value={card.level} compact />
+        <Spec label="Cost" value={card.cost} compact />
+        <Spec label="AP" value={card.ap} compact />
+        <Spec label="HP" value={card.hp} compact />
       </div>
-      <div className="grid gap-2 border-t border-[#a7b5c9]/20 p-3 2xl:grid-cols-2">
+      <div className="grid gap-1.5 border-t border-[#a7b5c9]/20 p-2 2xl:grid-cols-2">
         <QuantityStepper
           label="Main"
           quantity={mainQuantity}
@@ -7388,6 +7259,7 @@ function InspectorPanel({
           onIncrement={() => onAdjustMain(1)}
           onDecrement={() => onAdjustMain(-1)}
           pulseId={pulseIdFor?.(`main:${card.number}`)}
+          compact
         />
         <QuantityStepper
           label="Res"
@@ -7400,6 +7272,7 @@ function InspectorPanel({
           onIncrement={() => onAdjustResource(1)}
           onDecrement={() => onAdjustResource(-1)}
           pulseId={pulseIdFor?.(`resource:${card.number}`)}
+          compact
         />
       </div>
       <div className="border-t border-[#a7b5c9]/20 p-3 xl:hidden">
@@ -7420,7 +7293,7 @@ function InspectorPanel({
               </span>
             </div>
             <p className="mt-1 truncate text-base font-bold text-[#f7f7f2]/68">
-              {printDisplayId(artVariant)} · {formatPrintMoney(card, artVariant)}
+              {printDisplayId(artVariant)}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 2xl:grid-cols-3">
@@ -7479,8 +7352,8 @@ function InspectorPanel({
               onClick={() => onSetAllPrints(variant.id)}
               disabled={readOnly}
               aria-pressed={variant.id === artVariant.id}
-              aria-label={`Set selected card to ${artDisplayLabel(variant)} ${formatPrintMoney(card, variant)}`}
-              title={`${artDisplayLabel(variant)} ${formatPrintMoney(card, variant)}`}
+              aria-label={`Set selected card to ${artDisplayLabel(variant)}`}
+              title={artDisplayLabel(variant)}
             />
           ))}
         </div>
@@ -7583,13 +7456,31 @@ function InspectorPanel({
   );
 }
 
-function Spec({ label, value }: { label: string; value: string }) {
+function Spec({
+  label,
+  value,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  compact?: boolean;
+}) {
   return (
-    <div className="rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/[0.055] p-2 text-center">
-      <div className="font-display text-sm font-black uppercase text-[#f7f7f2]/58">
+    <div
+      className={`rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/[0.055] text-center ${
+        compact ? "px-1.5 py-1.5" : "p-2"
+      }`}
+    >
+      <div
+        className={`font-display font-black uppercase text-[#f7f7f2]/58 ${
+          compact ? "text-xs" : "text-sm"
+        }`}
+      >
         {label}
       </div>
-      <div className="mt-1 text-base font-black text-[#f7f7f2]">{value}</div>
+      <div className={`font-black text-[#f7f7f2] ${compact ? "mt-0.5 text-sm" : "mt-1 text-base"}`}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -7602,6 +7493,7 @@ function CardThumb({
   badge,
   eager = false,
   openLabel,
+  className = "",
 }: {
   card: GundamCard;
   artVariant?: CardArtVariant;
@@ -7610,21 +7502,22 @@ function CardThumb({
   badge?: string;
   eager?: boolean;
   openLabel?: string;
+  className?: string;
 }) {
   const sizeClass =
     size === "deck"
-      ? "h-28 w-20"
+      ? "h-36 w-[6.5rem]"
       : "h-16 w-12";
   const thumbClass =
-    `relative ${sizeClass} shrink-0 overflow-hidden rounded-sm border border-[#f7f7f2]/15 bg-black shadow-sm`;
+    `relative ${sizeClass} shrink-0 overflow-hidden rounded-sm border border-[#f7f7f2]/15 bg-black shadow-sm ${className}`;
   const cardOpenLabel = openLabel ?? `Open large view of ${card.name} ${card.number}`;
   const image = (
     <CardImage
       card={card}
       artVariant={artVariant}
-      imageSize={size === "deck" ? 800 : 600}
-      srcSetSizes={[320, 480, 640]}
-      sizes={size === "deck" ? "5rem" : "3rem"}
+      imageSize={size === "deck" ? 1000 : 600}
+      srcSetSizes={size === "deck" ? [320, 480, 640, 1000] : [320, 480, 640]}
+      sizes={size === "deck" ? "(min-width: 1280px) 11rem, 35vw" : "3rem"}
       alt={`${card.name} card`}
       className="card-image-surface h-full w-full object-contain object-top"
       eager={eager}
@@ -7673,11 +7566,13 @@ function IconButton({
   children,
   disabled = false,
   onClick,
+  className = "",
 }: {
   label: string;
   children: React.ReactNode;
   disabled?: boolean;
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
@@ -7686,7 +7581,7 @@ function IconButton({
         disabled
           ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
           : "border-[#f7f7f2]/12 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#f6c542]/35 hover:bg-[#f6c542]/12"
-      }`}
+      } ${className}`}
       onClick={onClick}
       disabled={disabled}
       title={label}

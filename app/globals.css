@@ -1199,14 +1199,6 @@ textarea {
     position: relative;
   }
 
-  .deck-entry > div {
-    grid-template-columns: 5.75rem minmax(0, 1fr);
-  }
-
-  .deck-entry .h-28.w-20 {
-    width: 5.75rem;
-    height: 8.05rem;
-  }
 }
 
 @media (min-width: 1280px) and (max-height: 760px) {
@@ -1316,8 +1308,9 @@ textarea {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  container-type: inline-size;
   content-visibility: auto;
-  contain-intrinsic-size: auto 206px;
+  contain-intrinsic-size: auto 260px;
 }
 
 .deck-entry::before {
@@ -1347,6 +1340,107 @@ textarea {
 .deck-entry:hover::after,
 .deck-entry:focus-within::after {
   opacity: 1;
+}
+
+.deck-entry-body {
+  grid-template-columns: minmax(6.4rem, 34%) minmax(0, 1fr);
+}
+
+.deck-entry .deck-card-thumb {
+  width: 100%;
+  height: auto;
+  min-height: 9rem;
+  aspect-ratio: 5 / 7;
+}
+
+.deck-entry-content {
+  min-height: 0;
+}
+
+.deck-entry-title {
+  max-width: 100%;
+}
+
+.deck-entry-meta,
+.deck-print-chips {
+  min-width: 0;
+}
+
+.deck-card-actions {
+  grid-template-columns: minmax(0, 1fr) 2.75rem;
+}
+
+.deck-card-actions .mini-stepper {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.deck-card-actions > a {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.deck-card-actions > button {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+@container (min-width: 520px) {
+  .deck-entry-body {
+    grid-template-columns: minmax(8.25rem, 30%) minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .deck-entry .deck-card-thumb {
+    min-height: 11.55rem;
+  }
+
+  .deck-entry-title {
+    font-size: 1.35rem;
+  }
+}
+
+@container (min-width: 680px) {
+  .deck-entry-body {
+    grid-template-columns: minmax(9.75rem, 24%) minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .deck-entry .deck-card-thumb {
+    min-height: 13.65rem;
+  }
+
+  .deck-card-actions {
+    grid-template-columns: minmax(8rem, 1fr) minmax(7.75rem, 10rem) 2.75rem;
+  }
+
+  .deck-card-actions .mini-stepper,
+  .deck-card-actions > a,
+  .deck-card-actions > button {
+    grid-row: 1;
+  }
+
+  .deck-card-actions .mini-stepper {
+    grid-column: 2;
+  }
+
+  .deck-card-actions > a {
+    grid-column: 1;
+  }
+
+  .deck-card-actions > button {
+    grid-column: 3;
+  }
+}
+
+@container (min-width: 880px) {
+  .deck-entry-body {
+    grid-template-columns: minmax(10.75rem, 22%) minmax(0, 1fr);
+  }
+
+  .deck-entry .deck-card-thumb {
+    min-height: 15.05rem;
+  }
 }
 
 .empty-deck-bay {
@@ -2006,14 +2100,13 @@ textarea {
     display: none;
   }
 
-  .deck-entry > div {
-    grid-template-columns: 4.25rem minmax(0, 1fr);
+  .deck-entry-body {
+    grid-template-columns: minmax(5.75rem, 35%) minmax(0, 1fr);
     gap: 0.5rem;
   }
 
-  .deck-entry .h-28.w-20 {
-    width: 4.25rem;
-    height: 5.95rem;
+  .deck-entry .deck-card-thumb {
+    min-height: 8.05rem;
   }
 
   .deck-card-actions {
@@ -2420,14 +2513,13 @@ textarea {
     min-height: 2.75rem;
   }
 
-  .deck-entry > div {
-    grid-template-columns: 4.25rem minmax(0, 1fr);
+  .deck-entry-body {
+    grid-template-columns: minmax(5.75rem, 35%) minmax(0, 1fr);
     gap: 0.5rem;
   }
 
-  .deck-entry .h-28.w-20 {
-    width: 4.25rem;
-    height: 5.95rem;
+  .deck-entry .deck-card-thumb {
+    min-height: 8.05rem;
   }
 
   .selected-card-scan {
