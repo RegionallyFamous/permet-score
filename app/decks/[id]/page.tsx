@@ -29,7 +29,7 @@ export async function generateMetadata({
   const { id } = await params;
   const deck = await loadValidSharedDeck(id);
   const path = `/decks/${id}`;
-  const title = `${deck.name} | Permet Link`;
+  const title = deck.name;
   const description =
     "Shared Gundam Card Game decklist with selected printings and TCGplayer links.";
 
@@ -40,7 +40,7 @@ export async function generateMetadata({
       canonical: path,
     },
     openGraph: {
-      title,
+      title: `${title} | Permet Link`,
       description,
       url: path,
       siteName: "Permet Link",
@@ -56,7 +56,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title,
+      title: `${title} | Permet Link`,
       description,
       images: ["/permet-link-logo.png"],
     },

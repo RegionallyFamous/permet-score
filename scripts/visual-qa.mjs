@@ -196,7 +196,7 @@ try {
 
     const audit = await readAudit(page);
 
-    if (audit.title !== "Permet Link") {
+    if (audit.title !== "Permet Link | Gundam Card Game Deck Builder") {
       throw new Error(`${viewport.name}: unexpected title ${audit.title}`);
     }
     if (audit.overflow > 1) {
@@ -262,7 +262,7 @@ try {
         const expectedWidth =
           viewport.height <= 700
             ? Math.min(viewport.width * 0.5, 180)
-            : Math.min(viewport.width * 0.68, 230);
+            : Math.min(viewport.width * 0.58, 210);
         if (!selectedScan || selectedScan.width < expectedWidth) {
           throw new Error(
             `${viewport.name} card: selected scan too small ${Math.round(

@@ -5,6 +5,13 @@ import type {
 import { Rajdhani } from "next/font/google";
 import "./globals.css";
 
+const siteUrl = "https://permetlink.com";
+const siteName = "Permet Link";
+const siteDescription =
+  "Build Gundam Card Game decks, tune alt-art printings, track collection ownership, draw opening hands, and share decklists.";
+const socialImage = "/permet-link-logo.png";
+const socialImageUrl = `${siteUrl}${socialImage}`;
+
 const rajdhani = Rajdhani({
   variable: "--font-gundam-display",
   subsets: ["latin"],
@@ -12,45 +19,55 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://permetlink.com"),
-  applicationName: "Permet Link",
-  title: "Permet Link",
-  description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
+  metadataBase: new URL(siteUrl),
+  applicationName: siteName,
+  title: {
+    default: `${siteName} | Gundam Card Game Deck Builder`,
+    template: `%s | ${siteName}`,
+  },
+  description: siteDescription,
   keywords: [
     "Gundam Card Game",
     "Gundam deck builder",
     "Gundam TCG",
+    "Gundam Card Game decklist",
     "deck list",
+    "deck builder",
     "alt art",
+    "opening hand simulator",
     "TCGplayer",
   ],
+  category: "games",
+  creator: siteName,
+  publisher: siteName,
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Permet Link",
-    description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
-    url: "https://permetlink.com",
-    siteName: "Permet Link",
+    title: `${siteName} | Gundam Card Game Deck Builder`,
+    description: siteDescription,
+    url: siteUrl,
+    siteName,
     type: "website",
+    locale: "en_US",
     images: [
       {
-        url: "/permet-link-logo.png",
+        url: socialImage,
         width: 1983,
         height: 793,
-        alt: "Permet Link",
+        alt: siteName,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Permet Link",
-    description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
-    images: ["/permet-link-logo.png"],
+    title: `${siteName} | Gundam Card Game Deck Builder`,
+    description: siteDescription,
+    images: [socialImage],
   },
   appleWebApp: {
     capable: true,
-    title: "Permet Link",
+    title: siteName,
     statusBarStyle: "black-translucent",
   },
   manifest: "/manifest.webmanifest",
@@ -66,6 +83,52 @@ export const metadata: Metadata = {
     ],
   },
 };
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: siteName,
+    url: siteUrl,
+    description: siteDescription,
+    applicationCategory: "GameApplication",
+    operatingSystem: "Any",
+    inLanguage: "en-US",
+    image: socialImageUrl,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    featureList: [
+      "Gundam Card Game deck building",
+      "Alt-art print planning",
+      "Collection ownership tracking",
+      "Opening hand draw simulator",
+      "Shareable decklist URLs",
+      "TCGplayer print links",
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: siteName,
+    url: siteUrl,
+    description: siteDescription,
+    inLanguage: "en-US",
+    publisher: {
+      "@type": "Organization",
+      name: siteName,
+      url: siteUrl,
+      logo: {
+        "@type": "ImageObject",
+        url: socialImageUrl,
+        width: 1983,
+        height: 793,
+      },
+    },
+  },
+];
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -85,6 +148,10 @@ export default function RootLayout({
       <body
         className={`${rajdhani.variable} antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         {children}
       </body>
     </html>

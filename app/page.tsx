@@ -36,6 +36,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import NextImage from "next/image";
 import {
   type SyntheticEvent,
   useCallback,
@@ -125,6 +126,7 @@ type TcgListEntry = {
   variant: CardArtVariant;
   quantity: number;
   owned: number;
+  openQuantity: number;
   unitCost: number;
   totalCost: number;
 };
@@ -140,32 +142,12 @@ type SynergyNotice = {
   detail: string;
 };
 
-type DataStatus = {
-  totalCards: number;
-  curatedCards: number;
-  tcgCards: number;
-  tcgPrints: number;
-  tcgCardsWithPrints: number;
-  pricedPrints: number;
-  volatilePricedPrints: number;
-  rulesReadyCards: number;
-  pendingRulesCards: number;
-  lastSync: string | null;
-  syncAgeHours: number | null;
-  isSynced: boolean;
-  isFresh: boolean;
-  isMarketCoverageLimited: boolean;
-  coverageTone: Notice["tone"];
-  syncTone: Notice["tone"];
-};
-
 const STORAGE_KEY = "gundam-deck-builder-v1";
 const MAIN_TARGET = 50;
 const RESOURCE_TARGET = 10;
 const MAX_MAIN_COPIES = 4;
 const MAX_MAIN_COLORS = 2;
 const TCGPLAYER_FRESH_HOURS = 48;
-const MARKET_FRESH_HOURS = TCGPLAYER_FRESH_HOURS;
 const COMPLETE_DATABASE_CARD_TARGET = 700;
 const MAIN_TYPES: CardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
 const RESOURCE_TYPES: CardType[] = ["RESOURCE"];
@@ -218,9 +200,6 @@ const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
 const CARD_IMAGE_FALLBACK = "/permet-link-logo-fallback.webp";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
 const CANONICAL_ORIGIN = "https://permetlink.com";
-const OFFICIAL_RULES_URL = "https://www.gundam-gcg.com/en/rules/";
-const OFFICIAL_PRODUCTS_URL = "https://www.gundam-gcg.com/en/";
-const OFFICIAL_RULES_UPDATED = "June 12, 2026";
 
 const starterDeck: DeckState = {
   name: "Heroic Beginnings Shell",
@@ -660,6 +639,60 @@ function handleCardImageError(event: SyntheticEvent<HTMLImageElement>) {
   image.classList.add("object-contain", "p-2");
 }
 
+function CardImage({
+  card,
+  artVariant,
+  imageSize,
+  srcSetSizes = [320, 480, 640],
+  sizes,
+  alt,
+  className,
+  eager = false,
+}: {
+  card: GundamCard;
+  artVariant?: CardArtVariant;
+  imageSize: number;
+  srcSetSizes?: readonly number[];
+  sizes: string;
+  alt: string;
+  className: string;
+  eager?: boolean;
+}) {
+  const src = cardImagePath(card, artVariant, imageSize);
+  const localImage = src.startsWith("/");
+
+  if (localImage) {
+    return (
+      <NextImage
+        src={src}
+        width={600}
+        height={838}
+        sizes={sizes}
+        alt={alt}
+        className={className}
+        decoding="async"
+        loading={eager ? "eager" : "lazy"}
+        fetchPriority={eager ? "high" : undefined}
+        onError={handleCardImageError}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      srcSet={cardImageSrcSet(card, artVariant, srcSetSizes)}
+      sizes={sizes}
+      alt={alt}
+      className={className}
+      decoding="async"
+      loading={eager ? "eager" : "lazy"}
+      referrerPolicy="no-referrer"
+      onError={handleCardImageError}
+    />
+  );
+}
+
 function printCostBase(card: GundamCard) {
   const rarityBase: Record<string, number> = {
     C: 0.25,
@@ -1052,19 +1085,28 @@ function getTcgListEntries(deck: DeckState): TcgListEntry[] {
           variant,
           quantity,
           owned: getOwnedPrintCount(deck.collection, card, variant.id),
+          openQuantity: 0,
           unitCost,
-          totalCost: unitCost * quantity,
+          totalCost: 0,
         });
       });
     });
   });
 
   return Array.from(entries.values())
-    .filter((entry) => entry.quantity > 0)
+    .map((entry) => {
+      const openQuantity = Math.max(0, entry.quantity - entry.owned);
+      return {
+        ...entry,
+        openQuantity,
+        totalCost: entry.unitCost * openQuantity,
+      };
+    })
+    .filter((entry) => entry.openQuantity > 0)
     .sort((a, b) => {
       const totalDelta = b.totalCost - a.totalCost;
       if (totalDelta !== 0) return totalDelta;
-      const quantityDelta = b.quantity - a.quantity;
+      const quantityDelta = b.openQuantity - a.openQuantity;
       if (quantityDelta !== 0) return quantityDelta;
       return a.card.name.localeCompare(b.card.name);
     });
@@ -1731,6 +1773,13 @@ export function DeckBuilder({
   const renderDeckPanel = renderAllPanels || mobileView === "deck";
   const eagerDeckThumbnails = !mobileTabsEnabled || mobileView === "deck";
 
+  useEffect(() => {
+    document.documentElement.dataset.permetHydrated = "true";
+    return () => {
+      delete document.documentElement.dataset.permetHydrated;
+    };
+  }, []);
+
   const clearStorageTimer = useCallback(() => {
     if (storageTimerRef.current) {
       window.clearTimeout(storageTimerRef.current);
@@ -1955,7 +2004,7 @@ export function DeckBuilder({
         .map((entry) => {
           const priceSummary = printPriceSummary(entry.card, entry.variant);
           const url = tcgplayerUrl(entry.card, entry.variant);
-          return `${entry.quantity}x ${printDisplayId(entry.variant)} ${entry.card.name} (${artDisplayLabel(
+          return `${entry.openQuantity}x ${printDisplayId(entry.variant)} ${entry.card.name} (${artDisplayLabel(
             entry.variant,
           )}) - ${priceSummary.full} each / ${formatMoney(
             entry.totalCost,
@@ -2393,7 +2442,7 @@ export function DeckBuilder({
   function openTcgList() {
     rememberFallbackReturnFocus();
     if (!tcgListText) {
-      showToast("good", "TCG list empty", "Add deck cards before reviewing selected prints.");
+      showToast("good", "TCG list empty", "Add deck cards or adjust owned counts before reviewing open prints.");
       return;
     }
 
@@ -3340,7 +3389,7 @@ export function DeckBuilder({
             </div>
           </div>
 
-          <div className="mt-2 hidden gap-2 2xl:grid 2xl:grid-cols-8">
+          <div className="mt-2 hidden gap-2 min-[1800px]:grid min-[1800px]:grid-cols-8">
             <Metric label="Main" value={`${mainTotal}/${MAIN_TARGET}`} />
             <Metric label="Resource" value={`${resourceTotal}/${RESOURCE_TARGET}`} />
             <Metric label="Colors" value={deckColors.length ? deckColors.join(" / ") : "-"} />
@@ -3788,8 +3837,6 @@ export function DeckBuilder({
             >
               {renderStatsPanel && (
                 <>
-              <DataIntegrityPanel status={dataStatus} />
-
               <CostPanel
                 summary={costSummary}
                 onMarkOwned={markDeckOwned}
@@ -4062,7 +4109,7 @@ function SharedDeckBanner({
         : "Shared Deck Preview";
 
   return (
-    <section className={panelClass("overflow-hidden")}>
+    <section className={panelClass("shared-deck-banner overflow-hidden")}>
       <div
         className="hero-surface relative grid gap-4 p-4 sm:grid-cols-[1fr_auto]"
         style={{
@@ -4097,16 +4144,14 @@ function SharedDeckBanner({
         <div className="flex items-center gap-3">
           <div className="hidden -space-x-3 sm:flex">
             {previewCards.map((card) => (
-              <img
+              <CardImage
                 key={card.number}
-                src={cardImagePath(card, undefined, 600)}
-                srcSet={cardImageSrcSet(card, undefined, [320, 480, 640])}
+                card={card}
+                imageSize={600}
+                srcSetSizes={[320, 480, 640]}
                 sizes="3.5rem"
                 alt=""
                 className="card-image-surface preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-contain object-top shadow-xl shadow-black/40"
-                decoding="async"
-                referrerPolicy="no-referrer"
-                onError={handleCardImageError}
               />
             ))}
           </div>
@@ -4675,7 +4720,7 @@ function FallbackPanelView({
                       card={entry.card}
                       artVariant={entry.variant}
                       size="sm"
-                      badge={`${entry.quantity}`}
+                      badge={`${entry.openQuantity}`}
                       eager
                       openLabel={`Open ${entry.card.name} ${artDisplayLabel(entry.variant)}`}
                     />
@@ -4695,7 +4740,7 @@ function FallbackPanelView({
                         {entry.card.name}
                       </h3>
                       <p className="text-sm font-bold leading-5 text-[#f7f7f2]/66">
-                        Qty {entry.quantity} · owned {entry.owned} · {priceSummary.full} each · {formatMoney(entry.totalCost)} total
+                        Open {entry.openQuantity} · deck {entry.quantity} · owned {entry.owned} · {priceSummary.full} each · {formatMoney(entry.totalCost)} total
                       </p>
                     </div>
                     <a
@@ -4705,7 +4750,7 @@ function FallbackPanelView({
                       className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] sm:self-center"
                       aria-label={`${actionLabel} for ${entry.card.name}, ${artDisplayLabel(
                         entry.variant,
-                      )}, ${entry.quantity} copies`}
+                      )}, ${entry.openQuantity} open copies`}
                     >
                       <ShoppingCart size={15} />
                       TCG
@@ -4759,89 +4804,6 @@ function FallbackPanelView({
         </div>
       </section>
     </div>
-  );
-}
-
-function DataIntegrityPanel({ status }: { status: DataStatus }) {
-  const syncLabel = status.lastSync
-    ? status.syncAgeHours === null
-      ? "Synced"
-      : `${Math.round(status.syncAgeHours)}h old`
-    : "Not synced";
-  const coverageDetail =
-    status.pendingRulesCards === 0
-      ? "All catalog records are deck-ready"
-      : `${status.rulesReadyCards} deck-ready cards · ${status.pendingRulesCards} catalog-only listings indexed`;
-  const volatileDetail = status.volatilePricedPrints
-    ? ` ${status.volatilePricedPrints} volatile TCGplayer prices are using local estimates.`
-    : "";
-  const marketDetail = status.isMarketCoverageLimited
-    ? `${status.pricedPrints}/${status.tcgPrints} prints have usable market prices; unpriced prints use estimates or TCGplayer search fallback.${volatileDetail}`
-    : `Pricing and discovered printings should sync every ${MARKET_FRESH_HOURS}h.${volatileDetail}`;
-
-  return (
-    <section className={panelClass()}>
-      <PanelTitle icon={<Radar size={18} />} title="Rules & Data" />
-      <div className="grid gap-2 p-3">
-        <div
-          className={`rounded-sm border p-3 ${noticeClass(status.coverageTone)}`}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <span className="font-display text-lg font-black uppercase">
-              Catalog Online
-            </span>
-            <span className="text-base font-black">{status.totalCards}</span>
-          </div>
-          <p className="mt-1 text-sm font-bold opacity-75">{coverageDetail}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Spec label="Rules Ready" value={`${status.rulesReadyCards}`} />
-          <Spec label="Market Cards" value={`${status.tcgCards}`} />
-          <Spec label="Prints" value={`${status.tcgPrints}`} />
-          <Spec label="Usable Prices" value={`${status.pricedPrints}`} />
-        </div>
-
-        <div className={`rounded-sm border p-3 ${noticeClass(status.syncTone)}`}>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-base font-black">Market Snapshot</span>
-            <span className="text-right text-base font-black">{syncLabel}</span>
-          </div>
-          <p className="mt-1 text-sm font-bold opacity-75">{marketDetail}</p>
-        </div>
-
-        <div className="rounded-sm border border-[#a7b5c9]/16 bg-black/24 p-3 text-sm font-bold leading-6 text-[#f7f7f2]/70">
-          Enforcing {MAIN_TARGET} main, {RESOURCE_TARGET} resource, max {MAX_MAIN_COPIES} copies, max {MAX_MAIN_COLORS} colors, official main/resource zones. Comprehensive rules reference: {OFFICIAL_RULES_UPDATED}.
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-3">
-          <a
-            href={OFFICIAL_RULES_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="interactive-control inline-flex h-11 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 font-display text-base font-black uppercase text-[#d9ecff]"
-          >
-            Rules
-          </a>
-          <a
-            href={OFFICIAL_PRODUCTS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="interactive-control inline-flex h-11 items-center justify-center rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 px-2 font-display text-base font-black uppercase text-[#f7f7f2]"
-          >
-            Products
-          </a>
-          <a
-            href="https://www.tcgplayer.com/categories/trading-and-collectible-card-games/gundam-card-game/price-guides"
-            target="_blank"
-            rel="noopener noreferrer nofollow"
-            className="interactive-control inline-flex h-11 items-center justify-center rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 font-display text-base font-black uppercase text-[#fff2bd]"
-          >
-            TCGplayer
-          </a>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -4926,15 +4888,15 @@ function CardLightbox({
         >
           <div className="grid min-w-0 gap-3">
             <div className="lightbox-card-stage scan-frame relative grid place-items-center overflow-hidden rounded-sm border border-[#8bdcff]/38 bg-black/88 p-2 shadow-2xl shadow-black/60">
-              <img
-                src={cardImagePath(card, artVariant, 2000)}
-                srcSet={cardImageSrcSet(card, artVariant, [640, 1000, 1500])}
+              <CardImage
+                card={card}
+                artVariant={artVariant}
+                imageSize={2000}
+                srcSetSizes={[640, 1000, 1500]}
                 sizes="(min-width: 1024px) 58vw, 94vw"
                 alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
                 className="card-image-surface mx-auto max-h-[58vh] max-w-full object-contain object-top lg:max-h-[66vh]"
-                decoding="async"
-                referrerPolicy="no-referrer"
-                onError={handleCardImageError}
+                eager
               />
             </div>
 
@@ -4964,16 +4926,14 @@ function CardLightbox({
                       aria-pressed={variant.id === artVariant.id}
                       title={`${artDisplayLabel(variant)} · ${formatPrintMoney(card, variant)}`}
                     >
-                      <img
-                        src={cardImagePath(card, variant, 600)}
-                        srcSet={cardImageSrcSet(card, variant, [320, 480, 640])}
+                      <CardImage
+                        card={card}
+                        artVariant={variant}
+                        imageSize={600}
+                        srcSetSizes={[320, 480, 640]}
                         sizes="4.5rem"
                         alt=""
                         className="card-image-surface aspect-[5/7] w-full object-contain object-top"
-                        decoding="async"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        onError={handleCardImageError}
                       />
                     </button>
                   ))}
@@ -5558,7 +5518,7 @@ function MiniQuantityControl({
         }}
       >
         {incrementDisabled ? (
-          <span className="font-display text-[10px] font-black uppercase leading-none">
+          <span className="font-display text-xs font-black uppercase leading-none">
             {disabledIncrementLabel}
           </span>
         ) : (
@@ -5811,17 +5771,16 @@ function LibraryCard({
           aria-label={`Open large view of ${cardActionLabel}`}
           title={`Open large view of ${cardActionLabel}`}
         >
-          <img
+          <CardImage
             key={`${card.number}-${artVariant.id}-${eagerImage ? "eager" : "lazy"}`}
-            src={cardImagePath(card, artVariant, 1000)}
-            srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
+            card={card}
+            artVariant={artVariant}
+            imageSize={1000}
+            srcSetSizes={[320, 480, 640]}
             sizes="(min-width: 1536px) 8.75rem, (min-width: 1280px) 8rem, (min-width: 640px) 8.75rem, (min-width: 380px) 8rem, 7.25rem"
             alt={`${card.name} card`}
             className="card-image-surface h-full w-full object-contain object-top transition duration-200 group-hover:scale-[1.06]"
-            decoding="async"
-            loading={eagerImage ? "eager" : "lazy"}
-            referrerPolicy="no-referrer"
-            onError={handleCardImageError}
+            eager={eagerImage}
           />
           {selected && (
             <span className="permet-scanline pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#8bdcff]/0 via-[#8bdcff]/28 to-[#8bdcff]/0" />
@@ -5837,7 +5796,7 @@ function LibraryCard({
         </button>
 
         <div className="grid min-w-0 content-start gap-2">
-          <div className="flex min-w-0 flex-wrap gap-1.5 text-[11px] font-black uppercase">
+          <div className="flex min-w-0 flex-wrap gap-1.5 text-xs font-black uppercase">
             <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 leading-none text-black">
               {card.number}
             </span>
@@ -5875,7 +5834,7 @@ function LibraryCard({
           <p className="library-card-rules line-clamp-2 text-sm font-semibold leading-5 text-[#f7f7f2]/66">
             {card.text}
           </p>
-          <div className="flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
+          <div className="flex min-w-0 flex-wrap gap-1 text-xs font-black uppercase">
             {quantity > 0 && (
               <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
                 Deck {quantity}
@@ -6047,16 +6006,14 @@ function InspectorPanel({
               aria-label={`Open large view of selected card ${card.name} ${card.number}`}
               title={`Open large view of selected card ${card.name} ${card.number}`}
           >
-            <img
-              src={cardImagePath(card, artVariant, 1000)}
-              srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
+            <CardImage
+              card={card}
+              artVariant={artVariant}
+              imageSize={1000}
+              srcSetSizes={[320, 480, 640]}
               sizes="(min-width: 1536px) 11rem, (min-width: 1280px) 9.5rem, (min-width: 640px) 10rem, 8.6rem"
               alt={`${card.name} card`}
               className="card-image-surface h-full w-full object-contain object-top"
-              decoding="async"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              onError={handleCardImageError}
             />
             <span className="absolute inset-x-0 bottom-0 z-10 inline-flex h-7 items-center justify-center gap-1 bg-black/72 font-display text-sm font-black uppercase text-[#d9ecff]">
               <Maximize2 size={12} />
@@ -6267,16 +6224,15 @@ function CardThumb({
     `relative ${sizeClass} shrink-0 overflow-hidden rounded-sm border border-[#f7f7f2]/15 bg-black shadow-sm`;
   const cardOpenLabel = openLabel ?? `Open large view of ${card.name} ${card.number}`;
   const image = (
-    <img
-      src={cardImagePath(card, artVariant, size === "deck" ? 800 : 600)}
-      srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
+    <CardImage
+      card={card}
+      artVariant={artVariant}
+      imageSize={size === "deck" ? 800 : 600}
+      srcSetSizes={[320, 480, 640]}
       sizes={size === "deck" ? "5rem" : "3rem"}
       alt={`${card.name} card`}
       className="card-image-surface h-full w-full object-contain object-top"
-      decoding="async"
-      loading={eager ? "eager" : "lazy"}
-      referrerPolicy="no-referrer"
-      onError={handleCardImageError}
+      eager={eager}
     />
   );
 

@@ -360,6 +360,12 @@ textarea {
   }
 }
 
+@media (max-width: 480px) {
+  .selected-card-scan {
+    width: min(58vw, 210px);
+  }
+}
+
 @media (min-width: 1280px) {
   .selected-card-scan {
     width: clamp(10.5rem, 13vw, 13.5rem);
@@ -782,6 +788,10 @@ textarea {
     grid-template-rows: minmax(0, 1fr);
     min-height: 0;
     overflow: hidden;
+  }
+
+  .app-content-shell > section:has(.shared-deck-banner) {
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .workbench-grid,
@@ -1354,8 +1364,7 @@ textarea {
   }
 
   .mobile-deck-title-chip {
-    display: block;
-    max-width: 12rem;
+    display: none;
   }
 
   .deck-entry > div {
@@ -1434,7 +1443,7 @@ textarea {
 
   .mobile-cockpit-nav .cockpit-tab {
     height: min(4.2rem, calc((100dvh - 2rem) / 4));
-    font-size: 0.68rem;
+    font-size: 0.75rem;
   }
 
   .mobile-cockpit-nav .cockpit-tab svg {
@@ -1470,9 +1479,9 @@ textarea {
   }
 
   .short-cockpit-actions .interactive-control {
-    height: 2.5rem;
-    min-width: 2.35rem;
-    min-height: 2.5rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
     padding-left: 0.35rem;
     padding-right: 0.35rem;
     font-size: 0.78rem;
@@ -1675,7 +1684,7 @@ textarea {
 
   .cockpit-tab {
     height: 2.75rem;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
   }
 
   .cockpit-tab svg {

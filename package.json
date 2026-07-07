@@ -14,6 +14,7 @@
     "qa:routes": "node scripts/route-timing.mjs",
     "qa:visual": "node scripts/visual-qa.mjs",
     "qa:workflow": "node scripts/workflow-qa.mjs",
+    "qa:deployed": "node scripts/deployed-qa.mjs",
     "data:audit": "node scripts/audit-data.mjs",
     "data:audit:strict": "npm run data:sync:tcgplayer -- --check && node scripts/audit-data.mjs --strict",
     "data:sync:tcgplayer": "node scripts/sync-tcgplayer-gundam.mjs",

@@ -6,6 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
+    host: "https://permetlink.com",
     sitemap: "https://permetlink.com/sitemap.xml",
   };
 }

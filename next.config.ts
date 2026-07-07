@@ -123,6 +123,10 @@ const nextConfig: NextConfig = {
         source: "/manifest.webmanifest",
         headers: staticAssetHeaders,
       },
+      {
+        source: "/llms.txt",
+        headers: staticAssetHeaders,
+      },
     ];
   },
 };

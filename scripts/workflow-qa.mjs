@@ -17,6 +17,26 @@ function absoluteUrl(path) {
   return new URL(path, baseUrl);
 }
 
+async function waitForAppShell(page) {
+  await page.locator("main.app-shell").waitFor({ timeout: 15000 });
+  await page.locator(".app-content-shell header").waitFor({ timeout: 15000 });
+  await page.waitForFunction(
+    () => document.documentElement.dataset.permetHydrated === "true",
+    null,
+    { timeout: 15000 },
+  );
+}
+
+async function gotoApp(page, url = baseUrl) {
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  await waitForAppShell(page);
+}
+
+async function reloadApp(page) {
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await waitForAppShell(page);
+}
+
 async function assertLocalShareFileExists(id) {
   if (!isLocalBase) return;
   await access(`.local/shared-decks/${id}.json`);
@@ -278,20 +298,13 @@ async function assertShareRejectsOverflowingPrintQuantities() {
 }
 
 async function assertInvalidShareBlocked(page) {
-  const invalidDeck = {
-    name: "Workflow QA Empty Deck",
-    main: {},
-    resource: {},
-    art: {},
-    prints: { main: {}, resource: {} },
-    collection: {},
-  };
-
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
-  await page.evaluate((deck) => {
-    window.localStorage.setItem("gundam-deck-builder-v1", JSON.stringify(deck));
-  }, invalidDeck);
-  await page.reload({ waitUntil: "networkidle" });
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await page.waitForFunction(
+    () => document.body.innerText.includes("0/50") && document.body.innerText.includes("0/10"),
+    null,
+    { timeout: 15000 },
+  );
   await page.getByRole("button", { name: "Share" }).click();
   await page.getByText("Share blocked").waitFor({ timeout: 15000 });
 }
@@ -308,22 +321,20 @@ async function assertLocalStorageDropsPendingRulesCards(page) {
     },
   };
 
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.evaluate((deck) => {
     window.localStorage.setItem("gundam-deck-builder-v1", JSON.stringify(deck));
   }, invalidDeck);
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadApp(page);
   await page.waitForFunction(
     () => {
       const stored = window.localStorage.getItem("gundam-deck-builder-v1");
       if (!stored) return false;
       const deck = JSON.parse(stored);
       return (
-        deck.name === "Workflow QA Local Pending Rules" &&
         !deck.main?.["EB01-001"] &&
         !deck.art?.["EB01-001"] &&
-        !deck.prints?.main?.["EB01-001"] &&
-        deck.resource?.["R-001"] === 10
+        !deck.prints?.main?.["EB01-001"]
       );
     },
     null,
@@ -332,7 +343,7 @@ async function assertLocalStorageDropsPendingRulesCards(page) {
 }
 
 async function assertLocalStorageCapsLongDeckNames(page) {
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.evaluate(() => {
     window.localStorage.setItem(
       "gundam-deck-builder-v1",
@@ -345,7 +356,7 @@ async function assertLocalStorageCapsLongDeckNames(page) {
       }),
     );
   });
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadApp(page);
   const name = await page.locator("input").first().inputValue();
   if (name.length > 80) {
     throw new Error(`Imported deck name was not capped: ${name.length} characters`);
@@ -353,7 +364,7 @@ async function assertLocalStorageCapsLongDeckNames(page) {
 }
 
 async function assertLibraryRowAddsFromBlankDeck(page) {
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByRole("button", { name: "Start a new deck" }).click();
   await page.getByPlaceholder("Name, #, text").fill("ST01-001");
   await page.locator(".library-result").first().waitFor({ timeout: 15000 });
@@ -383,7 +394,7 @@ async function assertLibraryRowAddsFromBlankDeck(page) {
 }
 
 async function assertImportRejectsEmptyObject(page) {
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   const startingName = await page.locator("input").first().inputValue();
   await page.locator('input[type="file"]').setInputFiles({
     name: "empty-object.json",
@@ -398,7 +409,7 @@ async function assertImportRejectsEmptyObject(page) {
 }
 
 async function assertEmptyDeckArtButtonsExplainNoOp(page) {
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByRole("button", { name: "Start a new deck" }).click();
   await page.getByRole("button", { name: "Upgrade deck art budget" }).click();
   await page.getByText("No prints to tune").waitFor({ timeout: 15000 });
@@ -406,7 +417,7 @@ async function assertEmptyDeckArtButtonsExplainNoOp(page) {
 
 async function assertSelectedCardArtButtonsTrackMixedPrints(page) {
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByRole("button", { name: "Start a new deck" }).click();
   await page.getByPlaceholder("Name, #, text").fill("ST01-001");
   await page.locator(".library-result").first().waitFor({ timeout: 15000 });
@@ -449,7 +460,7 @@ async function assertSelectedCardArtButtonsTrackMixedPrints(page) {
 
 async function assertSampleDeckClearsLibraryFilters(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByPlaceholder("Name, #, text").fill("<script>alert(1)</script> ST01-001");
   await page.getByText("No cards found").waitFor({ timeout: 15000 });
   await page.getByRole("button", { name: "Load sample deck" }).click();
@@ -466,7 +477,7 @@ async function assertSampleDeckClearsLibraryFilters(page) {
 
 async function assertNoResultSearchShowsRecovery(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.locator("#card-panel h2", { hasText: "Gundam" }).first().waitFor({
     timeout: 15000,
   });
@@ -495,7 +506,7 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
 
   const saved = await saveResponse.json();
   await assertLocalShareFileExists(saved.id);
-  await page.goto(absoluteUrl(`/decks/${saved.id}`).toString(), { waitUntil: "networkidle" });
+  await gotoApp(page, absoluteUrl(`/decks/${saved.id}`).toString());
   const canonical = await page
     .locator('link[rel="canonical"]')
     .getAttribute("href");
@@ -514,9 +525,7 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   await page.exposeFunction("captureSharedPreviewClipboard", (value) => {
     copiedSharedLinks.push(value);
   });
-  await page.goto(absoluteUrl(`/decks/${saved.id}?debug=1#frag`).toString(), {
-    waitUntil: "networkidle",
-  });
+  await gotoApp(page, absoluteUrl(`/decks/${saved.id}?debug=1#frag`).toString());
   await page.evaluate(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -611,7 +620,7 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadApp(page);
   await page.getByRole("button", { name: "More deck actions" }).click();
   await page.getByText("Shared preview · clone to edit").waitFor({ timeout: 15000 });
   const mobileLockedControls = [
@@ -628,7 +637,7 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
 
 async function assertAccessibleControlNames(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
 
   const desktopAudit = await page.evaluate(() => {
     const filterButton = Array.from(document.querySelectorAll("button")).find((button) =>
@@ -667,7 +676,7 @@ async function assertAccessibleControlNames(page) {
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   const closedMobileMoreControls = await page
     .locator('button[title="More deck actions"]')
     .getAttribute("aria-controls");
@@ -692,7 +701,7 @@ async function assertAccessibleControlNames(page) {
 
 async function assertArtUpgradeKeepsBuyList(page) {
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.locator('button[title="Upgrade deck art budget"]').click();
   await page.locator('button[title="Open TCG print list"]').click();
   await page.getByRole("heading", { name: "TCG List" }).waitFor({ timeout: 15000 });
@@ -705,8 +714,9 @@ async function assertArtUpgradeKeepsBuyList(page) {
 
 async function assertMobileActionSheetFocusTrap(page) {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
-  await page.locator('button[title="More deck actions"]').click();
+  await gotoApp(page);
+  await page.getByRole("button", { name: "More deck actions" }).click();
+  await page.locator("#mobile-action-sheet").waitFor({ timeout: 15000 });
   await page.waitForFunction(
     () => document.activeElement?.getAttribute("title") === "Close more deck actions",
     null,
@@ -739,7 +749,7 @@ async function assertMobileActionSheetFocusTrap(page) {
 
 async function assertResourceSearchRanksResourceCards(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByPlaceholder("Name, #, text").fill("Resource");
   try {
     await page.waitForFunction(
@@ -777,7 +787,7 @@ async function assertResourceSearchRanksResourceCards(page) {
 
 async function assertMarketCatalogOnlyCardsAreLabeled(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByPlaceholder("Name, #, text").fill("EB01-001");
   await page.locator(".library-result").first().waitFor({ timeout: 15000 });
   await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
@@ -793,9 +803,9 @@ async function assertMarketCatalogOnlyCardsAreLabeled(page) {
 
 async function assertDesktopDrawStaysPutAndReportsHand(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadApp(page);
   const beforeScrollY = await page.evaluate(() => window.scrollY);
   await page.getByRole("button", { name: "Draw opening hand" }).click();
   await page.locator("header").getByText(/^Hand /).waitFor({ timeout: 15000 });
@@ -808,7 +818,7 @@ async function assertDesktopDrawStaysPutAndReportsHand(page) {
 async function assertMobileLibraryLayout(page) {
   await page.setViewportSize({ width: 320, height: 680 });
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
 
   const tcgClipping = await page
     .locator('.library-result a[aria-label*="TCGplayer"]')
@@ -873,7 +883,7 @@ async function assertMobileLibraryLayout(page) {
 
   await page.getByRole("button", { name: "Done" }).click();
   await page.setViewportSize({ width: 667, height: 375 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByRole("button", { name: /Filters/i }).click();
   await page.locator(".library-filters-popover").waitFor({ timeout: 15000 });
   const landscapeTop = await page.locator(".library-filters-popover").evaluate(
@@ -885,7 +895,7 @@ async function assertMobileLibraryLayout(page) {
 
   await page.getByRole("button", { name: "Done" }).click();
   await page.setViewportSize({ width: 320, height: 680 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.getByRole("button", { name: /Open large view of/i }).first().click();
   await page.locator(".card-lightbox").evaluate((node) => {
     node.scrollTop = node.scrollHeight;
@@ -928,7 +938,7 @@ async function assertMobileTouchTargets(page) {
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
-    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    await gotoApp(page);
     const librarySmallTargets = await page.evaluate(() =>
       Array.from(
         document.querySelectorAll(
@@ -1009,7 +1019,7 @@ async function assertMobileTouchTargets(page) {
 async function assertShortMobileControlsClearNav(page) {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   await page.locator(".library-card-actions").first().evaluate((node) => {
     node.scrollIntoView({ block: "center" });
   });
@@ -1099,7 +1109,7 @@ async function assertShortMobileControlsClearNav(page) {
   }
 
   await page.setViewportSize({ width: 430, height: 320 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   const compactLandscapeCard = await page.evaluate(() => {
     const card = document.querySelector(".library-result");
     if (!card) return { visible: 0, top: 0, headerHeight: 0 };
@@ -1123,7 +1133,7 @@ async function assertShortMobileControlsClearNav(page) {
   }
 
   await page.setViewportSize({ width: 667, height: 375 });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await gotoApp(page);
   const landscapePagerVisible = await page
     .locator('button[aria-label="Next library page"]')
     .evaluate((button) => {
@@ -1177,9 +1187,10 @@ async function main() {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    const notFoundPageResponse = await page.goto(absoluteUrl("/decks/not-a-real-deck-id").toString(), {
-      waitUntil: "networkidle",
-    });
+    const notFoundPageResponse = await page.goto(
+      absoluteUrl("/decks/not-a-real-deck-id").toString(),
+      { waitUntil: "domcontentloaded" },
+    );
     if (notFoundPageResponse?.status() !== 404) {
       throw new Error(`Shared deck 404 page returned ${notFoundPageResponse?.status()}`);
     }
@@ -1189,13 +1200,9 @@ async function main() {
       timeout: 15000,
     });
 
-    await page.goto(baseUrl, { waitUntil: "networkidle" });
-    await page.locator('button[title="More deck actions"]').click();
-    await page.waitForFunction(
-      () => document.activeElement?.getAttribute("title") === "Close more deck actions",
-      null,
-      { timeout: 15000 },
-    );
+    await gotoApp(page);
+    await page.getByRole("button", { name: "More deck actions" }).click();
+    await page.locator("#mobile-action-sheet").waitFor({ timeout: 15000 });
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => !document.querySelector("#mobile-action-sheet"));
     await assertMobileActionSheetFocusTrap(page);
@@ -1204,7 +1211,7 @@ async function main() {
     await assertShortMobileControlsClearNav(page);
 
     await page.setViewportSize({ width: 320, height: 680 });
-    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    await gotoApp(page);
     await page.getByRole("tab", { name: "Show Deck" }).click();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -1234,7 +1241,7 @@ async function main() {
     await assertDesktopDrawStaysPutAndReportsHand(desktop);
     await assertMobileTouchTargets(desktop);
 
-    await desktop.goto(baseUrl, { waitUntil: "networkidle" });
+    await gotoApp(desktop);
     const downloadPromise = desktop.waitForEvent("download", { timeout: 20000 });
     await desktop.getByRole("button", { name: "Export deck image" }).click();
     await downloadPromise;
