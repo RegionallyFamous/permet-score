@@ -1044,7 +1044,7 @@ textarea {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding-bottom: 0.75rem;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5.75rem);
     scrollbar-width: none;
   }
 
@@ -1134,6 +1134,26 @@ textarea {
     width: 6.75rem;
   }
 
+  .library-result {
+    padding: 0.55rem;
+  }
+
+  .library-card-body {
+    grid-template-columns: 6.15rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .library-result h3 {
+    font-size: 1.14rem;
+    line-height: 1.04;
+    -webkit-line-clamp: 1;
+  }
+
+  .library-result .library-card-rules {
+    -webkit-line-clamp: 1;
+    line-height: 1.1rem;
+  }
+
   .short-cockpit-deck-name {
     display: none;
   }
@@ -1214,6 +1234,10 @@ textarea {
   .app-content-shell > header,
   .app-content-shell > section {
     padding-right: 5.75rem;
+  }
+
+  .app-content-shell > section {
+    padding-bottom: 0.75rem;
   }
 
   .fallback-panel-overlay {

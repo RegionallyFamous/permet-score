@@ -9,7 +9,7 @@ import { saveSharedDeck } from "../../share-store";
 export const runtime = "nodejs";
 
 const MAX_SHARE_BODY_BYTES = 64 * 1024;
-const SHARE_RATE_LIMIT_MAX = 60;
+const SHARE_RATE_LIMIT_MAX = 180;
 const SHARE_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const shareRateBuckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -97,17 +97,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const retryAfter = checkShareRateLimit(request);
-  if (retryAfter !== null) {
-    return NextResponse.json(
-      { error: "Too many shared decks. Try again shortly." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(retryAfter) },
-      },
-    );
-  }
-
   try {
     const bodyText = await readRequestTextWithinLimit(request);
     if (bodyText === null) {
@@ -124,6 +113,17 @@ export async function POST(request: Request) {
   const validationError = validateSharedDeckPayload(body);
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
+  }
+
+  const retryAfter = checkShareRateLimit(request);
+  if (retryAfter !== null) {
+    return NextResponse.json(
+      { error: "Too many shared decks. Try again shortly." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfter) },
+      },
+    );
   }
 
   const deck = sanitizeSharedDeck(body);

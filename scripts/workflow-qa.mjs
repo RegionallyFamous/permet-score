@@ -388,6 +388,49 @@ async function assertEmptyDeckArtButtonsExplainNoOp(page) {
   await page.getByText("No prints to tune").waitFor({ timeout: 15000 });
 }
 
+async function assertSelectedCardArtButtonsTrackMixedPrints(page) {
+  await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await page.getByPlaceholder("Name, #, text").fill("ST01-001");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+
+  const addMain = page
+    .getByRole("button", { name: /Add one Gundam ST01-001 main copy/i })
+    .first();
+  for (let index = 0; index < 4; index += 1) {
+    await addMain.click();
+  }
+  await page.waitForFunction(
+    () => JSON.parse(window.localStorage.getItem("gundam-deck-builder-v1") ?? "{}").main?.["ST01-001"] === 4,
+    null,
+    { timeout: 15000 },
+  );
+
+  await page.locator('button[title="Upgrade deck art budget"]').click();
+  const down = page.getByRole("button", { name: "Downgrade art cost" });
+  await down.click();
+  if (await down.isDisabled()) {
+    throw new Error("Selected-card art Down disabled while upgraded copies remain");
+  }
+  for (let index = 0; index < 3; index += 1) {
+    await down.click();
+  }
+  if (!(await down.isDisabled())) {
+    throw new Error("Selected-card art Down stayed enabled after all copies reached standard");
+  }
+
+  const deckArtUp = page.locator('button[title="Upgrade deck art budget"]').first();
+  for (let index = 0; index < 6; index += 1) {
+    await deckArtUp.click();
+  }
+  const up = page.getByRole("button", { name: "Upgrade art cost" });
+  await up.click();
+  if (await up.isDisabled()) {
+    throw new Error("Selected-card art Up disabled while lower-tier copies remain");
+  }
+}
+
 async function assertSampleDeckClearsLibraryFilters(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
@@ -942,6 +985,7 @@ async function main() {
     await assertLibraryRowAddsFromBlankDeck(desktop);
     await assertImportRejectsEmptyObject(desktop);
     await assertEmptyDeckArtButtonsExplainNoOp(desktop);
+    await assertSelectedCardArtButtonsTrackMixedPrints(desktop);
     await assertSampleDeckClearsLibraryFilters(desktop);
     await assertSharedPreviewRequiresCloneBeforeEditing(desktop);
     await assertAccessibleControlNames(desktop);

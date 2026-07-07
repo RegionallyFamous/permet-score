@@ -151,6 +151,7 @@ type DataStatus = {
   syncAgeHours: number | null;
   isSynced: boolean;
   isFresh: boolean;
+  isMarketCoverageLimited: boolean;
   coverageTone: Notice["tone"];
   syncTone: Notice["tone"];
 };
@@ -678,15 +679,7 @@ function formatMoney(value: number) {
   });
 }
 
-function formatEstimatedMoney(value: number) {
-  return `Local est. ${formatMoney(value)}`;
-}
-
-function hasDirectMarketProduct(print: TcgplayerPrint | null | undefined) {
-  return Boolean(print?.productId && hasDirectTcgplayerProduct(print));
-}
-
-function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
+function printPriceSummary(card: GundamCard, variant: CardArtVariant) {
   const print = tcgplayerPrint(card, variant);
   const price =
     typeof print?.marketPrice === "number" &&
@@ -694,12 +687,39 @@ function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
     print.marketPrice > 0
       ? print.marketPrice
       : null;
-  if (price === null && hasDirectMarketProduct(print)) {
-    return `TCGplayer pending · est. ${formatMoney(estimatePrintCost(card, variant))}`;
+  const estimatedAmount = formatMoney(estimatePrintCost(card, variant));
+
+  if (price !== null) {
+    const source = print?.priceSource ?? "TCGplayer market";
+    const amount = formatMoney(price);
+    return {
+      source,
+      amount,
+      full: `${source} ${amount}`,
+    };
   }
-  return price === null
-    ? formatEstimatedMoney(estimatePrintCost(card, variant))
-    : `${print?.priceSource ?? "TCGplayer market"} ${formatMoney(price)}`;
+
+  if (hasDirectMarketProduct(print)) {
+    return {
+      source: "TCGplayer pending",
+      amount: `est. ${estimatedAmount}`,
+      full: `TCGplayer pending · est. ${estimatedAmount}`,
+    };
+  }
+
+  return {
+    source: "Local est.",
+    amount: estimatedAmount,
+    full: `Local est. ${estimatedAmount}`,
+  };
+}
+
+function hasDirectMarketProduct(print: TcgplayerPrint | null | undefined) {
+  return Boolean(print?.productId && hasDirectTcgplayerProduct(print));
+}
+
+function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
+  return printPriceSummary(card, variant).full;
 }
 
 function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
@@ -964,9 +984,19 @@ function getMissingPrintEntries(deck: DeckState): MissingPrintEntry[] {
     });
 }
 
-function artReadyCards(deck: DeckState) {
-  return [...deckEntries(deck.main), ...deckEntries(deck.resource)].reduce((sum, entry) => {
-    return sum + (cardArtVariants(entry.card).length > 1 ? entry.quantity : 0);
+function selectedAltPrintCopies(deck: DeckState) {
+  return (["main", "resource"] as const).reduce((sum, zone) => {
+    return (
+      sum +
+      deckEntries(deck[zone]).reduce((zoneSum, entry) => {
+        return (
+          zoneSum +
+          printEntriesForCard(deck, zone, entry.card).reduce((printSum, printEntry) => {
+            return printSum + (printEntry.variant.tier > 0 ? printEntry.quantity : 0);
+          }, 0)
+        );
+      }, 0)
+    );
   }, 0);
 }
 
@@ -1002,11 +1032,18 @@ function databaseStatus(now?: number) {
   const pendingRulesCards = Math.max(0, totalCards - rulesReadyCards);
   const syncAgeHours = tcgplayerSyncAgeHours(now);
   const isSynced = Boolean(TCGPLAYER_LAST_SYNC && tcgPrints > 0);
+  const isMarketCoverageLimited = tcgPrints > 0 && pricedPrints < tcgPrints;
   const isFresh =
     isSynced && syncAgeHours !== null && syncAgeHours <= TCGPLAYER_FRESH_HOURS;
   const coverageTone: Notice["tone"] =
     totalCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
-  const syncTone: Notice["tone"] = isFresh ? "good" : isSynced ? "warn" : "bad";
+  const syncTone: Notice["tone"] = isFresh
+    ? isMarketCoverageLimited
+      ? "warn"
+      : "good"
+    : isSynced
+      ? "warn"
+      : "bad";
 
   return {
     totalCards,
@@ -1021,6 +1058,7 @@ function databaseStatus(now?: number) {
     syncAgeHours,
     isSynced,
     isFresh,
+    isMarketCoverageLimited,
     coverageTone,
     syncTone,
   };
@@ -1374,6 +1412,20 @@ function canShiftDeckArt(deck: DeckState, delta: number) {
   );
 }
 
+function canShiftCardArt(deck: DeckState, card: GundamCard, delta: number) {
+  const zones: Zone[] = (deck.main[card.number] ?? 0) > 0 ? ["main"] : ["resource"];
+
+  return zones.some((zone) =>
+    canShiftPrints(
+      deck.prints[zone],
+      card,
+      delta,
+      deck[zone][card.number] ?? 0,
+      deck.art[card.number],
+    ),
+  );
+}
+
 function shiftAllPrints(
   printMap: PrintChoiceMap,
   card: GundamCard,
@@ -1718,18 +1770,18 @@ export function DeckBuilder({
     () =>
       missingPrints
         .map((entry) => {
-          const source = priceSourceLabel(entry.card, entry.variant);
+          const priceSummary = printPriceSummary(entry.card, entry.variant);
           const url = tcgplayerUrl(entry.card, entry.variant);
           return `${entry.missing}x ${printDisplayId(entry.variant)} ${entry.card.name} (${artDisplayLabel(
             entry.variant,
-          )}) - ${source} ${formatMoney(entry.unitCost)} each / ${formatMoney(
+          )}) - ${priceSummary.full} each / ${formatMoney(
             entry.totalCost,
           )} total - ${url}`;
         })
         .join("\n"),
     [missingPrints],
   );
-  const altReadyTotal = useMemo(() => artReadyCards(deck), [deck]);
+  const selectedAltTotal = useMemo(() => selectedAltPrintCopies(deck), [deck]);
   const synergyNotices = useMemo(() => analyzeSynergy(mainEntries), [mainEntries]);
   const setOptions = useMemo(
     () => ["All", ...Array.from(new Set(CARD_POOL.map((card) => card.set)))],
@@ -1966,9 +2018,13 @@ export function DeckBuilder({
     messages.push(
       dataStatus.isSynced
         ? {
-            tone: dataStatus.isFresh ? "good" : "warn",
+            tone: dataStatus.syncTone,
             label: "Card DB",
-            detail: dataStatus.isFresh ? "Fresh market" : "Market stale",
+            detail: dataStatus.isFresh
+              ? dataStatus.isMarketCoverageLimited
+                ? "Fresh scan"
+                : "Fresh market"
+              : "Market stale",
           }
         : {
             tone: "warn",
@@ -1999,7 +2055,9 @@ export function DeckBuilder({
     return messages;
   }, [
     dataStatus.isFresh,
+    dataStatus.isMarketCoverageLimited,
     dataStatus.isSynced,
+    dataStatus.syncTone,
     deckColors,
     mainEntries,
     mainTotal,
@@ -2389,7 +2447,7 @@ export function DeckBuilder({
     const nextHand = drawOpeningHandNumbers(deck.main);
     setOpeningHand(nextHand);
     setMobileView("stats");
-    if (nextHand.length && mobileTabsEnabled) {
+    if (nextHand.length) {
       window.setTimeout(() => {
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         openingHandRef.current?.focus({ preventScroll: true });
@@ -2635,6 +2693,14 @@ export function DeckBuilder({
         shareUrl?: string;
       };
       if (!response.ok || !result.shareUrl) {
+        if (response.status === 429) {
+          const retryAfterSeconds = Number(response.headers.get("Retry-After") ?? 0);
+          const retryText =
+            retryAfterSeconds > 0
+              ? ` Try again in ${Math.ceil(retryAfterSeconds / 60)} min.`
+              : " Try again shortly.";
+          throw new Error(`${result.error ?? "Too many shared decks."}${retryText}`);
+        }
         throw new Error(result.error ?? "Share failed");
       }
 
@@ -2970,7 +3036,7 @@ export function DeckBuilder({
             <Metric label="Resource" value={`${resourceTotal}/${RESOURCE_TARGET}`} />
             <Metric label="Colors" value={deckColors.length ? deckColors.join(" / ") : "-"} />
             <Metric label="Cards" value={`${CARD_POOL.length} loaded`} />
-            <Metric label="Alt Prints" value={`${altReadyTotal}`} />
+            <Metric label="Alt Selected" value={`${selectedAltTotal}`} />
             <Metric label="Market / Est." value={formatMoney(costSummary.artTotal)} />
             <Metric label="Missing Est." value={formatMoney(missingPrintCost)} />
             <Metric label="Showing" value={`${filteredCards.length}`} />
@@ -4204,6 +4270,9 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
     status.pendingRulesCards === 0
       ? "All catalog records are deck-ready"
       : `${status.rulesReadyCards} deck-ready cards · ${status.pendingRulesCards} catalog-only listings indexed`;
+  const marketDetail = status.isMarketCoverageLimited
+    ? `${status.pricedPrints}/${status.tcgPrints} prints priced; unpriced prints use estimates or TCGplayer search fallback.`
+    : `Pricing and discovered printings should sync every ${MARKET_FRESH_HOURS}h.`;
 
   return (
     <section className={panelClass()}>
@@ -4233,9 +4302,7 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
             <span className="text-base font-black">Market Snapshot</span>
             <span className="text-right text-base font-black">{syncLabel}</span>
           </div>
-          <p className="mt-1 text-sm font-bold opacity-75">
-            Pricing and discovered printings should sync every {MARKET_FRESH_HOURS}h.
-          </p>
+          <p className="mt-1 text-sm font-bold opacity-75">{marketDetail}</p>
         </div>
 
         <div className="rounded-sm border border-[#a7b5c9]/16 bg-black/24 p-3 text-sm font-bold leading-6 text-[#f7f7f2]/70">
@@ -4484,7 +4551,7 @@ function CostPanel({
       <div className="grid gap-2 p-3">
         <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-sm font-bold leading-6 text-[#d9ecff]/82">
           {TCGPLAYER_LAST_SYNC
-            ? `Market snapshot synced ${TCGPLAYER_LAST_SYNC}. Unmatched prints fall back to local estimates.`
+            ? `Market snapshot synced ${TCGPLAYER_LAST_SYNC}. Unpriced prints use local estimates and direct TCGplayer search links.`
             : "No market snapshot has been generated yet. Showing local estimates."}
         </div>
         <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
@@ -5026,8 +5093,13 @@ function DeckPanel({
         }`}
       >
         {entries.length === 0 ? (
-          <div className="flex h-32 items-center justify-center rounded-sm border border-dashed border-[#f7f7f2]/15 font-display text-lg font-black uppercase text-[#f7f7f2]/58">
-            Empty
+          <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-[#f7f7f2]/15 text-center">
+            <span className="font-display text-lg font-black uppercase text-[#f7f7f2]/68">
+              No {zoneLabel(zone).toLowerCase()} deck cards
+            </span>
+            <span className="text-sm font-black text-[#8bdcff]/70">
+              0/{target} occupied
+            </span>
           </div>
         ) : (
           entries.map(({ card, quantity }, index) => {
@@ -5176,6 +5248,7 @@ function LibraryCard({
     primaryZone === "main" && MAIN_TYPES.includes(card.type) && !hasDeckRulesData(card);
   const deckReady = isDeckReadyCard(card);
   const cardActionLabel = `${card.name} ${card.number}`;
+  const priceSummary = printPriceSummary(card, artVariant);
   const onAdjustPrimary =
     primaryZone === "main"
       ? onAdjustMain
@@ -5189,7 +5262,7 @@ function LibraryCard({
         card.color,
       )} ${selected ? "active-scan-card ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
     >
-      <div className="grid grid-cols-[7.25rem_minmax(0,1fr)] gap-2.5 min-[380px]:grid-cols-[8rem_minmax(0,1fr)] sm:grid-cols-[8.75rem_minmax(0,1fr)] xl:grid-cols-[8rem_minmax(0,1fr)] 2xl:grid-cols-[8.75rem_minmax(0,1fr)]">
+      <div className="library-card-body grid grid-cols-[7.25rem_minmax(0,1fr)] gap-2.5 min-[380px]:grid-cols-[8rem_minmax(0,1fr)] sm:grid-cols-[8.75rem_minmax(0,1fr)] xl:grid-cols-[8rem_minmax(0,1fr)] 2xl:grid-cols-[8.75rem_minmax(0,1fr)]">
         <button
           type="button"
           className="scan-frame interactive-control relative aspect-[5/7] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-black text-left shadow-lg shadow-black/35"
@@ -5246,8 +5319,19 @@ function LibraryCard({
             <h3 className="line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2] sm:text-2xl">
               {card.name}
             </h3>
-            <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/68">
-              {formatPrintMoney(card, artVariant)}
+            <p
+              className="mt-1 min-w-0 text-sm font-bold text-[#f7f7f2]/68"
+              title={priceSummary.full}
+            >
+              <span
+                className="inline-flex rounded-sm border border-[#8bdcff]/22 bg-[#1167d8]/10 px-1.5 py-0.5 font-black leading-none text-[#d9ecff] min-[360px]:hidden"
+                aria-label={priceSummary.full}
+              >
+                {priceSummary.amount}
+              </span>
+              <span className="hidden truncate min-[360px]:block">
+                {priceSummary.full}
+              </span>
             </p>
           </div>
           <p className="library-card-rules line-clamp-2 text-sm font-semibold leading-5 text-[#f7f7f2]/54">
@@ -5408,12 +5492,8 @@ function InspectorPanel({
 }) {
   const mainConstraint = zoneAddConstraint("main", card, mainQuantity, deck);
   const resourceConstraint = zoneAddConstraint("resource", card, resourceQuantity, deck);
-  const artIndex = Math.max(
-    0,
-    artVariants.findIndex((variant) => variant.id === artVariant.id),
-  );
-  const canDowngradeArt = artIndex > 0;
-  const canUpgradeArt = artIndex < artVariants.length - 1;
+  const canDowngradeArt = canShiftCardArt(deck, card, -1);
+  const canUpgradeArt = canShiftCardArt(deck, card, 1);
   const missingSelectedPrint = Math.max(0, neededQuantity - ownedQuantity);
 
   return (
