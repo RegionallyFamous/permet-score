@@ -1,10 +1,26 @@
 import type { Metadata } from "next";
-import { Geist_Mono } from "next/font/google";
+import {
+  Geist_Mono,
+  Rajdhani,
+  Zen_Kaku_Gothic_New,
+} from "next/font/google";
 import "./globals.css";
 
 const geistMono = Geist_Mono({
   variable: "--font-gundam-mono",
   subsets: ["latin"],
+});
+
+const rajdhani = Rajdhani({
+  variable: "--font-gundam-display",
+  subsets: ["latin"],
+  weight: ["600", "700"],
+});
+
+const zenKakuGothic = Zen_Kaku_Gothic_New({
+  variable: "--font-gundam-ui",
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
 });
 
 export const metadata: Metadata = {
@@ -41,13 +57,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preload" as="image" href="/assets/permet-armor-ui-v2.webp" />
-        <link rel="preload" as="image" href="/assets/mecha-deck-hangar.png" />
-        <link rel="preload" as="image" href="/permet-link-logo.png" />
-      </head>
       <body
-        className={`${geistMono.variable} antialiased`}
+        className={`${geistMono.variable} ${rajdhani.variable} ${zenKakuGothic.variable} antialiased`}
       >
         {children}
       </body>

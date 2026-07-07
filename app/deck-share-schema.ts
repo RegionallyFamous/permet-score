@@ -6,6 +6,7 @@ import {
   CARD_POOL,
   type GundamCard,
 } from "./card-data";
+import { TCGPLAYER_CARD_POOL } from "./tcgplayer-card-data";
 
 export type QuantityMap = Record<string, number>;
 export type ArtChoiceMap = Record<string, string>;
@@ -20,7 +21,13 @@ export type SharedDeckState = {
   prints: DeckPrints;
 };
 
-const CARD_BY_NUMBER = new Map(CARD_POOL.map((card) => [card.number, card]));
+const SHARE_CARD_POOL = [
+  ...CARD_POOL,
+  ...TCGPLAYER_CARD_POOL.filter(
+    (card) => !CARD_POOL.some((curated) => curated.number === card.number),
+  ),
+];
+const CARD_BY_NUMBER = new Map(SHARE_CARD_POOL.map((card) => [card.number, card]));
 const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
   string,
   readonly CardArtVariant[]
@@ -43,17 +50,18 @@ function cleanQuantityMap(map: QuantityMap) {
 }
 
 function cardArtVariants(card: GundamCard) {
-  return (
-    CARD_ARTS_BY_NUMBER[card.number] ?? [
-      {
-        id: "standard",
-        label: "Standard",
-        image: `/card-images/${card.number}.webp`,
-        tier: 0,
-        officialId: card.number,
-      },
-    ]
-  );
+  const standardVariant = {
+    id: "standard",
+    label: "Standard",
+    image: `/card-images/${card.number}.webp`,
+    tier: 0,
+    officialId: card.number,
+  };
+  const variants = CARD_ARTS_BY_NUMBER[card.number];
+  if (!variants) return [standardVariant];
+  return variants.some((variant) => variant.id === "standard")
+    ? variants
+    : [standardVariant, ...variants];
 }
 
 function validArtId(card: GundamCard, artId: string) {

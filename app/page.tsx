@@ -138,6 +138,9 @@ type DataStatus = {
   tcgCards: number;
   tcgPrints: number;
   tcgCardsWithPrints: number;
+  pricedPrints: number;
+  rulesReadyCards: number;
+  pendingRulesCards: number;
   lastSync: string | null;
   syncAgeHours: number | null;
   isSynced: boolean;
@@ -275,6 +278,13 @@ function tcgplayerProductImageUrl(productId: number, size = 1500) {
 function cardArtVariants(card: GundamCard) {
   const localVariants = CARD_ARTS_BY_NUMBER[card.number];
   const tcgPrints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
+  const standardVariant = {
+    id: "standard",
+    label: "Standard",
+    image: `/card-images/${card.number}.webp`,
+    tier: 0,
+    officialId: card.number,
+  };
   const tcgVariants = tcgPrints.map((print, index) => ({
     id: print.variantId,
     label: print.variantId === "standard" ? "Standard" : `Market Print ${index + 1}`,
@@ -283,17 +293,14 @@ function cardArtVariants(card: GundamCard) {
     officialId: print.officialId,
   }));
 
+  if (localVariants) {
+    return localVariants.some((variant) => variant.id === "standard")
+      ? localVariants
+      : [standardVariant, ...localVariants];
+  }
+
   return (
-    localVariants ??
-    (tcgVariants.length ? tcgVariants : [
-      {
-        id: "standard",
-        label: "Standard",
-        image: `/card-images/${card.number}.webp`,
-        tier: 0,
-        officialId: card.number,
-      },
-    ])
+    tcgVariants.length ? tcgVariants : [standardVariant]
   );
 }
 
@@ -847,12 +854,25 @@ function databaseStatus(): DataStatus {
     0,
   );
   const tcgCardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
+  const pricedPrints = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
+    (sum, prints) =>
+      sum +
+      prints.filter(
+        (print) =>
+          typeof print.marketPrice === "number" &&
+          Number.isFinite(print.marketPrice) &&
+          print.marketPrice > 0,
+      ).length,
+    0,
+  );
+  const rulesReadyCards = CARD_POOL.filter(hasDeckRulesData).length;
+  const pendingRulesCards = Math.max(0, totalCards - rulesReadyCards);
   const syncAgeHours = tcgplayerSyncAgeHours();
   const isSynced = Boolean(TCGPLAYER_LAST_SYNC && tcgPrints > 0);
   const isFresh =
     isSynced && syncAgeHours !== null && syncAgeHours <= TCGPLAYER_FRESH_HOURS;
   const coverageTone: Notice["tone"] =
-    totalCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
+    rulesReadyCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
   const syncTone: Notice["tone"] = isFresh ? "good" : isSynced ? "warn" : "bad";
 
   return {
@@ -861,6 +881,9 @@ function databaseStatus(): DataStatus {
     tcgCards,
     tcgPrints,
     tcgCardsWithPrints,
+    pricedPrints,
+    rulesReadyCards,
+    pendingRulesCards,
     lastSync: TCGPLAYER_LAST_SYNC,
     syncAgeHours,
     isSynced,
@@ -887,6 +910,20 @@ function parseCost(card: GundamCard) {
   return Number.isFinite(cost) ? cost : null;
 }
 
+function hasRulesValue(value: string) {
+  return Boolean(value && value.trim() !== "-");
+}
+
+function hasDeckRulesData(card: GundamCard) {
+  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") return true;
+  if (!MAIN_TYPES.includes(card.type)) return false;
+  return (
+    hasRulesValue(card.color) &&
+    hasRulesValue(card.level) &&
+    parseCost(card) !== null
+  );
+}
+
 function typeTarget(type: CardType) {
   switch (type) {
     case "UNIT":
@@ -903,9 +940,11 @@ function typeTarget(type: CardType) {
 }
 
 function canCardEnterZone(zone: Zone, card: GundamCard) {
-  return zone === "main"
-    ? MAIN_TYPES.includes(card.type)
-    : RESOURCE_TYPES.includes(card.type);
+  if (zone === "main") {
+    return MAIN_TYPES.includes(card.type) && hasDeckRulesData(card);
+  }
+
+  return RESOURCE_TYPES.includes(card.type);
 }
 
 function zoneLabel(zone: Zone) {
@@ -914,6 +953,10 @@ function zoneLabel(zone: Zone) {
 
 function zoneAddConstraint(zone: Zone, card: GundamCard, quantity: number) {
   if (!canCardEnterZone(zone, card)) {
+    if (zone === "main" && MAIN_TYPES.includes(card.type) && !hasDeckRulesData(card)) {
+      return "Official rules data pending";
+    }
+
     return zone === "main"
       ? "Main uses Units, Pilots, Commands, or Bases"
       : "Resource uses Resource cards";
@@ -928,7 +971,6 @@ function zoneAddConstraint(zone: Zone, card: GundamCard, quantity: number) {
 
 function variantMatchesArtFilter(
   card: GundamCard,
-  variant: CardArtVariant,
   filter: (typeof artFilters)[number],
 ) {
   const variants = cardArtVariants(card);
@@ -936,13 +978,13 @@ function variantMatchesArtFilter(
     case "Has Alt Art":
       return variants.length > 1;
     case "Standard Only":
-      return variant.id === "standard";
+      return variants.some((variant) => variant.id === "standard");
     case "Alt Print 1":
-      return variant.tier === 1;
+      return variants.some((variant) => variant.tier === 1);
     case "Alt Print 2":
-      return variant.tier === 2;
+      return variants.some((variant) => variant.tier === 2);
     case "Premium Alt":
-      return variant.tier >= 3;
+      return variants.some((variant) => variant.tier >= 3);
     default:
       return true;
   }
@@ -1207,6 +1249,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const openingHandRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
   const undoDeckRef = useRef<DeckState | null>(null);
@@ -1350,7 +1393,6 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
 
     return CARD_POOL.filter((card) => {
-      const selectedVariant = getArtVariant(card, deck.art);
       const matchesQuery =
         !normalizedQuery ||
         [card.name, card.number, card.text, card.trait, card.link, card.source, card.set]
@@ -1360,7 +1402,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       const matchesColor = colorFilter === "All" || card.color === colorFilter;
       const matchesType = typeFilter === "All" || card.type === typeFilter;
       const matchesSet = setFilter === "All" || card.set === setFilter;
-      const matchesArt = variantMatchesArtFilter(card, selectedVariant, artFilter);
+      const matchesArt = variantMatchesArtFilter(card, artFilter);
       const matchesCollection = cardMatchesCollectionFilter(
         deck,
         card,
@@ -1409,7 +1451,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   );
 
   const selectedCard =
-    CARD_BY_NUMBER.get(selectedNumber) ?? filteredCards[0] ?? CARD_POOL[0];
+    filteredCards.find((card) => card.number === selectedNumber) ??
+    filteredCards[0] ??
+    CARD_BY_NUMBER.get(selectedNumber) ??
+    CARD_POOL[0];
   const selectedArtVariants = useMemo(
     () => cardArtVariants(selectedCard),
     [selectedCard],
@@ -1490,7 +1535,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         detail: deckColors.join(" / "),
       });
     } else {
-      messages.push({ tone: "warn", label: "Colors", detail: "No colors" });
+      messages.push({ tone: "bad", label: "Colors", detail: "No colors" });
     }
 
     const overLimit = mainEntries.filter(
@@ -1517,6 +1562,17 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         ? { tone: "bad", label: "Zones", detail: "Mismatch" }
         : { tone: "good", label: "Zones", detail: "Clean" },
     );
+
+    const pendingRulesEntries = mainEntries.filter(
+      (entry) => MAIN_TYPES.includes(entry.card.type) && !hasDeckRulesData(entry.card),
+    );
+    if (pendingRulesEntries.length) {
+      messages.push({
+        tone: "bad",
+        label: "Rules Data",
+        detail: `${pendingRulesEntries.length} card IDs pending`,
+      });
+    }
 
     messages.push(
       dataStatus.isSynced
@@ -1844,6 +1900,14 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     const nextHand = drawOpeningHandNumbers(deck.main);
     setOpeningHand(nextHand);
     setMobileView("stats");
+    if (nextHand.length) {
+      window.setTimeout(() => {
+        openingHandRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 0);
+    }
     showToast(
       nextHand.length ? "good" : "warn",
       nextHand.length ? "Opening hand drawn" : "Draw skipped",
@@ -1967,14 +2031,22 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     );
 
     const anchor = document.createElement("a");
-    anchor.download = `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "gundam-deck"}-sheet.png`;
-    anchor.href = canvas.toDataURL("image/png");
-    anchor.click();
-    showToast(
-      "good",
-      "Deck sheet exported",
-      `${rows.length} print rows rendered as a PNG.`,
-    );
+    anchor.download = `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-sheet.png`;
+    try {
+      anchor.href = canvas.toDataURL("image/png");
+      anchor.click();
+      showToast(
+        "good",
+        "Deck sheet exported",
+        `${rows.length} print rows rendered as a PNG.`,
+      );
+    } catch {
+      showToast(
+        "bad",
+        "Deck sheet blocked",
+        "Remote card images need a same-origin image proxy before exporting.",
+      );
+    }
   }
 
   async function copyDeckList() {
@@ -2064,9 +2136,13 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
           : "Manual share panel opened; ownership is not included.",
       );
       window.setTimeout(() => setShareState("Share"), copied ? 1400 : 2600);
-    } catch {
+    } catch (error) {
       setShareState("Failed");
-      showToast("bad", "Share failed", "The deck link could not be created.");
+      showToast(
+        "bad",
+        "Share failed",
+        error instanceof Error ? error.message : "The deck link could not be created.",
+      );
       window.setTimeout(() => setShareState("Share"), 1800);
     }
   }
@@ -2079,7 +2155,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = `${
-      deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "gundam-deck"
+      deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"
     }.json`;
     anchor.click();
     URL.revokeObjectURL(url);
@@ -2109,6 +2185,14 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   function runMobileAction(action: () => void) {
     setMobileActionsOpen(false);
     action();
+  }
+
+  function changeMobileView(view: MobileView) {
+    setMobileActionsOpen(false);
+    setMobileView(view);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   }
 
   return (
@@ -2249,7 +2333,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   </div>
                 </div>
                 {mobileActionsOpen && (
-                  <div className="absolute right-0 top-[calc(100%+0.5rem)] z-40 grid w-[min(23rem,calc(100vw-1.5rem))] grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/60 backdrop-blur-xl xl:hidden">
+                  <div className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden">
                     <ToolbarButton
                       label="Sample"
                       title="Load sample deck"
@@ -2388,7 +2472,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   </span>
                 </div>
                 <div className="grid gap-2">
-                  <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(6.75rem,auto)] gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
                     <label className="filter-cell relative block">
                       <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
                         Search
@@ -2409,24 +2493,28 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                         />
                       </div>
                     </label>
-                    <SelectFilter
-                      label="Color"
-                      value={colorFilter}
-                      values={colorFilters}
-                      onChange={(value) => {
-                        setColorFilter(value);
-                        setLibraryPage(0);
-                      }}
-                    />
-                    <SelectFilter
-                      label="Type"
-                      value={typeFilter}
-                      values={typeFilters}
-                      onChange={(value) => {
-                        setTypeFilter(value);
-                        setLibraryPage(0);
-                      }}
-                    />
+                    <div className="hidden md:block">
+                      <SelectFilter
+                        label="Color"
+                        value={colorFilter}
+                        values={colorFilters}
+                        onChange={(value) => {
+                          setColorFilter(value);
+                          setLibraryPage(0);
+                        }}
+                      />
+                    </div>
+                    <div className="hidden md:block">
+                      <SelectFilter
+                        label="Type"
+                        value={typeFilter}
+                        values={typeFilters}
+                        onChange={(value) => {
+                          setTypeFilter(value);
+                          setLibraryPage(0);
+                        }}
+                      />
+                    </div>
                     <button
                       type="button"
                       className="interactive-control inline-flex h-full min-h-16 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18"
@@ -2465,6 +2553,28 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
 
                   {advancedFiltersOpen && (
                     <div className="workbench-scroll grid gap-2 md:grid-cols-4">
+                      <div className="md:hidden">
+                        <SelectFilter
+                          label="Color"
+                          value={colorFilter}
+                          values={colorFilters}
+                          onChange={(value) => {
+                            setColorFilter(value);
+                            setLibraryPage(0);
+                          }}
+                        />
+                      </div>
+                      <div className="md:hidden">
+                        <SelectFilter
+                          label="Type"
+                          value={typeFilter}
+                          values={typeFilters}
+                          onChange={(value) => {
+                            setTypeFilter(value);
+                            setLibraryPage(0);
+                          }}
+                        />
+                      </div>
                       <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
                         <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
                           Set
@@ -2645,12 +2755,14 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
 
               <SynergyPanel notices={synergyNotices} />
 
-              <HandSimulatorPanel
-                cards={openingHandEntries}
-                onDraw={drawHand}
-                onClear={() => setOpeningHand([])}
-                onOpenCard={(card) => openCardLightbox(card)}
-              />
+              <div ref={openingHandRef} className="scroll-mt-24">
+                <HandSimulatorPanel
+                  cards={openingHandEntries}
+                  onDraw={drawHand}
+                  onClear={() => setOpeningHand([])}
+                  onOpenCard={(card) => openCardLightbox(card)}
+                />
+              </div>
 
               <div className="xl:hidden">
                 <CompositionPanel
@@ -2701,7 +2813,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
           </div>
         </div>
       </section>
-      <MobileCockpitNav activeView={mobileView} onChange={setMobileView} />
+      <MobileCockpitNav activeView={mobileView} onChange={changeMobileView} />
       <ToastViewport
         toast={toast}
         onAction={restoreUndoDeck}
@@ -2970,6 +3082,7 @@ function MobileCockpitNav({
             }`}
             onClick={() => onChange(view.id)}
             aria-label={`Show ${view.label}`}
+            aria-current={activeView === view.id ? "page" : undefined}
           >
             {view.icon}
             <span className="leading-none">{view.label}</span>
@@ -3115,9 +3228,9 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
     ? `${Math.round(status.syncAgeHours ?? 0)}h old`
     : "Not synced";
   const coverageDetail =
-    status.totalCards >= COMPLETE_DATABASE_CARD_TARGET
-      ? "Complete target met"
-      : `${COMPLETE_DATABASE_CARD_TARGET - status.totalCards}+ cards below complete target`;
+    status.rulesReadyCards >= COMPLETE_DATABASE_CARD_TARGET
+      ? "Rules target met"
+      : `${status.pendingRulesCards} market cards need official rules data`;
 
   return (
     <section className={panelClass()}>
@@ -3136,10 +3249,10 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <Spec label="Curated" value={`${status.curatedCards}`} />
+          <Spec label="Rules Ready" value={`${status.rulesReadyCards}`} />
           <Spec label="Market Cards" value={`${status.tcgCards}`} />
           <Spec label="Prints" value={`${status.tcgPrints}`} />
-          <Spec label="Priced IDs" value={`${status.tcgCardsWithPrints}`} />
+          <Spec label="Priced Prints" value={`${status.pricedPrints}`} />
         </div>
 
         <div className={`rounded-sm border p-3 ${noticeClass(status.syncTone)}`}>
@@ -3215,9 +3328,18 @@ function CardLightbox({
     >
       <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
         <section
-          className="lightbox-shell grid w-full gap-3 rounded-sm border border-[#8bdcff]/34 bg-[#05070c]/96 p-3 shadow-2xl shadow-black/70 lg:grid-cols-[minmax(280px,0.9fr)_minmax(320px,0.68fr)] lg:p-4"
+          className="lightbox-shell relative grid w-full gap-3 rounded-sm border border-[#8bdcff]/34 bg-[#05070c]/96 p-3 shadow-2xl shadow-black/70 lg:grid-cols-[minmax(280px,0.9fr)_minmax(320px,0.68fr)] lg:p-4"
           onClick={(event) => event.stopPropagation()}
         >
+          <button
+            type="button"
+            className="interactive-control absolute right-2 top-2 z-20 inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-[#a7b5c9]/28 bg-[#05070c]/94 text-[#f7f7f2] shadow-xl shadow-black/45 lg:hidden"
+            onClick={onClose}
+            aria-label="Close card view"
+            title="Close"
+          >
+            <X size={19} />
+          </button>
           <div className="grid min-w-0 gap-3">
             <div className="lightbox-card-stage scan-frame relative grid place-items-center overflow-hidden rounded-sm border border-[#8bdcff]/38 bg-black/88 p-2 shadow-2xl shadow-black/60">
               <img
@@ -3591,17 +3713,18 @@ function ToolbarButton({
   return (
     <button
       type="button"
-      className={`interactive-control inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-base font-black uppercase shadow-sm sm:h-11 sm:gap-2 sm:px-3 sm:text-lg xl:px-0 2xl:px-3 ${className} ${
+      className={`interactive-control inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-base font-black uppercase shadow-sm sm:h-11 sm:gap-2 sm:px-3 sm:text-lg xl:px-0 ${className} ${
         disabled
           ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
           : "border-[#a7b5c9]/25 bg-[linear-gradient(90deg,rgba(145,145,145,0.22),rgba(62,112,124,0.28))] text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
       }`}
       onClick={onClick}
       title={title}
+      aria-label={title}
       disabled={disabled}
     >
       {children}
-      <span className="inline whitespace-nowrap xl:hidden 2xl:inline">
+      <span className="inline whitespace-nowrap xl:hidden">
         <span className="sm:hidden">{mobileLabel ?? label}</span>
         <span className="hidden sm:inline">{label}</span>
       </span>
@@ -3799,7 +3922,7 @@ function MiniQuantityControl({
       ? "border-[#e31b23]/36 bg-[#2b0710]/72 text-[#ffe3e3]"
       : "border-[#2e8cff]/36 bg-[#06142a]/72 text-[#d9ecff]";
   const controlClass = (disabled: boolean) =>
-    `interactive-control grid h-9 place-items-center ${
+    `interactive-control grid h-11 place-items-center ${
       disabled
         ? "cursor-not-allowed bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
         : "bg-black/22 text-current hover:bg-current/10"
@@ -3807,10 +3930,10 @@ function MiniQuantityControl({
 
   return (
     <div
-      className={`mini-stepper grid h-9 ${
+      className={`mini-stepper grid h-11 ${
         dense
-          ? "grid-cols-[1.85rem_minmax(1.7rem,1fr)_1.85rem]"
-          : "grid-cols-[2.15rem_minmax(2rem,1fr)_2.15rem]"
+          ? "grid-cols-[2.5rem_minmax(2rem,1fr)_2.5rem]"
+          : "grid-cols-[2.75rem_minmax(2.2rem,1fr)_2.75rem]"
       } overflow-hidden rounded-sm border ${toneClass}`}
       title={incrementDisabled ? incrementReason : `${label}: ${quantity}`}
     >
@@ -3828,9 +3951,11 @@ function MiniQuantityControl({
         <Minus size={dense ? 13 : 14} />
       </button>
       <output
-        className={`grid h-9 place-items-center border-x-0 bg-[#f7f7f2]/6 px-1 font-display font-black ${
+        className={`grid h-11 place-items-center border-x-0 bg-[#f7f7f2]/6 px-1 font-display font-black ${
           dense ? "text-base" : "text-lg"
         }`}
+        aria-live="polite"
+        aria-label={`${label} quantity`}
       >
         {quantity}
       </output>
@@ -4030,6 +4155,8 @@ function LibraryCard({
   const primaryConstraint = primaryZone
     ? zoneAddConstraint(primaryZone, card, primaryQuantity)
     : "No builder slot for this card type";
+  const rulesPending =
+    primaryZone === "main" && MAIN_TYPES.includes(card.type) && !hasDeckRulesData(card);
   const onAdjustPrimary =
     primaryZone === "main"
       ? onAdjustMain
@@ -4042,7 +4169,16 @@ function LibraryCard({
       className={`library-result interactive-row group cursor-pointer overflow-hidden rounded-sm border bg-[#080b11]/96 p-2.5 shadow-lg shadow-black/18 transition duration-200 hover:-translate-y-0.5 hover:border-[#8bdcff]/45 hover:bg-[#0d131d] ${colorAccentClass(
         card.color,
       )} ${selected ? "ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`Select ${card.name}`}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelect();
+      }}
       onDoubleClick={(event) => {
         event.stopPropagation();
         onOpenCard();
@@ -4125,9 +4261,17 @@ function LibraryCard({
             Need {missingQuantity}
           </span>
         )}
+        {rulesPending && (
+          <span
+            className="rounded-sm border border-[#e31b23]/35 bg-[#e31b23]/12 px-1.5 py-0.5 text-[#ffe3e3]"
+            title="This market-discovered card needs official color, level, and cost data before deck building."
+          >
+            Rules pending
+          </span>
+        )}
       </div>
 
-      <div className="mt-2 grid grid-cols-[minmax(5.7rem,1fr)_2.35rem_3.1rem] gap-1.5">
+      <div className="mt-2 grid grid-cols-[minmax(8.25rem,1fr)_2.75rem_3.4rem] gap-1.5">
         {primaryZone && onAdjustPrimary ? (
           <MiniQuantityControl
             label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}

@@ -27,6 +27,26 @@ async function launchBrowser() {
 
 const browser = await launchBrowser();
 
+async function waitForVisibleCardImages(page) {
+  await page.waitForFunction(
+    () => {
+      const images = Array.from(document.querySelectorAll('img[alt$=" card"]')).filter(
+        (image) => {
+          const rect = image.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+        },
+      );
+
+      return (
+        images.length > 0 &&
+        images.slice(0, 4).every((image) => image.complete && image.naturalWidth > 0)
+      );
+    },
+    null,
+    { timeout: 15000 },
+  );
+}
+
 async function readAudit(page) {
   try {
     return await page.evaluate(() => {
@@ -80,6 +100,7 @@ try {
       state: "visible",
       timeout: 15000,
     });
+    await waitForVisibleCardImages(page);
     await page.screenshot({
       caret: "initial",
       path: join(outputDir, `permet-${viewport.name}.png`),
