@@ -8,8 +8,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://permetscore.com"),
   title: "Permet Score",
   description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Permet Score",
+    description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
+    url: "https://permetscore.com",
+    siteName: "Permet Score",
+    type: "website",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

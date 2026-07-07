@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   ListChecks,
   Minus,
+  MoreHorizontal,
   Plus,
   Radar,
   RotateCcw,
@@ -37,11 +38,17 @@ import {
   type CardArtVariant,
 } from "./card-art-data";
 import {
-  CARD_POOL,
+  CARD_POOL as CURATED_CARD_POOL,
   type CardColor,
   type CardType,
   type GundamCard,
 } from "./card-data";
+import { TCGPLAYER_CARD_POOL } from "./tcgplayer-card-data";
+import {
+  TCGPLAYER_CARD_PRINTS,
+  TCGPLAYER_LAST_SYNC,
+  type TcgplayerPrint,
+} from "./tcgplayer-data";
 
 type QuantityMap = Record<string, number>;
 type ArtChoiceMap = Record<string, string>;
@@ -146,6 +153,12 @@ const collectionFilters = ["All", "Owned", "Missing", "Budget"] as const;
 const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
 
+const CARD_POOL = [
+  ...CURATED_CARD_POOL,
+  ...TCGPLAYER_CARD_POOL.filter(
+    (card) => !CURATED_CARD_POOL.some((curated) => curated.number === card.number),
+  ),
+];
 const CARD_BY_NUMBER = new Map(CARD_POOL.map((card) => [card.number, card]));
 const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
   string,
@@ -153,6 +166,7 @@ const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
 >;
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
+const CANONICAL_ORIGIN = "https://permetscore.com";
 
 const starterDeck: DeckState = {
   name: "Heroic Beginnings Shell",
@@ -215,8 +229,19 @@ function sanitizeQuantities(value: unknown): QuantityMap {
 }
 
 function cardArtVariants(card: GundamCard) {
+  const localVariants = CARD_ARTS_BY_NUMBER[card.number];
+  const tcgPrints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
+  const tcgVariants = tcgPrints.map((print, index) => ({
+    id: print.variantId,
+    label: print.variantId === "standard" ? "Standard" : `TCG Print ${index + 1}`,
+    image: print.imageUrl ?? `/card-images/${card.number}.webp`,
+    tier: index,
+    officialId: print.officialId,
+  }));
+
   return (
-    CARD_ARTS_BY_NUMBER[card.number] ?? [
+    localVariants ??
+    (tcgVariants.length ? tcgVariants : [
       {
         id: "standard",
         label: "Standard",
@@ -224,7 +249,7 @@ function cardArtVariants(card: GundamCard) {
         tier: 0,
         officialId: card.number,
       },
-    ]
+    ])
   );
 }
 
@@ -434,6 +459,29 @@ function estimatePrintCost(card: GundamCard, variant: CardArtVariant) {
   return Math.max(0.05, Math.round(value * 100) / 100);
 }
 
+function tcgplayerPrint(card: GundamCard, variant: CardArtVariant): TcgplayerPrint | null {
+  const prints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
+  return (
+    prints.find((print) => print.variantId === variant.id) ??
+    prints.find((print) => print.officialId === variant.officialId) ??
+    (variant.id === "standard" ? prints.find((print) => print.variantId === "standard") : undefined) ??
+    prints[variant.tier] ??
+    prints[0] ??
+    null
+  );
+}
+
+function tcgplayerMarketPrice(card: GundamCard, variant: CardArtVariant) {
+  const price = tcgplayerPrint(card, variant)?.marketPrice;
+  return typeof price === "number" && Number.isFinite(price) && price > 0
+    ? price
+    : null;
+}
+
+function printCost(card: GundamCard, variant: CardArtVariant) {
+  return tcgplayerMarketPrice(card, variant) ?? estimatePrintCost(card, variant);
+}
+
 function formatMoney(value: number) {
   return value.toLocaleString("en-US", {
     style: "currency",
@@ -445,6 +493,17 @@ function formatMoney(value: number) {
 
 function formatEstimatedMoney(value: number) {
   return `Local est. ${formatMoney(value)}`;
+}
+
+function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
+  const price = tcgplayerMarketPrice(card, variant);
+  return price === null
+    ? formatEstimatedMoney(estimatePrintCost(card, variant))
+    : `TCG market ${formatMoney(price)}`;
+}
+
+function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
+  return tcgplayerMarketPrice(card, variant) === null ? "local estimate" : "TCGplayer market";
 }
 
 function formatCopyCount(quantity: number) {
@@ -467,6 +526,11 @@ function tcgplayerSearchUrl(card: GundamCard, variant?: CardArtVariant) {
   });
 
   return `${TCGPLAYER_SEARCH_URL}?${params.toString()}`;
+}
+
+function tcgplayerUrl(card: GundamCard, variant?: CardArtVariant) {
+  if (!variant) return tcgplayerSearchUrl(card);
+  return tcgplayerPrint(card, variant)?.url ?? tcgplayerSearchUrl(card, variant);
 }
 
 function colorAccentClass(color: CardColor) {
@@ -611,10 +675,10 @@ function summarizeDeckCosts(deck: DeckState): CostSummary {
   (["main", "resource"] as const).forEach((zone) => {
     deckEntries(deck[zone]).forEach(({ card }) => {
       const standard = cardArtVariants(card)[0];
-      const standardCost = estimatePrintCost(card, standard);
+      const standardCost = printCost(card, standard);
 
       printEntriesForCard(deck, zone, card).forEach(({ variant, quantity }) => {
-        const cost = estimatePrintCost(card, variant);
+        const cost = printCost(card, variant);
         const key = `${card.number}:${variant.id}`;
         const owned = getOwnedPrintCount(deck.collection, card, variant.id);
         const alreadyConsumed = consumedOwned[key] ?? 0;
@@ -651,7 +715,7 @@ function getMissingPrintEntries(deck: DeckState): MissingPrintEntry[] {
         const needed = getNeededPrintCount(deck, card, variant.id);
         const owned = getOwnedPrintCount(deck.collection, card, variant.id);
         const missing = Math.max(0, needed - owned);
-        const unitCost = estimatePrintCost(card, variant);
+        const unitCost = printCost(card, variant);
 
         return {
           card,
@@ -767,7 +831,7 @@ function cardMatchesCollectionFilter(
   const needed = getTotalNeededForCard(deck, card);
   const owned = getTotalOwnedForCard(deck.collection, card);
   const missing = getMissingCopiesForCard(deck, card);
-  const selectedCost = estimatePrintCost(card, getArtVariant(card, deck.art));
+  const selectedCost = printCost(card, getArtVariant(card, deck.art));
 
   switch (filter) {
     case "Owned":
@@ -1013,6 +1077,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const [toast, setToast] = useState<ActionToast | null>(null);
   const [fallbackPanel, setFallbackPanel] = useState<FallbackPanel | null>(null);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const missingPrintsRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -1108,12 +1173,15 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const buyListText = useMemo(
     () =>
       missingPrints
-        .map(
-          (entry) =>
-            `${entry.missing}x ${entry.variant.officialId} ${entry.card.name} (${artDisplayLabel(
-              entry.variant,
-            )}) - local est. ${formatMoney(entry.totalCost)}`,
-        )
+        .map((entry) => {
+          const source = priceSourceLabel(entry.card, entry.variant);
+          const url = tcgplayerUrl(entry.card, entry.variant);
+          return `${entry.missing}x ${entry.variant.officialId} ${entry.card.name} (${artDisplayLabel(
+            entry.variant,
+          )}) - ${source} ${formatMoney(entry.unitCost)} each / ${formatMoney(
+            entry.totalCost,
+          )} total - ${url}`;
+        })
         .join("\n"),
     [missingPrints],
   );
@@ -1181,10 +1249,6 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const selectedArtVariant = useMemo(
     () => getArtVariant(selectedCard, deck.art),
     [deck.art, selectedCard],
-  );
-  const selectedArtCost = useMemo(
-    () => estimatePrintCost(selectedCard, selectedArtVariant),
-    [selectedArtVariant, selectedCard],
   );
   const selectedNeededCount = useMemo(
     () => getNeededPrintCount(deck, selectedCard, selectedArtVariant.id),
@@ -1670,7 +1734,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     context.fillStyle = "#f7f7f2";
     context.font = "700 24px Arial";
     context.fillText(
-      `${mainTotal}/${MAIN_TARGET} main · ${resourceTotal}/${RESOURCE_TARGET} resource · ${formatEstimatedMoney(costSummary.artTotal)} art`,
+      `${mainTotal}/${MAIN_TARGET} main · ${resourceTotal}/${RESOURCE_TARGET} resource · ${formatMoney(costSummary.artTotal)} prints`,
       42,
       116,
     );
@@ -1779,7 +1843,13 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         throw new Error(result.error ?? "Share failed");
       }
 
-      const shareUrl = new URL(result.shareUrl, window.location.origin).toString();
+      const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(
+        window.location.hostname,
+      );
+      const shareUrl = new URL(
+        result.shareUrl,
+        isLocalHost ? window.location.origin : CANONICAL_ORIGIN,
+      ).toString();
       const copied = await writeClipboardText(shareUrl);
       setShareState(copied ? "Copied" : "Link Ready");
       if (!copied) {
@@ -1841,6 +1911,11 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     }
   }
 
+  function runMobileAction(action: () => void) {
+    setMobileActionsOpen(false);
+    action();
+  }
+
   return (
     <main className="app-shell min-h-screen bg-[#05060a] text-[#f7f7f2]">
       <div
@@ -1896,65 +1971,160 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   className="control-field h-10 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15 sm:h-11"
                 />
               </label>
-              <div className="workbench-scroll flex gap-2 overflow-x-auto pb-1 xl:overflow-visible xl:pb-0">
-                <ToolbarButton label={`Draw ${OPENING_HAND_SIZE}`} title="Draw opening hand" onClick={drawHand}>
-                  <Shuffle size={16} />
-                </ToolbarButton>
-                <ToolbarButton
-                  label="Buy List"
-                  title="Open missing prints buy list"
-                  onClick={openBuyList}
-                >
-                  <ShoppingCart size={16} />
-                </ToolbarButton>
-                <ToolbarButton label="Sample" title="Load sample deck" onClick={loadSampleDeck}>
-                  <ShieldCheck size={16} />
-                </ToolbarButton>
-                <ToolbarButton label="New" title="Start a new deck" onClick={startNewDeck}>
-                  <RotateCcw size={16} />
-                </ToolbarButton>
-                <ToolbarButton
-                  label="Art -"
-                  title="Downgrade deck art budget"
-                  onClick={() => stepDeckArt(-1)}
-                >
-                  <ChevronDown size={16} />
-                </ToolbarButton>
-                <ToolbarButton
-                  label="Art +"
-                  title="Upgrade deck art budget"
-                  onClick={() => stepDeckArt(1)}
-                >
-                  <ChevronUp size={16} />
-                </ToolbarButton>
-                <ToolbarButton
-                  label={shareState}
-                  title="Share decklist and selected printings"
-                  onClick={copyShareUrl}
-                  disabled={shareState === "Saving"}
-                >
-                  <Share2 size={16} />
-                </ToolbarButton>
-                <ToolbarButton label={copyState} title="Copy deck list" onClick={copyDeckList}>
-                  <Clipboard size={16} />
-                </ToolbarButton>
-                <ToolbarButton label="Export" title="Export JSON" onClick={exportJson}>
-                  <Download size={16} />
-                </ToolbarButton>
-                <ToolbarButton
-                  label="Sheet"
-                  title="Export deck image"
-                  onClick={() => void exportDeckImage()}
-                >
-                  <Layers size={16} />
-                </ToolbarButton>
-                <ToolbarButton
-                  label="Import"
-                  title="Import JSON"
-                  onClick={() => importInputRef.current?.click()}
-                >
-                  <Upload size={16} />
-                </ToolbarButton>
+              <div className="relative">
+                <div className="grid grid-cols-4 gap-2 xl:flex xl:justify-end">
+                  <ToolbarButton
+                    label={`Draw ${OPENING_HAND_SIZE}`}
+                    mobileLabel={`Draw ${OPENING_HAND_SIZE}`}
+                    title="Draw opening hand"
+                    onClick={drawHand}
+                    className="w-full xl:w-auto"
+                  >
+                    <Shuffle size={16} />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    label="Buy List"
+                    mobileLabel="Buy"
+                    title="Open missing prints buy list"
+                    onClick={openBuyList}
+                    className="w-full xl:w-auto"
+                  >
+                    <ShoppingCart size={16} />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    label={shareState}
+                    mobileLabel={shareState}
+                    title="Share decklist and selected printings"
+                    onClick={copyShareUrl}
+                    disabled={shareState === "Saving"}
+                    className="w-full xl:w-auto"
+                  >
+                    <Share2 size={16} />
+                  </ToolbarButton>
+                  <ToolbarButton
+                    label={mobileActionsOpen ? "Close" : "More"}
+                    mobileLabel={mobileActionsOpen ? "Close" : "More"}
+                    title="More deck actions"
+                    onClick={() => setMobileActionsOpen((open) => !open)}
+                    className="w-full xl:hidden"
+                  >
+                    {mobileActionsOpen ? <X size={16} /> : <MoreHorizontal size={16} />}
+                  </ToolbarButton>
+                  <div className="hidden xl:contents">
+                    <ToolbarButton label="Sample" title="Load sample deck" onClick={loadSampleDeck}>
+                      <ShieldCheck size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton label="New" title="Start a new deck" onClick={startNewDeck}>
+                      <RotateCcw size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Art -"
+                      title="Downgrade deck art budget"
+                      onClick={() => stepDeckArt(-1)}
+                    >
+                      <ChevronDown size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Art +"
+                      title="Upgrade deck art budget"
+                      onClick={() => stepDeckArt(1)}
+                    >
+                      <ChevronUp size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton label={copyState} title="Copy deck list" onClick={copyDeckList}>
+                      <Clipboard size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton label="Export" title="Export JSON" onClick={exportJson}>
+                      <Download size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Sheet"
+                      title="Export deck image"
+                      onClick={() => void exportDeckImage()}
+                    >
+                      <Layers size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Import"
+                      title="Import JSON"
+                      onClick={() => importInputRef.current?.click()}
+                    >
+                      <Upload size={16} />
+                    </ToolbarButton>
+                  </div>
+                </div>
+                {mobileActionsOpen && (
+                  <div className="absolute right-0 top-[calc(100%+0.5rem)] z-40 grid w-[min(23rem,calc(100vw-1.5rem))] grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/60 backdrop-blur-xl xl:hidden">
+                    <ToolbarButton
+                      label="Sample"
+                      title="Load sample deck"
+                      onClick={() => runMobileAction(loadSampleDeck)}
+                      className="w-full"
+                    >
+                      <ShieldCheck size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="New"
+                      title="Start a new deck"
+                      onClick={() => runMobileAction(startNewDeck)}
+                      className="w-full"
+                    >
+                      <RotateCcw size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Art -"
+                      title="Downgrade deck art budget"
+                      onClick={() => runMobileAction(() => stepDeckArt(-1))}
+                      className="w-full"
+                    >
+                      <ChevronDown size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Art +"
+                      title="Upgrade deck art budget"
+                      onClick={() => runMobileAction(() => stepDeckArt(1))}
+                      className="w-full"
+                    >
+                      <ChevronUp size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label={copyState}
+                      title="Copy deck list"
+                      onClick={() => runMobileAction(() => {
+                        void copyDeckList();
+                      })}
+                      className="w-full"
+                    >
+                      <Clipboard size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Export"
+                      title="Export JSON"
+                      onClick={() => runMobileAction(exportJson)}
+                      className="w-full"
+                    >
+                      <Download size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Sheet"
+                      title="Export deck image"
+                      onClick={() => runMobileAction(() => {
+                        void exportDeckImage();
+                      })}
+                      className="w-full"
+                    >
+                      <Layers size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Import"
+                      title="Import JSON"
+                      onClick={() => runMobileAction(() => importInputRef.current?.click())}
+                      className="w-full"
+                    >
+                      <Upload size={16} />
+                    </ToolbarButton>
+                  </div>
+                )}
               </div>
               <input
                 ref={importInputRef}
@@ -1975,7 +2145,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
             <Metric label="Colors" value={deckColors.length ? deckColors.join(" / ") : "-"} />
             <Metric label="Cards" value={`${CARD_POOL.length} loaded`} />
             <Metric label="Alt Prints" value={`${altReadyTotal}`} />
-            <Metric label="Local Est." value={formatMoney(costSummary.artTotal)} />
+            <Metric label="TCG / Est." value={formatMoney(costSummary.artTotal)} />
             <Metric label="Missing Est." value={formatMoney(missingPrintCost)} />
             <Metric label="Showing" value={`${filteredCards.length}`} />
           </div>
@@ -2003,10 +2173,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
           />
         )}
 
-        <div className="workbench-grid grid gap-4 xl:grid-cols-[minmax(480px,1.35fr)_minmax(320px,0.78fr)_minmax(340px,0.87fr)] xl:items-start">
+        <div className="workbench-grid grid gap-4 xl:grid-cols-[minmax(430px,1.05fr)_minmax(360px,0.82fr)_minmax(360px,0.9fr)] xl:items-start 2xl:grid-cols-[minmax(540px,1.25fr)_minmax(390px,0.82fr)_minmax(390px,0.9fr)]">
           <section
             className={panelClass(
-              `workbench-scroll min-w-0 overflow-hidden xl:max-h-[calc(100vh-8.5rem)] xl:overflow-y-auto ${
+              `min-w-0 overflow-hidden ${
                 mobileView === "library" ? "block" : "hidden xl:block"
               }`,
             )}
@@ -2023,7 +2193,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   </span>
                 </div>
                 <div className="grid gap-2">
-                  <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
+                  <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
                     <label className="filter-cell relative block">
                       <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
                         Search
@@ -2036,7 +2206,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                         <input
                           value={query}
                           onChange={(event) => setQuery(event.target.value)}
-                          placeholder="Name, number, rules text"
+                          placeholder="Name, #, text"
                           className="control-field h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/42 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         />
                       </div>
@@ -2162,7 +2332,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
             </div>
           </section>
 
-          <aside className="contents xl:grid xl:max-h-[calc(100vh-8.5rem)] xl:gap-4 xl:overflow-y-auto xl:pr-1 workbench-scroll">
+          <aside className="contents xl:grid xl:gap-4">
             <div className="hidden xl:block">
               <MissingPrintsSummary
                 missingCount={missingPrintCount}
@@ -2176,7 +2346,6 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                 card={selectedCard}
                 artVariant={selectedArtVariant}
                 artVariants={selectedArtVariants}
-                artCost={selectedArtCost}
                 neededQuantity={selectedNeededCount}
                 ownedQuantity={selectedOwnedCount}
                 mainQuantity={deck.main[selectedCard.number] ?? 0}
@@ -2222,7 +2391,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
           </aside>
 
           <div
-            className={`workbench-scroll gap-4 xl:grid xl:max-h-[calc(100vh-8.5rem)] xl:overflow-y-auto xl:pr-1 ${
+            className={`gap-4 xl:grid ${
               mobileView === "deck" ? "grid" : "hidden"
             }`}
           >
@@ -2393,7 +2562,7 @@ function SharedDeckBanner({
               {deckColors.length ? deckColors.join(" / ") : "No Colors"}
             </span>
             <span className="rounded-sm border border-[#28d17c]/30 bg-[#28d17c]/12 px-2 py-1 text-[#d9ffe9]">
-              {formatEstimatedMoney(artTotal)} art
+              {formatMoney(artTotal)} prints
             </span>
           </div>
         </div>
@@ -2665,15 +2834,17 @@ function CostPanel({
 }) {
   return (
     <section className={panelClass()}>
-      <PanelTitle icon={<BadgeDollarSign size={18} />} title="Local Est. Cost" />
+      <PanelTitle icon={<BadgeDollarSign size={18} />} title="TCGplayer Cost" />
       <div className="grid gap-2 p-3">
         <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-sm font-bold leading-6 text-[#d9ecff]/82">
-          Heuristic estimate, not live TCGplayer pricing. Search links open marketplace results.
+          {TCGPLAYER_LAST_SYNC
+            ? `TCGplayer snapshot synced ${TCGPLAYER_LAST_SYNC}. Unmatched prints fall back to local estimates.`
+            : "TCGplayer sync is ready, but no snapshot has been generated yet. Showing local estimates."}
         </div>
-        <CostRow label="Base print est." value={formatMoney(summary.baseTotal)} />
-        <CostRow label="Alt-art premium est." value={formatMoney(summary.altPremium)} />
-        <CostRow label="Owned print est." value={formatMoney(summary.ownedValue)} />
-        <CostRow label="Missing print est." value={formatMoney(summary.missingCost)} hot />
+        <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
+        <CostRow label="Alt-art premium" value={formatMoney(summary.altPremium)} />
+        <CostRow label="Owned prints" value={formatMoney(summary.ownedValue)} />
+        <CostRow label="Missing prints" value={formatMoney(summary.missingCost)} hot />
         <div className="mt-1 grid grid-cols-3 gap-2 text-center">
           <Spec label="Needed" value={`${summary.neededCopies}`} />
           <Spec label="Owned" value={`${summary.ownedCopies}`} />
@@ -2714,7 +2885,7 @@ function MissingPrintsSummary({
             Buy List
           </div>
           <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/62">
-            Missing selected prints, not live market pricing.
+            Missing selected prints with TCGplayer links.
           </p>
         </div>
         <div className="text-right">
@@ -2744,11 +2915,11 @@ function MissingPrintsPanel({
       <PanelTitle icon={<ShoppingCart size={18} />} title="Missing Prints" />
       <div className="grid gap-2 p-3">
         <div className="rounded-sm border border-[#f6c542]/20 bg-[#f6c542]/10 p-2 text-sm font-bold leading-6 text-[#fff2bd]/86">
-          Heuristic estimate, not live TCGplayer pricing. Verify exact printing on TCGplayer.
+          Prices use the TCGplayer snapshot when matched. Verify exact language and condition before buying.
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Spec label="Missing" value={`${entries.reduce((sum, entry) => sum + entry.missing, 0)}`} />
-          <Spec label="Local Est." value={formatMoney(totalMissingCost)} />
+          <Spec label="TCG / Est." value={formatMoney(totalMissingCost)} />
         </div>
         <button
           type="button"
@@ -2789,14 +2960,14 @@ function MissingPrintsPanel({
                     </div>
                     <div className="mt-2 grid gap-1 text-sm font-bold text-[#f7f7f2]/62">
                       <span>
-                        Owned {entry.owned} / Deck {entry.needed} · {formatEstimatedMoney(entry.unitCost)} each
+                        Owned {entry.owned} / Deck {entry.needed} · {priceSourceLabel(entry.card, entry.variant)} {formatMoney(entry.unitCost)} each
                       </span>
                       <span>
-                        {formatCopyCount(entry.missing)} missing · Local est. {formatMoney(entry.totalCost)}
+                        {formatCopyCount(entry.missing)} missing · Total {formatMoney(entry.totalCost)}
                       </span>
                     </div>
                     <a
-                      href={tcgplayerSearchUrl(entry.card, entry.variant)}
+                      href={tcgplayerUrl(entry.card, entry.variant)}
                       target="_blank"
                       rel="noopener noreferrer nofollow"
                       className="interactive-control mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
@@ -2964,20 +3135,24 @@ function StatusBadge({ isLegal }: { isLegal: boolean }) {
 function ToolbarButton({
   children,
   label,
+  mobileLabel,
   title,
   onClick,
   disabled = false,
+  className = "",
 }: {
   children: React.ReactNode;
   label: string;
+  mobileLabel?: string;
   title: string;
   onClick: () => void;
   disabled?: boolean;
+  className?: string;
 }) {
   return (
     <button
       type="button"
-      className={`interactive-control inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-2 rounded-sm border px-3 font-display text-lg font-black uppercase shadow-sm sm:h-11 xl:px-0 2xl:px-3 ${
+      className={`interactive-control inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-base font-black uppercase shadow-sm sm:h-11 sm:gap-2 sm:px-3 sm:text-lg xl:px-0 2xl:px-3 ${className} ${
         disabled
           ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
           : "border-[#a7b5c9]/25 bg-[linear-gradient(90deg,rgba(145,145,145,0.22),rgba(62,112,124,0.28))] text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
@@ -2987,7 +3162,10 @@ function ToolbarButton({
       disabled={disabled}
     >
       {children}
-      <span className="inline xl:hidden 2xl:inline">{label}</span>
+      <span className="inline whitespace-nowrap xl:hidden 2xl:inline">
+        <span className="sm:hidden">{mobileLabel ?? label}</span>
+        <span className="hidden sm:inline">{label}</span>
+      </span>
     </button>
   );
 }
@@ -3217,7 +3395,7 @@ function DeckPanel({
                         {card.name}
                       </h3>
                       <p className="truncate text-sm font-bold text-[#f7f7f2]/55">
-                        {card.number} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
+                        {card.number} · {formatPrintMoney(card, artVariant)}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {printEntries.map((entry) => (
@@ -3234,7 +3412,7 @@ function DeckPanel({
                   <div className={`flex flex-wrap justify-end gap-1 ${compact ? "" : "shrink-0"}`}>
                     <IconLink
                       label={`Search TCGplayer for ${card.name}`}
-                      href={tcgplayerSearchUrl(card, artVariant)}
+                      href={tcgplayerUrl(card, artVariant)}
                     >
                       <ShoppingCart size={14} />
                       <span className="text-xs">TCG</span>
@@ -3360,7 +3538,7 @@ function LibraryCard({
             <div className="absolute bottom-2 right-2 h-5 w-5 border-b-2 border-r-2 border-[#f6c542]" />
           </div>
         )}
-        <div className="absolute left-2 top-2 flex max-w-[calc(100%-5.75rem)] flex-wrap gap-1">
+        <div className="absolute left-2 top-2 flex max-w-[calc(100%-4.25rem)] flex-wrap gap-1">
           <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black text-black">
             {card.number}
           </span>
@@ -3378,36 +3556,17 @@ function LibraryCard({
             <span className="shrink-0 rounded-sm border border-[#f6c542]/55 bg-[#e31b23] px-2 py-1 text-center text-xs font-black text-white shadow-lg shadow-black/30">
               {quantity}
             </span>
-            {ownedQuantity > 0 && (
-              <span
-                className="rounded-sm border border-[#28d17c]/35 bg-black/70 px-2 py-0.5 text-center text-xs font-black text-[#d9ffe9]"
-                title={`${ownedQuantity} owned across all prints`}
-              >
-                Owned all {ownedQuantity}
-              </span>
-            )}
-            {missingQuantity > 0 && (
-              <span
-                className="rounded-sm border border-[#f6c542]/35 bg-black/70 px-2 py-0.5 text-center text-xs font-black text-[#fff2bd]"
-                title={`${missingQuantity} missing selected-print copies`}
-              >
-                Need print {missingQuantity}
-              </span>
-            )}
           </div>
         )}
-        {primaryZone && onAdjustPrimary && (
+        {primaryZone && onAdjustPrimary && !primaryConstraint && (
           <button
             type="button"
-            className={`interactive-control absolute bottom-2 right-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-sm font-black uppercase shadow-xl ${
-              primaryConstraint
-                ? "border-[#f7f7f2]/10 bg-black/68 text-[#f7f7f2]/38"
-                : primaryZone === "main"
-                  ? "border-[#e31b23]/50 bg-[#e31b23]/80 text-white"
-                  : "border-[#2e8cff]/50 bg-[#1167d8]/80 text-[#d9ecff]"
+            className={`interactive-control absolute bottom-2 right-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-sm font-black uppercase opacity-100 shadow-xl transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 ${
+              primaryZone === "main"
+                ? "border-[#e31b23]/50 bg-[#e31b23]/80 text-white"
+                : "border-[#2e8cff]/50 bg-[#1167d8]/80 text-[#d9ecff]"
             }`}
-            disabled={Boolean(primaryConstraint)}
-            title={primaryConstraint || `Add one ${zoneLabel(primaryZone)} copy`}
+            title={`Add one ${zoneLabel(primaryZone)} copy`}
             onClick={(event) => {
               event.stopPropagation();
               onAdjustPrimary(1);
@@ -3423,8 +3582,31 @@ function LibraryCard({
           {card.name}
         </h3>
         <p className="mt-0.5 text-sm font-bold text-[#f7f7f2]/65">
-          {card.type} · {formatEstimatedMoney(estimatePrintCost(card, artVariant))}
+          {card.type} · {formatPrintMoney(card, artVariant)}
         </p>
+        {quantity > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1 text-xs font-black uppercase">
+            <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
+              Deck {quantity}
+            </span>
+            {ownedQuantity > 0 && (
+              <span
+                className="rounded-sm border border-[#28d17c]/24 bg-[#28d17c]/10 px-1.5 py-0.5 text-[#d9ffe9]"
+                title={`${ownedQuantity} owned across all prints`}
+              >
+                Owned {ownedQuantity}
+              </span>
+            )}
+            {missingQuantity > 0 && (
+              <span
+                className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 text-[#fff2bd]"
+                title={`${missingQuantity} missing selected-print copies`}
+              >
+                Need {missingQuantity}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_4.75rem] gap-2 border-t border-[#a7b5c9]/20 bg-[#080a0f] p-2">
         {primaryZone && onAdjustPrimary ? (
@@ -3451,7 +3633,7 @@ function LibraryCard({
           </div>
         )}
         <a
-          href={tcgplayerSearchUrl(card, artVariant)}
+          href={tcgplayerUrl(card, artVariant)}
           target="_blank"
           rel="noopener noreferrer nofollow"
           className="interactive-control inline-flex h-full min-h-10 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-lg font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
@@ -3470,7 +3652,6 @@ function InspectorPanel({
   card,
   artVariant,
   artVariants,
-  artCost,
   neededQuantity,
   ownedQuantity,
   mainQuantity,
@@ -3483,7 +3664,6 @@ function InspectorPanel({
   card: GundamCard;
   artVariant: CardArtVariant;
   artVariants: readonly CardArtVariant[];
-  artCost: number;
   neededQuantity: number;
   ownedQuantity: number;
   mainQuantity: number;
@@ -3543,7 +3723,7 @@ function InspectorPanel({
         <Spec label="AP" value={card.ap} />
         <Spec label="HP" value={card.hp} />
       </div>
-      <div className="grid gap-2 border-t border-[#a7b5c9]/20 p-3 sm:grid-cols-2">
+      <div className="grid gap-2 border-t border-[#a7b5c9]/20 p-3 2xl:grid-cols-2">
         <QuantityStepper
           label="Main"
           quantity={mainQuantity}
@@ -3577,7 +3757,7 @@ function InspectorPanel({
               </span>
             </div>
             <p className="mt-1 truncate text-base font-bold text-[#f7f7f2]/68">
-              {artVariant.officialId} · {formatEstimatedMoney(artCost)}
+              {artVariant.officialId} · {formatPrintMoney(card, artVariant)}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 2xl:grid-cols-3">
@@ -3610,7 +3790,7 @@ function InspectorPanel({
               Up
             </button>
             <a
-              href={tcgplayerSearchUrl(card, artVariant)}
+              href={tcgplayerUrl(card, artVariant)}
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="interactive-control col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 2xl:col-span-1"
@@ -3628,7 +3808,7 @@ function InspectorPanel({
               className={`h-1.5 rounded-full ${
                 variant.id === artVariant.id ? "bg-[#f6c542]" : "bg-[#f7f7f2]/16"
               }`}
-              title={`${artDisplayLabel(variant)} ${formatEstimatedMoney(estimatePrintCost(card, variant))}`}
+              title={`${artDisplayLabel(variant)} ${formatPrintMoney(card, variant)}`}
             />
           ))}
         </div>

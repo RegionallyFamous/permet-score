@@ -13,6 +13,8 @@
     "qa": "npm run qa:routes && npm run qa:visual",
     "qa:routes": "node scripts/route-timing.mjs",
     "qa:visual": "node scripts/visual-qa.mjs",
+    "data:sync:tcgplayer": "node scripts/sync-tcgplayer.mjs",
+    "data:check:tcgplayer": "node scripts/sync-tcgplayer.mjs --check",
     "perf:lighthouse": "npx lighthouse@latest http://localhost:3000 --output=html --output-path=./qa-screenshots/lighthouse.html --only-categories=performance,accessibility,best-practices,seo --chrome-flags='--headless=new'",
     "analyze": "next experimental-analyze --output"
   },

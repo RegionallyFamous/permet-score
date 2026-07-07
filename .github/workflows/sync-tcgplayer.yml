@@ -1,0 +1,44 @@
+name: Sync TCGplayer Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync TCGplayer snapshot
+        run: npm run data:sync:tcgplayer
+        env:
+          TCGPLAYER_PUBLIC_KEY: ${{ secrets.TCGPLAYER_PUBLIC_KEY }}
+          TCGPLAYER_PRIVATE_KEY: ${{ secrets.TCGPLAYER_PRIVATE_KEY }}
+          TCGPLAYER_CATEGORY_ID: ${{ secrets.TCGPLAYER_CATEGORY_ID }}
+          TCGPLAYER_CATEGORY_NAME: ${{ vars.TCGPLAYER_CATEGORY_NAME || 'Gundam Card Game' }}
+
+      - name: Validate generated app
+        run: |
+          npm run lint
+          npm run build
+
+      - name: Commit generated data
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: "Sync TCGplayer card data"
+          file_pattern: "app/tcgplayer-data.ts app/tcgplayer-card-data.ts data/tcgplayer-unmatched.json"

@@ -32,6 +32,27 @@ API, and shared deck page. `perf:lighthouse` expects the app to already be
 running on `http://localhost:3000`, ideally with `npm run build && npm run start`.
 `analyze` uses the Turbopack analyzer built into current Next.js.
 
+## TCGplayer Source Of Truth
+
+TCGplayer product/catalog data is synced into generated files so the app stays
+fast on Vercel:
+
+```bash
+TCGPLAYER_PUBLIC_KEY=... TCGPLAYER_PRIVATE_KEY=... npm run data:sync:tcgplayer
+```
+
+The sync writes:
+
+- `app/tcgplayer-data.ts`: product IDs, product URLs, image URLs, and market prices.
+- `app/tcgplayer-card-data.ts`: new cards discovered from TCGplayer that are not in the curated rules file yet.
+- `data/tcgplayer-unmatched.json`: products that need manual cleanup or matching.
+
+In GitHub, add repository secrets `TCGPLAYER_PUBLIC_KEY` and
+`TCGPLAYER_PRIVATE_KEY`. If category discovery ever misses Gundam, add
+`TCGPLAYER_CATEGORY_ID` as a repository secret. The scheduled workflow
+`.github/workflows/sync-tcgplayer.yml` runs daily and commits generated updates
+back to `main` when TCGplayer changes.
+
 ## Share Links
 
 Use the Share button in the app to save the deck through the backend and copy a
@@ -51,3 +72,8 @@ The app is tailored for Vercel with Next.js scripts:
 npm run build
 npm run start
 ```
+
+The canonical domain is `https://permetscore.com`. Vercel should point
+`permetscore.com` at the project and redirect `www.permetscore.com`,
+`permetlink.com`, `www.permetlink.com`, and `permet-score.vercel.app` to the
+canonical host after DNS is configured.
