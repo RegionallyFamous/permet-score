@@ -34,6 +34,7 @@ jobs:
 
       - name: Validate generated app
         run: |
+          npm run data:audit:strict
           npm run lint
           npm run build
 

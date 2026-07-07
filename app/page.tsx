@@ -16,6 +16,7 @@ import {
   Layers,
   LayoutGrid,
   ListChecks,
+  Maximize2,
   Minus,
   MoreHorizontal,
   Plus,
@@ -111,15 +112,38 @@ type MissingPrintEntry = {
   totalCost: number;
 };
 
+type CardLightboxState = {
+  card: GundamCard;
+  artVariant: CardArtVariant;
+};
+
 type SynergyNotice = {
   tone: Notice["tone"];
   label: string;
   detail: string;
 };
 
+type DataStatus = {
+  totalCards: number;
+  curatedCards: number;
+  tcgCards: number;
+  tcgPrints: number;
+  tcgCardsWithPrints: number;
+  lastSync: string | null;
+  syncAgeHours: number | null;
+  isSynced: boolean;
+  isFresh: boolean;
+  coverageTone: Notice["tone"];
+  syncTone: Notice["tone"];
+};
+
 const STORAGE_KEY = "gundam-deck-builder-v1";
 const MAIN_TARGET = 50;
 const RESOURCE_TARGET = 10;
+const MAX_MAIN_COPIES = 4;
+const MAX_MAIN_COLORS = 2;
+const TCGPLAYER_FRESH_HOURS = 48;
+const COMPLETE_DATABASE_CARD_TARGET = 700;
 const MAIN_TYPES: CardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
 const RESOURCE_TYPES: CardType[] = ["RESOURCE"];
 const TYPE_ORDER: Record<CardType, number> = {
@@ -167,6 +191,9 @@ const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
 const CANONICAL_ORIGIN = "https://permetscore.com";
+const OFFICIAL_RULES_URL = "https://www.gundam-gcg.com/en/rules/";
+const OFFICIAL_PRODUCTS_URL = "https://www.gundam-gcg.com/en/";
+const OFFICIAL_RULES_UPDATED = "June 12, 2026";
 
 const starterDeck: DeckState = {
   name: "Heroic Beginnings Shell",
@@ -744,6 +771,45 @@ function artReadyCards(deck: DeckState) {
   }, 0);
 }
 
+function tcgplayerSyncAgeHours() {
+  if (!TCGPLAYER_LAST_SYNC) return null;
+  const syncedAt = new Date(TCGPLAYER_LAST_SYNC).getTime();
+  if (!Number.isFinite(syncedAt)) return null;
+  return Math.max(0, (Date.now() - syncedAt) / 3_600_000);
+}
+
+function databaseStatus(): DataStatus {
+  const totalCards = CARD_POOL.length;
+  const curatedCards = CURATED_CARD_POOL.length;
+  const tcgCards = TCGPLAYER_CARD_POOL.length;
+  const tcgPrints = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
+    (sum, prints) => sum + prints.length,
+    0,
+  );
+  const tcgCardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
+  const syncAgeHours = tcgplayerSyncAgeHours();
+  const isSynced = Boolean(TCGPLAYER_LAST_SYNC && tcgPrints > 0);
+  const isFresh =
+    isSynced && syncAgeHours !== null && syncAgeHours <= TCGPLAYER_FRESH_HOURS;
+  const coverageTone: Notice["tone"] =
+    totalCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
+  const syncTone: Notice["tone"] = isFresh ? "good" : isSynced ? "warn" : "bad";
+
+  return {
+    totalCards,
+    curatedCards,
+    tcgCards,
+    tcgPrints,
+    tcgCardsWithPrints,
+    lastSync: TCGPLAYER_LAST_SYNC,
+    syncAgeHours,
+    isSynced,
+    isFresh,
+    coverageTone,
+    syncTone,
+  };
+}
+
 function countByType(entries: DeckEntry[]) {
   return MAIN_TYPES.reduce(
     (counts, type) => ({
@@ -793,8 +859,8 @@ function zoneAddConstraint(zone: Zone, card: GundamCard, quantity: number) {
       : "Resource uses Resource cards";
   }
 
-  if (zone === "main" && quantity >= 4) {
-    return "Max 4 copies in main";
+  if (zone === "main" && quantity >= MAX_MAIN_COPIES) {
+    return `Max ${MAX_MAIN_COPIES} copies in main`;
   }
 
   return "";
@@ -1076,6 +1142,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const [shareState, setShareState] = useState("Share");
   const [toast, setToast] = useState<ActionToast | null>(null);
   const [fallbackPanel, setFallbackPanel] = useState<FallbackPanel | null>(null);
+  const [lightbox, setLightbox] = useState<CardLightboxState | null>(null);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -1149,6 +1216,25 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!lightbox) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLightbox(null);
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [lightbox]);
+
   const mainEntries = useMemo(() => deckEntries(deck.main), [deck.main]);
   const resourceEntries = useMemo(
     () => deckEntries(deck.resource),
@@ -1162,6 +1248,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const deckList = useMemo(() => buildDeckList(deck), [deck]);
   const costSummary = useMemo(() => summarizeDeckCosts(deck), [deck]);
   const missingPrints = useMemo(() => getMissingPrintEntries(deck), [deck]);
+  const dataStatus = useMemo(() => databaseStatus(), []);
   const missingPrintCount = useMemo(
     () => missingPrints.reduce((sum, entry) => sum + entry.missing, 0),
     [missingPrints],
@@ -1309,7 +1396,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
           },
     );
 
-    if (deckColors.length > 2) {
+    if (deckColors.length > MAX_MAIN_COLORS) {
       messages.push({
         tone: "bad",
         label: "Colors",
@@ -1325,13 +1412,15 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       messages.push({ tone: "warn", label: "Colors", detail: "No colors" });
     }
 
-    const overLimit = mainEntries.filter((entry) => entry.quantity > 4);
+    const overLimit = mainEntries.filter(
+      (entry) => entry.quantity > MAX_MAIN_COPIES,
+    );
     messages.push(
       overLimit.length
         ? {
             tone: "bad",
             label: "Copies",
-            detail: `${overLimit.length} over 4`,
+            detail: `${overLimit.length} over ${MAX_MAIN_COPIES}`,
           }
         : { tone: "good", label: "Copies", detail: "Clean" },
     );
@@ -1346,6 +1435,20 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       invalidMainTypes.length || invalidResourceTypes.length
         ? { tone: "bad", label: "Zones", detail: "Mismatch" }
         : { tone: "good", label: "Zones", detail: "Clean" },
+    );
+
+    messages.push(
+      dataStatus.isSynced
+        ? {
+            tone: dataStatus.isFresh ? "good" : "warn",
+            label: "Card DB",
+            detail: dataStatus.isFresh ? "Fresh TCGplayer" : "TCGplayer stale",
+          }
+        : {
+            tone: "warn",
+            label: "Card DB",
+            detail: "TCGplayer missing",
+          },
     );
 
     if (mainTotal === MAIN_TARGET) {
@@ -1368,7 +1471,16 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     }
 
     return messages;
-  }, [deckColors, mainEntries, mainTotal, resourceEntries, resourceTotal, typeCounts]);
+  }, [
+    dataStatus.isFresh,
+    dataStatus.isSynced,
+    deckColors,
+    mainEntries,
+    mainTotal,
+    resourceEntries,
+    resourceTotal,
+    typeCounts,
+  ]);
 
   const isLegal = notices.every((notice) => notice.tone !== "bad");
   const activeAdvancedFilterCount = [
@@ -1470,6 +1582,13 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         behavior: "smooth",
         block: "start",
       });
+    });
+  }
+
+  function openCardLightbox(card: GundamCard, artVariant?: CardArtVariant) {
+    setLightbox({
+      card,
+      artVariant: artVariant ?? getArtVariant(card, deck.art),
     });
   }
 
@@ -2323,6 +2442,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                   ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
                   missingQuantity={getMissingCopiesForCard(deck, card)}
                   onSelect={() => setSelectedNumber(card.number)}
+                  onOpenCard={() => {
+                    setSelectedNumber(card.number);
+                    openCardLightbox(card, getArtVariant(card, deck.art));
+                  }}
                   onAdjustMain={(delta) => adjustCard("main", card.number, delta)}
                   onAdjustResource={(delta) =>
                     adjustCard("resource", card.number, delta)
@@ -2360,14 +2483,21 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                 onAdjustCollection={(delta) =>
                   adjustCollection(selectedCard.number, selectedArtVariant.id, delta)
                 }
+                onOpenCard={() => openCardLightbox(selectedCard, selectedArtVariant)}
               />
             </div>
 
             <div className={mobileView === "stats" ? "grid gap-4" : "hidden xl:grid xl:gap-4"}>
+              <DataIntegrityPanel status={dataStatus} />
+
               <CostPanel summary={costSummary} onMarkOwned={markDeckOwned} />
 
               <div ref={missingPrintsRef}>
-                <MissingPrintsPanel entries={missingPrints} onCopy={copyBuyList} />
+                <MissingPrintsPanel
+                  entries={missingPrints}
+                  onCopy={copyBuyList}
+                  onOpenCard={openCardLightbox}
+                />
               </div>
 
               <LegalityPanel notices={notices} />
@@ -2378,6 +2508,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                 cards={openingHandEntries}
                 onDraw={drawHand}
                 onClear={() => setOpeningHand([])}
+                onOpenCard={(card) => openCardLightbox(card)}
               />
 
               <div className="xl:hidden">
@@ -2404,6 +2535,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
               zone="main"
               onAdjust={adjustCard}
               onRemove={removeCard}
+              onOpenCard={openCardLightbox}
               compact
             />
 
@@ -2416,6 +2548,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
               zone="resource"
               onAdjust={adjustCard}
               onRemove={removeCard}
+              onOpenCard={openCardLightbox}
               compact
             />
 
@@ -2436,6 +2569,13 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
       <FallbackPanelView
         panel={fallbackPanel}
         onClose={() => setFallbackPanel(null)}
+      />
+      <CardLightbox
+        item={lightbox}
+        onClose={() => setLightbox(null)}
+        onVariantChange={(artVariant) =>
+          setLightbox((current) => (current ? { ...current, artVariant } : current))
+        }
       />
     </main>
   );
@@ -2825,6 +2965,236 @@ function FallbackPanelView({
   );
 }
 
+function DataIntegrityPanel({ status }: { status: DataStatus }) {
+  const syncLabel = status.lastSync
+    ? `${Math.round(status.syncAgeHours ?? 0)}h old`
+    : "Not synced";
+  const coverageDetail =
+    status.totalCards >= COMPLETE_DATABASE_CARD_TARGET
+      ? "Complete target met"
+      : `${COMPLETE_DATABASE_CARD_TARGET - status.totalCards}+ cards below complete target`;
+
+  return (
+    <section className={panelClass()}>
+      <PanelTitle icon={<Radar size={18} />} title="Rules & Data" />
+      <div className="grid gap-2 p-3">
+        <div
+          className={`rounded-sm border p-3 ${noticeClass(status.coverageTone)}`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-display text-lg font-black uppercase">
+              Card Database
+            </span>
+            <span className="text-base font-black">{status.totalCards}</span>
+          </div>
+          <p className="mt-1 text-sm font-bold opacity-75">{coverageDetail}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Spec label="Curated" value={`${status.curatedCards}`} />
+          <Spec label="TCG Cards" value={`${status.tcgCards}`} />
+          <Spec label="Prints" value={`${status.tcgPrints}`} />
+          <Spec label="Priced IDs" value={`${status.tcgCardsWithPrints}`} />
+        </div>
+
+        <div className={`rounded-sm border p-3 ${noticeClass(status.syncTone)}`}>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-black">TCGplayer Snapshot</span>
+            <span className="text-right text-base font-black">{syncLabel}</span>
+          </div>
+          <p className="mt-1 text-sm font-bold opacity-75">
+            Source-of-truth pricing and discovered printings must sync every {TCGPLAYER_FRESH_HOURS}h.
+          </p>
+        </div>
+
+        <div className="rounded-sm border border-[#a7b5c9]/16 bg-black/24 p-3 text-sm font-bold leading-6 text-[#f7f7f2]/70">
+          Enforcing {MAIN_TARGET} main, {RESOURCE_TARGET} resource, max {MAX_MAIN_COPIES} copies, max {MAX_MAIN_COLORS} colors, official main/resource zones. Comprehensive rules reference: {OFFICIAL_RULES_UPDATED}.
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          <a
+            href={OFFICIAL_RULES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-2 font-display text-base font-black uppercase text-[#d9ecff]"
+          >
+            Rules
+          </a>
+          <a
+            href={OFFICIAL_PRODUCTS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 px-2 font-display text-base font-black uppercase text-[#f7f7f2]"
+          >
+            Products
+          </a>
+          <a
+            href="https://www.tcgplayer.com/categories/trading-and-collectible-card-games/gundam-card-game/price-guides"
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 font-display text-base font-black uppercase text-[#fff2bd]"
+          >
+            TCGplayer
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CardLightbox({
+  item,
+  onClose,
+  onVariantChange,
+}: {
+  item: CardLightboxState | null;
+  onClose: () => void;
+  onVariantChange: (artVariant: CardArtVariant) => void;
+}) {
+  if (!item) return null;
+
+  const { card } = item;
+  const variants = cardArtVariants(card);
+  const artVariant =
+    variants.find((variant) => variant.id === item.artVariant.id) ?? item.artVariant;
+  const hasAltPrints = variants.length > 1;
+  const sourceLabel = priceSourceLabel(card, artVariant);
+
+  return (
+    <div
+      className="card-lightbox fixed inset-0 z-[70] overflow-y-auto bg-[#020305]/88 px-3 py-4 backdrop-blur-xl sm:px-5 sm:py-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="card-lightbox-title"
+      onClick={onClose}
+    >
+      <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
+        <section
+          className="lightbox-shell grid w-full gap-3 rounded-sm border border-[#8bdcff]/34 bg-[#05070c]/96 p-3 shadow-2xl shadow-black/70 lg:grid-cols-[minmax(280px,0.9fr)_minmax(320px,0.68fr)] lg:p-4"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="grid min-w-0 gap-3">
+            <div className="lightbox-card-stage scan-frame relative grid place-items-center overflow-hidden rounded-sm border border-[#8bdcff]/38 bg-black/88 p-2 shadow-2xl shadow-black/60">
+              <img
+                src={cardImagePath(card, artVariant)}
+                alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
+                className="mx-auto max-h-[72vh] max-w-full object-contain object-top lg:max-h-[78vh]"
+              />
+              <div className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1.5">
+                <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
+                  {artVariant.officialId}
+                </span>
+                <span className="rounded-sm border border-[#f6c542]/35 bg-black/70 px-2 py-1 text-sm font-black text-[#fff2bd]">
+                  {artDisplayLabel(artVariant)}
+                </span>
+              </div>
+            </div>
+
+            {hasAltPrints && (
+              <div className="grid gap-2 rounded-sm border border-[#a7b5c9]/16 bg-black/28 p-2">
+                <div className="flex items-center gap-2 font-display text-base font-black uppercase text-[#f7f7f2]/74">
+                  <Sparkles size={15} className="text-[#f6c542]" />
+                  Alt Prints
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-2">
+                  {variants.map((variant) => (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      className={`interactive-control overflow-hidden rounded-sm border bg-black ${
+                        variant.id === artVariant.id
+                          ? "border-[#f6c542]/70 shadow-lg shadow-[#f6c542]/12"
+                          : "border-[#a7b5c9]/18"
+                      }`}
+                      onClick={() => onVariantChange(variant)}
+                      aria-label={`View ${artDisplayLabel(variant)} of ${card.name}`}
+                      title={`${artDisplayLabel(variant)} · ${formatPrintMoney(card, variant)}`}
+                    >
+                      <img
+                        src={cardImagePath(card, variant)}
+                        alt=""
+                        className="aspect-[5/7] w-full object-cover object-top"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid min-w-0 content-start gap-3 lg:max-h-[82vh] lg:overflow-y-auto lg:pr-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={`rounded-sm border px-2 py-1 text-sm font-black ${colorChipClass(card.color)}`}>
+                    {card.color}
+                  </span>
+                  <span className="rounded-sm border border-[#f7f7f2]/14 bg-[#f7f7f2]/9 px-2 py-1 text-sm font-black text-[#f7f7f2]">
+                    {card.type}
+                  </span>
+                  <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
+                    {formatPrintMoney(card, artVariant)}
+                  </span>
+                </div>
+                <h2
+                  id="card-lightbox-title"
+                  className="mt-3 font-display text-3xl font-black uppercase leading-none text-[#f7f7f2] sm:text-4xl"
+                >
+                  {card.name}
+                </h2>
+                <p className="mt-2 text-base font-bold text-[#f7f7f2]/64">
+                  {card.set} · {sourceLabel}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="interactive-control inline-flex size-10 shrink-0 items-center justify-center rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 text-[#f7f7f2]"
+                onClick={onClose}
+                aria-label="Close card view"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              <Spec label="Lv" value={card.level} />
+              <Spec label="Cost" value={card.cost} />
+              <Spec label="AP" value={card.ap} />
+              <Spec label="HP" value={card.hp} />
+            </div>
+
+            <div className="rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-3">
+              <p className="text-lg font-medium leading-7 text-[#f7f7f2]/88">
+                {card.text}
+              </p>
+            </div>
+
+            <div className="grid gap-2 rounded-sm border border-[#a7b5c9]/16 bg-black/26 p-3 text-base font-bold text-[#f7f7f2]/66">
+              <span>{card.number}</span>
+              <span>{card.trait}</span>
+              <span>{card.link}</span>
+              <span>{card.source}</span>
+            </div>
+
+            <a
+              href={tcgplayerUrl(card, artVariant)}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/42 bg-[#f6c542]/13 font-display text-lg font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+              title={`Search TCGplayer for ${card.name} ${artDisplayLabel(artVariant)}`}
+            >
+              <ShoppingCart size={17} />
+              Search TCGplayer
+            </a>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function CostPanel({
   summary,
   onMarkOwned,
@@ -2904,9 +3274,11 @@ function MissingPrintsSummary({
 function MissingPrintsPanel({
   entries,
   onCopy,
+  onOpenCard,
 }: {
   entries: MissingPrintEntry[];
   onCopy: () => void;
+  onOpenCard: (card: GundamCard, artVariant: CardArtVariant) => void;
 }) {
   const totalMissingCost = entries.reduce((sum, entry) => sum + entry.totalCost, 0);
 
@@ -2943,7 +3315,11 @@ function MissingPrintsPanel({
                 )}`}
               >
                 <div className="grid grid-cols-[auto_1fr] gap-2">
-                  <CardThumb card={entry.card} artVariant={entry.variant} />
+                  <CardThumb
+                    card={entry.card}
+                    artVariant={entry.variant}
+                    onOpen={() => onOpenCard(entry.card, entry.variant)}
+                  />
                   <div className="min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -3043,10 +3419,12 @@ function HandSimulatorPanel({
   cards,
   onDraw,
   onClear,
+  onOpenCard,
 }: {
   cards: GundamCard[];
   onDraw: () => void;
   onClear: () => void;
+  onOpenCard: (card: GundamCard) => void;
 }) {
   const typeSummary = MAIN_TYPES.map((type) => ({
     type,
@@ -3087,7 +3465,7 @@ function HandSimulatorPanel({
                   card.color,
                 )}`}
               >
-                <CardThumb card={card} />
+                <CardThumb card={card} onOpen={() => onOpenCard(card)} />
                 <div className="min-w-0">
                   <div className="truncate text-base font-black text-[#f7f7f2]">
                     {card.name}
@@ -3267,15 +3645,23 @@ function QuantityStepper({
   const visibleReason = incrementDisabled ? incrementReason : "";
 
   return (
-    <div className={`quantity-stepper rounded-sm border p-1.5 ${toneClass}`}>
+    <div
+      className={`quantity-stepper rounded-sm border ${
+        compact ? "p-1" : "p-1.5"
+      } ${toneClass}`}
+    >
       <div
         className={`grid items-center gap-1.5 ${
           compact
-            ? "grid-cols-[minmax(3rem,1fr)_2rem_2.4rem_2rem]"
+            ? "grid-cols-[minmax(1.8rem,1fr)_2rem_2rem_2rem]"
             : "grid-cols-[minmax(4.5rem,1fr)_2.25rem_3rem_2.25rem]"
         }`}
       >
-        <span className="truncate font-display text-base font-black uppercase">
+        <span
+          className={`truncate font-display font-black uppercase ${
+            compact ? "text-sm" : "text-base"
+          }`}
+        >
           {label}
         </span>
         <button
@@ -3293,7 +3679,7 @@ function QuantityStepper({
         </button>
         <output
           className={`grid place-items-center rounded-sm border border-current/22 bg-black/28 font-display font-black ${
-            compact ? "h-8 text-lg" : "h-9 text-xl"
+            compact ? "h-8 text-base" : "h-9 text-xl"
           }`}
           aria-live="polite"
         >
@@ -3313,9 +3699,93 @@ function QuantityStepper({
           <Plus size={compact ? 13 : 15} />
         </button>
       </div>
-      <div className="mt-1 min-h-4 truncate text-xs font-bold opacity-70">
+      <div
+        className={`mt-1 min-h-4 truncate font-bold opacity-70 ${
+          compact ? "text-[11px]" : "text-xs"
+        }`}
+      >
         {visibleReason}
       </div>
+    </div>
+  );
+}
+
+function MiniQuantityControl({
+  label,
+  quantity,
+  tone,
+  dense = false,
+  incrementDisabled,
+  decrementDisabled,
+  incrementReason,
+  decrementReason,
+  onIncrement,
+  onDecrement,
+}: {
+  label: string;
+  quantity: number;
+  tone: Zone;
+  dense?: boolean;
+  incrementDisabled: boolean;
+  decrementDisabled: boolean;
+  incrementReason?: string;
+  decrementReason?: string;
+  onIncrement: () => void;
+  onDecrement: () => void;
+}) {
+  const toneClass =
+    tone === "main"
+      ? "border-[#e31b23]/36 bg-[#2b0710]/72 text-[#ffe3e3]"
+      : "border-[#2e8cff]/36 bg-[#06142a]/72 text-[#d9ecff]";
+  const controlClass = (disabled: boolean) =>
+    `interactive-control grid h-9 place-items-center ${
+      disabled
+        ? "cursor-not-allowed bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
+        : "bg-black/22 text-current hover:bg-current/10"
+    }`;
+
+  return (
+    <div
+      className={`mini-stepper grid h-9 ${
+        dense
+          ? "grid-cols-[1.85rem_minmax(1.7rem,1fr)_1.85rem]"
+          : "grid-cols-[2.15rem_minmax(2rem,1fr)_2.15rem]"
+      } overflow-hidden rounded-sm border ${toneClass}`}
+      title={incrementDisabled ? incrementReason : `${label}: ${quantity}`}
+    >
+      <button
+        type="button"
+        className={`${controlClass(decrementDisabled)} border-r border-current/18`}
+        disabled={decrementDisabled}
+        title={decrementDisabled ? decrementReason : `Remove one ${label}`}
+        aria-label={`Remove one ${label}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onDecrement();
+        }}
+      >
+        <Minus size={dense ? 13 : 14} />
+      </button>
+      <output
+        className={`grid h-9 place-items-center border-x-0 bg-[#f7f7f2]/6 px-1 font-display font-black ${
+          dense ? "text-base" : "text-lg"
+        }`}
+      >
+        {quantity}
+      </output>
+      <button
+        type="button"
+        className={`${controlClass(incrementDisabled)} border-l border-current/18`}
+        disabled={incrementDisabled}
+        title={incrementDisabled ? incrementReason : `Add one ${label}`}
+        aria-label={incrementDisabled ? incrementReason : `Add one ${label}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onIncrement();
+        }}
+      >
+        <Plus size={dense ? 13 : 14} />
+      </button>
     </div>
   );
 }
@@ -3330,6 +3800,7 @@ function DeckPanel({
   compact = false,
   onAdjust,
   onRemove,
+  onOpenCard,
 }: {
   title: string;
   total: number;
@@ -3340,6 +3811,7 @@ function DeckPanel({
   compact?: boolean;
   onAdjust: (zone: "main" | "resource", number: string, delta: number) => void;
   onRemove: (zone: "main" | "resource", number: string) => void;
+  onOpenCard: (card: GundamCard, artVariant: CardArtVariant) => void;
 }) {
   return (
     <section className={panelClass()}>
@@ -3370,93 +3842,80 @@ function DeckPanel({
             return (
               <div
                 key={card.number}
-                className={`interactive-row rounded-sm border bg-[#f7f7f2]/[0.055] p-2 shadow-lg shadow-black/10 ${colorAccentClass(
+                className={`deck-entry interactive-row rounded-sm border bg-[#f7f7f2]/[0.045] p-2 shadow-lg shadow-black/10 ${colorAccentClass(
                   card.color,
                 )}`}
               >
-                <div className={compact ? "grid gap-2" : "flex items-center justify-between gap-2"}>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <CardThumb card={card} artVariant={artVariant} />
+                <div className="grid grid-cols-[4.35rem_minmax(0,1fr)] gap-2.5 sm:grid-cols-[4.85rem_minmax(0,1fr)]">
+                  <CardThumb
+                    card={card}
+                    artVariant={artVariant}
+                    onOpen={() => onOpenCard(card, artVariant)}
+                    size="deck"
+                    badge={`${quantity}`}
+                  />
+                  <div className="grid min-w-0 content-start gap-2">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-sm bg-[#f6c542] px-1.5 py-0.5 text-sm font-black leading-none text-black">
-                          {quantity}
-                        </span>
-                        <span className={`rounded border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className={`rounded-sm border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
                           {card.color}
                         </span>
+                        <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/8 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/78">
+                          {card.type}
+                        </span>
                         {artVariant.id !== "standard" && (
-                          <span className="rounded border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
+                          <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
                             {artDisplayLabel(artVariant)}
                           </span>
                         )}
                       </div>
-                      <h3 className="mt-1 truncate text-base font-black text-[#f7f7f2]">
+                      <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {card.name}
                       </h3>
-                      <p className="truncate text-sm font-bold text-[#f7f7f2]/55">
+                      <p className="truncate text-sm font-bold text-[#f7f7f2]/58">
                         {card.number} · {formatPrintMoney(card, artVariant)}
                       </p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {printEntries.map((entry) => (
-                          <span
-                            key={entry.variant.id}
-                            className="rounded border border-[#a7b5c9]/20 bg-black/26 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/72"
-                          >
-                            {entry.quantity} {artDisplayLabel(entry.variant)}
-                          </span>
-                        ))}
-                      </div>
                     </div>
-                  </div>
-                  <div className={`flex flex-wrap justify-end gap-1 ${compact ? "" : "shrink-0"}`}>
-                    <IconLink
-                      label={`Search TCGplayer for ${card.name}`}
-                      href={tcgplayerUrl(card, artVariant)}
-                    >
-                      <ShoppingCart size={14} />
-                      <span className="text-xs">TCG</span>
-                    </IconLink>
-                    <div
-                      className={`quantity-stepper flex h-8 items-center overflow-hidden rounded-sm border ${
-                        zone === "main"
-                          ? "border-[#e31b23]/30 bg-[#e31b23]/10 text-[#ffe3e3]"
-                          : "border-[#2e8cff]/30 bg-[#1167d8]/12 text-[#d9ecff]"
-                      }`}
-                      title={addConstraint || `${quantity} copies`}
-                    >
-                      <button
-                        type="button"
-                        className="interactive-control grid h-8 w-8 place-items-center border-r border-current/20 bg-black/18"
-                        onClick={() => onAdjust(zone, card.number, -1)}
-                        aria-label={`Remove one ${card.name}`}
-                      >
-                        <Minus size={13} />
-                      </button>
-                      <output className="grid h-8 min-w-8 place-items-center px-1 font-display text-base font-black">
-                        {quantity}
-                      </output>
-                      <button
-                        type="button"
-                        className={`interactive-control grid h-8 w-8 place-items-center border-l border-current/20 ${
-                          addConstraint
-                            ? "cursor-not-allowed bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
-                            : "bg-black/18"
-                        }`}
-                        onClick={() => onAdjust(zone, card.number, 1)}
-                        disabled={Boolean(addConstraint)}
-                        aria-label={addConstraint || `Add one ${card.name}`}
-                        title={addConstraint || "Add one"}
-                      >
-                        <Plus size={13} />
-                      </button>
+                    <div className="flex min-w-0 flex-wrap gap-1">
+                      {printEntries.map((entry) => (
+                        <span
+                          key={entry.variant.id}
+                          className="rounded-sm border border-[#a7b5c9]/18 bg-black/24 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/68"
+                        >
+                          {entry.quantity} {artDisplayLabel(entry.variant)}
+                        </span>
+                      ))}
                     </div>
-                    <IconButton
-                      label="Remove card"
-                      onClick={() => onRemove(zone, card.number)}
-                    >
-                      <Trash2 size={14} />
-                    </IconButton>
+                    <div className="grid grid-cols-[minmax(3.75rem,1fr)_6.45rem_2.25rem] gap-1.5">
+                      <a
+                        href={tcgplayerUrl(card, artVariant)}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        className="interactive-control inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/34 bg-[#f6c542]/10 px-2 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/16"
+                        title={`Search TCGplayer for ${card.name}`}
+                        aria-label={`Search TCGplayer for ${card.name}`}
+                      >
+                        <ShoppingCart size={15} />
+                        <span>TCG</span>
+                      </a>
+                      <MiniQuantityControl
+                        label={card.name}
+                        quantity={quantity}
+                        tone={zone}
+                        incrementDisabled={Boolean(addConstraint)}
+                        decrementDisabled={quantity <= 0}
+                        incrementReason={addConstraint}
+                        decrementReason={`No ${zoneLabel(zone).toLowerCase()} copies`}
+                        onIncrement={() => onAdjust(zone, card.number, 1)}
+                        onDecrement={() => onAdjust(zone, card.number, -1)}
+                      />
+                      <IconButton
+                        label={`Remove ${card.name}`}
+                        onClick={() => onRemove(zone, card.number)}
+                      >
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3478,6 +3937,7 @@ function LibraryCard({
   ownedQuantity,
   missingQuantity,
   onSelect,
+  onOpenCard,
   onAdjustMain,
   onAdjustResource,
 }: {
@@ -3490,6 +3950,7 @@ function LibraryCard({
   ownedQuantity: number;
   missingQuantity: number;
   onSelect: () => void;
+  onOpenCard: () => void;
   onAdjustMain: (delta: number) => void;
   onAdjustResource: (delta: number) => void;
 }) {
@@ -3517,16 +3978,29 @@ function LibraryCard({
 
   return (
     <article
-      className={`virtual-card group relative cursor-pointer overflow-hidden rounded-sm border bg-black shadow-xl transition duration-200 hover:-translate-y-0.5 hover:shadow-2xl ${colorAccentClass(
+      className={`virtual-card group relative cursor-pointer overflow-hidden rounded-sm border bg-[#07090d] shadow-xl transition duration-200 hover:-translate-y-0.5 hover:shadow-2xl ${colorAccentClass(
         card.color,
       )} ${selected ? "ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
       onClick={onSelect}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        onOpenCard();
+      }}
     >
-      <div className="relative aspect-[5/7] bg-[#11141b]">
+      <button
+        type="button"
+        className="relative block aspect-[5/7] w-full overflow-hidden bg-[#11141b] text-left"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpenCard();
+        }}
+        aria-label={`Open large view of ${card.name}`}
+        title={`Open large view of ${card.name}`}
+      >
         <img
           src={cardImagePath(card, artVariant)}
           alt={`${card.name} card`}
-          className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.025]"
+          className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.018]"
           loading="lazy"
         />
         {selected && (
@@ -3538,47 +4012,32 @@ function LibraryCard({
             <div className="absolute bottom-2 right-2 h-5 w-5 border-b-2 border-r-2 border-[#f6c542]" />
           </div>
         )}
-        <div className="absolute left-2 top-2 flex max-w-[calc(100%-4.25rem)] flex-wrap gap-1">
-          <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black text-black">
-            {card.number}
-          </span>
-          <span className={`rounded border px-1.5 py-0.5 text-xs font-black ${colorChipClass(card.color)}`}>
-            {card.color}
-          </span>
-          {artVariants.length > 1 && (
-            <span className="rounded border border-[#f6c542]/35 bg-black/70 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
-              {artDisplayLabel(artVariant)}
-            </span>
-          )}
-        </div>
         {quantity > 0 && (
           <div className="absolute right-2 top-2 grid gap-1">
-            <span className="shrink-0 rounded-sm border border-[#f6c542]/55 bg-[#e31b23] px-2 py-1 text-center text-xs font-black text-white shadow-lg shadow-black/30">
+            <span className="grid size-8 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-lg font-black leading-none text-white shadow-lg shadow-black/30">
               {quantity}
             </span>
           </div>
         )}
-        {primaryZone && onAdjustPrimary && !primaryConstraint && (
-          <button
-            type="button"
-            className={`interactive-control absolute bottom-2 right-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border px-2 font-display text-sm font-black uppercase opacity-100 shadow-xl transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 ${
-              primaryZone === "main"
-                ? "border-[#e31b23]/50 bg-[#e31b23]/80 text-white"
-                : "border-[#2e8cff]/50 bg-[#1167d8]/80 text-[#d9ecff]"
-            }`}
-            title={`Add one ${zoneLabel(primaryZone)} copy`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onAdjustPrimary(1);
-            }}
-          >
-            <Plus size={14} />
-            {primaryConstraint ? "Max" : zoneLabel(primaryZone)}
-          </button>
-        )}
-      </div>
-      <div className="border-t border-[#a7b5c9]/20 bg-[#07090d] p-2">
-        <h3 className="line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
+        <span className="pointer-events-none absolute bottom-2 right-2 grid size-8 place-items-center rounded-sm border border-[#8bdcff]/42 bg-[#04101b]/78 text-[#d9ecff] opacity-100 shadow-lg shadow-black/30 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
+          <Maximize2 size={15} />
+        </span>
+      </button>
+      <div className="border-t border-[#a7b5c9]/18 bg-[#07090d] p-2">
+        <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-1">
+          <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-[11px] font-black leading-none text-black">
+            {card.number}
+          </span>
+          <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] font-black leading-none ${colorChipClass(card.color)}`}>
+            {card.color}
+          </span>
+          {artVariants.length > 1 && (
+            <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/10 px-1.5 py-0.5 text-[11px] font-black leading-none text-[#fff2bd]">
+              {artDisplayLabel(artVariant)}
+            </span>
+          )}
+        </div>
+        <h3 className="line-clamp-2 font-display text-lg font-black uppercase leading-tight text-[#f7f7f2] sm:text-xl">
           {card.name}
         </h3>
         <p className="mt-0.5 text-sm font-bold text-[#f7f7f2]/65">
@@ -3608,27 +4067,24 @@ function LibraryCard({
           </div>
         )}
       </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_4.75rem] gap-2 border-t border-[#a7b5c9]/20 bg-[#080a0f] p-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_3.35rem] gap-1.5 border-t border-[#a7b5c9]/18 bg-[#080a0f] p-2">
         {primaryZone && onAdjustPrimary ? (
-          <QuantityStepper
-            label={zoneLabel(primaryZone)}
+          <MiniQuantityControl
+            label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
             quantity={primaryQuantity}
             tone={primaryZone}
+            dense
             incrementDisabled={Boolean(primaryConstraint)}
             decrementDisabled={primaryQuantity <= 0}
             incrementReason={primaryConstraint}
             decrementReason={`No ${zoneLabel(primaryZone).toLowerCase()} copies`}
             onIncrement={() => onAdjustPrimary(1)}
             onDecrement={() => onAdjustPrimary(-1)}
-            compact
           />
         ) : (
-          <div className="rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] p-2">
-            <div className="font-display text-base font-black uppercase text-[#f7f7f2]/35">
+          <div className="grid h-9 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2">
+            <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/35">
               Locked
-            </div>
-            <div className="mt-1 text-xs font-bold text-[#f7f7f2]/35">
-              {primaryConstraint}
             </div>
           </div>
         )}
@@ -3636,9 +4092,10 @@ function LibraryCard({
           href={tcgplayerUrl(card, artVariant)}
           target="_blank"
           rel="noopener noreferrer nofollow"
-          className="interactive-control inline-flex h-full min-h-10 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-lg font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+          className="interactive-control inline-flex h-9 min-h-9 items-center justify-center gap-1 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-sm font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
           onClick={(event) => event.stopPropagation()}
           title={`Search TCGplayer for ${card.name}`}
+          aria-label={`Search TCGplayer for ${card.name}`}
         >
           <ShoppingCart size={15} />
           TCG
@@ -3660,6 +4117,7 @@ function InspectorPanel({
   onAdjustResource,
   onStepArt,
   onAdjustCollection,
+  onOpenCard,
 }: {
   card: GundamCard;
   artVariant: CardArtVariant;
@@ -3672,6 +4130,7 @@ function InspectorPanel({
   onAdjustResource: (delta: number) => void;
   onStepArt: (delta: number) => void;
   onAdjustCollection: (delta: number) => void;
+  onOpenCard: () => void;
 }) {
   const mainConstraint = zoneAddConstraint("main", card, mainQuantity);
   const resourceConstraint = zoneAddConstraint("resource", card, resourceQuantity);
@@ -3687,14 +4146,24 @@ function InspectorPanel({
     <section className={panelClass("overflow-hidden")}>
       <div className={`border-b border-[#a7b5c9]/20 p-3 ${colorAccentClass(card.color)}`}>
         <div className="flex items-start gap-3">
-          <div className="scan-frame h-36 w-[103px] shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black shadow-2xl shadow-black/40">
+          <button
+            type="button"
+            className="scan-frame interactive-control relative h-36 w-[103px] shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black text-left shadow-2xl shadow-black/40"
+            onClick={onOpenCard}
+            aria-label={`Open large view of ${card.name}`}
+            title={`Open large view of ${card.name}`}
+          >
             <img
               src={cardImagePath(card, artVariant)}
               alt={`${card.name} card`}
               className="h-full w-full object-cover object-top"
               loading="lazy"
             />
-          </div>
+            <span className="absolute inset-x-0 bottom-0 z-10 inline-flex h-7 items-center justify-center gap-1 bg-black/72 font-display text-sm font-black uppercase text-[#d9ecff]">
+              <Maximize2 size={12} />
+              View
+            </span>
+          </button>
           <div className="min-w-0">
             <div className="flex flex-wrap gap-1.5">
               <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
@@ -3858,18 +4327,64 @@ function Spec({ label, value }: { label: string; value: string }) {
 function CardThumb({
   card,
   artVariant,
+  onOpen,
+  size = "sm",
+  badge,
 }: {
   card: GundamCard;
   artVariant?: CardArtVariant;
+  onOpen?: () => void;
+  size?: "sm" | "deck";
+  badge?: string;
 }) {
+  const sizeClass =
+    size === "deck"
+      ? "h-24 w-[4.25rem] sm:h-28 sm:w-20"
+      : "h-16 w-12";
+  const thumbClass =
+    `relative ${sizeClass} shrink-0 overflow-hidden rounded-sm border border-[#f7f7f2]/15 bg-black shadow-sm`;
+  const image = (
+    <img
+      src={cardImagePath(card, artVariant)}
+      alt={`${card.name} card`}
+      className="h-full w-full object-cover object-top"
+      loading="lazy"
+    />
+  );
+
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        className={`${thumbClass} interactive-control group/card-thumb`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+        aria-label={`Open large view of ${card.name}`}
+        title={`Open large view of ${card.name}`}
+      >
+        {image}
+        {badge && (
+          <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
+            {badge}
+          </span>
+        )}
+        <span className="absolute inset-x-0 bottom-0 grid h-5 place-items-center bg-black/70 text-[#d9ecff] opacity-0 transition group-hover/card-thumb:opacity-100 group-focus-visible/card-thumb:opacity-100">
+          <Maximize2 size={11} />
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <div className="h-16 w-12 shrink-0 overflow-hidden rounded-sm border border-[#f7f7f2]/15 bg-black shadow-sm">
-      <img
-        src={cardImagePath(card, artVariant)}
-        alt={`${card.name} card`}
-        className="h-full w-full object-cover object-top"
-        loading="lazy"
-      />
+    <div className={thumbClass}>
+      {image}
+      {badge && (
+        <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
+          {badge}
+        </span>
+      )}
     </div>
   );
 }
@@ -3900,29 +4415,6 @@ function IconButton({
     >
       {children}
     </button>
-  );
-}
-
-function IconLink({
-  label,
-  children,
-  href,
-}: {
-  label: string;
-  children: React.ReactNode;
-  href: string;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer nofollow"
-      className="interactive-control inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-1.5 font-display font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/16"
-      title={label}
-      aria-label={label}
-    >
-      {children}
-    </a>
   );
 }
 
