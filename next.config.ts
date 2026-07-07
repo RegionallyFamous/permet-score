@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     ].filter(
       (redirect) =>
         process.env.ENABLE_CANONICAL_HOST_REDIRECTS === "true" ||
-        redirect.has[0]?.value !== "permet-score.vercel.app",
+        redirect.has[0]?.value === "www.permetscore.com",
     );
   },
 };
