@@ -25,6 +25,37 @@ const nextConfig: NextConfig = {
         redirect.has[0]?.value === "www.permetlink.com",
     );
   },
+  async headers() {
+    const staticAssetHeaders = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800",
+      },
+    ];
+
+    return [
+      {
+        source: "/assets/:path*",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/card-images/:path*",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/permet-link-logo-header.webp",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/permet-link-logo-fallback.webp",
+        headers: staticAssetHeaders,
+      },
+      {
+        source: "/permet-link-logo.png",
+        headers: staticAssetHeaders,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -4,6 +4,7 @@ import {
 } from "./card-art-data";
 import {
   CARD_POOL,
+  type CardType,
   type GundamCard,
 } from "./card-data";
 import { TCGPLAYER_CARD_POOL } from "./tcgplayer-card-data";
@@ -33,6 +34,11 @@ const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
   string,
   readonly CardArtVariant[]
 >;
+const MAIN_TARGET = 50;
+const RESOURCE_TARGET = 10;
+const MAX_MAIN_COPIES = 4;
+const MAIN_TYPES: CardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
+const RESOURCE_TYPES: CardType[] = ["RESOURCE"];
 
 function clampQuantity(value: unknown) {
   const quantity = Number(value);
@@ -77,13 +83,33 @@ function validArtId(card: GundamCard, artId: string) {
   return cardArtVariants(card).some((variant) => variant.id === artId);
 }
 
-function sanitizeQuantities(value: unknown): QuantityMap {
+function canCardEnterZone(zone: "main" | "resource", card: GundamCard) {
+  return zone === "main"
+    ? MAIN_TYPES.includes(card.type)
+    : RESOURCE_TYPES.includes(card.type);
+}
+
+function sanitizeQuantities(
+  value: unknown,
+  zone: "main" | "resource",
+): QuantityMap {
   if (!value || typeof value !== "object") return {};
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([number, quantity]) => [number, clampQuantity(quantity)] as const)
-      .filter(([number, quantity]) => quantity > 0 && CARD_BY_NUMBER.has(number)),
-  );
+  const maxCopies = zone === "main" ? MAX_MAIN_COPIES : RESOURCE_TARGET;
+  const maxTotal = zone === "main" ? MAIN_TARGET : RESOURCE_TARGET;
+  const next: QuantityMap = {};
+  let remaining = maxTotal;
+
+  Object.entries(value as Record<string, unknown>).forEach(([number, quantity]) => {
+    if (remaining <= 0) return;
+    const card = CARD_BY_NUMBER.get(number);
+    if (!card || !canCardEnterZone(zone, card)) return;
+    const safeQuantity = Math.min(clampQuantity(quantity), maxCopies, remaining);
+    if (safeQuantity <= 0) return;
+    next[number] = safeQuantity;
+    remaining -= safeQuantity;
+  });
+
+  return next;
 }
 
 function sanitizeArtChoices(value: unknown): ArtChoiceMap {
@@ -177,8 +203,8 @@ function sanitizePrints(
 export function sanitizeSharedDeck(value: unknown): SharedDeckState | null {
   if (!value || typeof value !== "object") return null;
   const maybeDeck = value as Partial<SharedDeckState>;
-  const main = sanitizeQuantities(maybeDeck.main);
-  const resource = sanitizeQuantities(maybeDeck.resource);
+  const main = sanitizeQuantities(maybeDeck.main, "main");
+  const resource = sanitizeQuantities(maybeDeck.resource, "resource");
   const art = sanitizeArtChoices(maybeDeck.art);
 
   if (totalCards(main) === 0 && totalCards(resource) === 0) return null;

@@ -1,14 +1,6 @@
 import type { Metadata } from "next";
-import {
-  Geist_Mono,
-  Rajdhani,
-} from "next/font/google";
+import { Rajdhani } from "next/font/google";
 import "./globals.css";
-
-const geistMono = Geist_Mono({
-  variable: "--font-gundam-mono",
-  subsets: ["latin"],
-});
 
 const rajdhani = Rajdhani({
   variable: "--font-gundam-display",
@@ -51,7 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistMono.variable} ${rajdhani.variable} antialiased`}
+        className={`${rajdhani.variable} antialiased`}
       >
         {children}
       </body>

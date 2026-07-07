@@ -5,6 +5,7 @@ import { join } from "node:path";
 const baseUrl = process.env.PERMET_BASE_URL ?? "http://localhost:3000";
 const outputDir = join(process.cwd(), "qa-screenshots");
 const viewports = [
+  { name: "compact", width: 320, height: 680 },
   { name: "mobile", width: 390, height: 844 },
   { name: "tablet", width: 820, height: 1180 },
   { name: "desktop", width: 1280, height: 720 },
@@ -58,10 +59,35 @@ async function readAudit(page) {
           return rect.width > 0 && rect.height > 0;
         },
       ).length;
+      const overflowOffenders = Array.from(document.body.querySelectorAll("*"))
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = window.getComputedStyle(element);
+          return {
+            tag: element.tagName.toLowerCase(),
+            text: element.textContent?.trim().slice(0, 60) ?? "",
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+            visible:
+              rect.width > 0 &&
+              rect.height > 0 &&
+              rect.bottom > 0 &&
+              rect.top < window.innerHeight &&
+              style.visibility !== "hidden" &&
+              style.display !== "none",
+          };
+        })
+        .filter(
+          (item) =>
+            item.visible && (item.left < -1 || item.right > viewportWidth + 1),
+        )
+        .slice(0, 5);
 
       return {
         title: document.title,
         overflow,
+        overflowOffenders,
         visibleButtons,
         hasMobileNav: window.matchMedia("(max-width: 1279px)").matches
           ? Boolean(document.querySelector("nav"))
@@ -79,10 +105,35 @@ async function readAudit(page) {
           return rect.width > 0 && rect.height > 0;
         },
       ).length;
+      const overflowOffenders = Array.from(document.body.querySelectorAll("*"))
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = window.getComputedStyle(element);
+          return {
+            tag: element.tagName.toLowerCase(),
+            text: element.textContent?.trim().slice(0, 60) ?? "",
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+            visible:
+              rect.width > 0 &&
+              rect.height > 0 &&
+              rect.bottom > 0 &&
+              rect.top < window.innerHeight &&
+              style.visibility !== "hidden" &&
+              style.display !== "none",
+          };
+        })
+        .filter(
+          (item) =>
+            item.visible && (item.left < -1 || item.right > viewportWidth + 1),
+        )
+        .slice(0, 5);
 
       return {
         title: document.title,
         overflow,
+        overflowOffenders,
         visibleButtons,
         hasMobileNav: window.matchMedia("(max-width: 1279px)").matches
           ? Boolean(document.querySelector("nav"))
@@ -115,11 +166,61 @@ try {
     if (audit.overflow > 1) {
       throw new Error(`${viewport.name}: horizontal overflow ${audit.overflow}px`);
     }
+    if (audit.overflowOffenders.length) {
+      throw new Error(
+        `${viewport.name}: visible child overflow ${JSON.stringify(audit.overflowOffenders)}`,
+      );
+    }
     if (!audit.hasMobileNav) {
       throw new Error(`${viewport.name}: missing mobile cockpit nav`);
     }
     if (audit.visibleButtons < 4) {
       throw new Error(`${viewport.name}: expected visible controls`);
+    }
+
+    if (viewport.width < 1280) {
+      await page.getByRole("button", { name: "Show Deck" }).click();
+      const deckAudit = await readAudit(page);
+      if (deckAudit.overflow > 1 || deckAudit.overflowOffenders.length) {
+        throw new Error(
+          `${viewport.name} deck: overflow ${deckAudit.overflow}px ${JSON.stringify(
+            deckAudit.overflowOffenders,
+          )}`,
+        );
+      }
+
+      await page.getByRole("button", { name: "Show Stats" }).click();
+      const statsAudit = await readAudit(page);
+      if (statsAudit.overflow > 1 || statsAudit.overflowOffenders.length) {
+        throw new Error(
+          `${viewport.name} stats: overflow ${statsAudit.overflow}px ${JSON.stringify(
+            statsAudit.overflowOffenders,
+          )}`,
+        );
+      }
+
+      await page.getByRole("button", { name: "Show Library" }).click();
+      await page.getByRole("button", { name: /Filters/i }).first().click();
+      const filtersAudit = await readAudit(page);
+      if (filtersAudit.overflow > 1 || filtersAudit.overflowOffenders.length) {
+        throw new Error(
+          `${viewport.name} filters: overflow ${filtersAudit.overflow}px ${JSON.stringify(
+            filtersAudit.overflowOffenders,
+          )}`,
+        );
+      }
+
+      await page.getByRole("button", { name: /Filters/i }).first().click();
+      await page.getByRole("button", { name: /Open large view of/i }).first().click();
+      const lightboxAudit = await readAudit(page);
+      if (lightboxAudit.overflow > 1 || lightboxAudit.overflowOffenders.length) {
+        throw new Error(
+          `${viewport.name} lightbox: overflow ${lightboxAudit.overflow}px ${JSON.stringify(
+            lightboxAudit.overflowOffenders,
+          )}`,
+        );
+      }
+      await page.keyboard.press("Escape");
     }
 
     await page.close();

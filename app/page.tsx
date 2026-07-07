@@ -501,6 +501,10 @@ function getArtVariant(card: GundamCard, choices: ArtChoiceMap) {
 
 function cardImagePath(card: GundamCard, variant?: CardArtVariant, size = 1500) {
   const selectedVariant = variant ?? cardArtVariants(card)[0];
+  if (selectedVariant.image.startsWith("/") && size <= 1000) {
+    return selectedVariant.image;
+  }
+
   const print = tcgplayerImagePrint(card, selectedVariant);
   if (print) {
     const imageUrl = tcgplayerPrintImageUrl(print, size);
@@ -620,7 +624,6 @@ function tcgplayerPrint(card: GundamCard, variant: CardArtVariant): TcgplayerPri
     prints.find((print) => print.variantId === variant.id) ??
     prints.find((print) => print.officialId === variant.officialId) ??
     (variant.id === "standard" ? prints.find((print) => print.variantId === "standard") : undefined) ??
-    (variant.id === "standard" ? undefined : prints[variant.tier] ?? prints[0]) ??
     null
   );
 }
@@ -1297,7 +1300,10 @@ export function DeckBuilder({
   const hasInitialSharedDeck = sharedDeckId && initialSharedDeck !== undefined;
   const [deck, setDeck] = useState<DeckState>(() => {
     if (hasInitialSharedDeck) {
-      return sanitizeDeck(initialSharedDeck) ?? cloneDeckState(starterDeck);
+      return sanitizeDeck(initialSharedDeck) ?? emptyDeck();
+    }
+    if (sharedDeckId) {
+      return emptyDeck();
     }
     return cloneDeckState(starterDeck);
   });
@@ -1339,6 +1345,8 @@ export function DeckBuilder({
   const toastTimerRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
   const undoDeckRef = useRef<DeckState | null>(null);
+  const storageTimerRef = useRef<number | null>(null);
+  const lastSavedDeckRef = useRef("");
   const deferredQuery = useDeferredValue(query);
 
   const isDialogOpen = Boolean(fallbackPanel || lightbox);
@@ -1355,6 +1363,7 @@ export function DeckBuilder({
       if (cancelled) return;
 
       if (sharedDeckId && hasInitialSharedDeck) {
+        if (!initialSharedDeck) setDeck(emptyDeck());
         setSharedStatus(initialSharedDeck ? "ready" : "missing");
         setLoaded(true);
         return;
@@ -1371,12 +1380,15 @@ export function DeckBuilder({
               setDeck(parsed);
               setSharedStatus("ready");
             } else {
+              setDeck(emptyDeck());
               setSharedStatus("missing");
             }
           } else {
+            setDeck(emptyDeck());
             setSharedStatus("missing");
           }
         } catch {
+          setDeck(emptyDeck());
           setSharedStatus("missing");
         }
         if (!cancelled) setLoaded(true);
@@ -1406,14 +1418,37 @@ export function DeckBuilder({
 
   useEffect(() => {
     if (loaded && !sharedDeckId) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(deck));
+      const serializedDeck = JSON.stringify(deck);
+      if (serializedDeck === lastSavedDeckRef.current) return undefined;
+
+      if (storageTimerRef.current) {
+        window.clearTimeout(storageTimerRef.current);
+      }
+
+      storageTimerRef.current = window.setTimeout(() => {
+        window.localStorage.setItem(STORAGE_KEY, serializedDeck);
+        lastSavedDeckRef.current = serializedDeck;
+        storageTimerRef.current = null;
+      }, 180);
+
+      return () => {
+        if (storageTimerRef.current) {
+          window.clearTimeout(storageTimerRef.current);
+          storageTimerRef.current = null;
+        }
+      };
     }
+
+    return undefined;
   }, [deck, loaded, sharedDeckId]);
 
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current);
+      }
+      if (storageTimerRef.current) {
+        window.clearTimeout(storageTimerRef.current);
       }
     };
   }, []);
@@ -1813,6 +1848,17 @@ export function DeckBuilder({
   }
 
   function resetAdvancedFilters() {
+    setSetFilter("All");
+    setArtFilter("All Art");
+    setCollectionFilter("All");
+    setBudgetLimit(DEFAULT_BUDGET_LIMIT);
+    setLibraryPage(0);
+  }
+
+  function clearLibraryFilters() {
+    setQuery("");
+    setColorFilter("All");
+    setTypeFilter("All");
     setSetFilter("All");
     setArtFilter("All Art");
     setCollectionFilter("All");
@@ -2328,7 +2374,8 @@ export function DeckBuilder({
     setMobileActionsOpen(false);
     setMobileView(view);
     window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
     });
   }
 
@@ -2391,7 +2438,7 @@ export function DeckBuilder({
                   onChange={(event) =>
                     setDeck((current) => ({ ...current, name: event.target.value }))
                   }
-                  className="control-field h-10 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15 sm:h-11"
+                  className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/12 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                 />
               </label>
               <div className="relative">
@@ -2429,6 +2476,8 @@ export function DeckBuilder({
                     mobileLabel={mobileActionsOpen ? "Close" : "More"}
                     title="More deck actions"
                     onClick={() => setMobileActionsOpen((open) => !open)}
+                    ariaExpanded={mobileActionsOpen}
+                    ariaControls="mobile-action-sheet"
                     className="w-full xl:hidden"
                   >
                     {mobileActionsOpen ? <X size={16} /> : <MoreHorizontal size={16} />}
@@ -2510,7 +2559,7 @@ export function DeckBuilder({
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-[1800px] gap-4 px-3 py-3 pb-36 sm:px-5 sm:py-4 xl:pb-4">
+      <section className="mx-auto grid max-w-[1800px] gap-4 px-3 pb-36 pt-3 sm:px-5 sm:pb-36 sm:pt-4 xl:pb-4">
         {sharedDeckId && (
           <SharedDeckBanner
             deckName={deck.name}
@@ -2527,8 +2576,8 @@ export function DeckBuilder({
         <div className="workbench-grid grid gap-4 xl:grid-cols-[minmax(430px,1.05fr)_minmax(360px,0.82fr)_minmax(360px,0.9fr)] xl:items-start 2xl:grid-cols-[minmax(540px,1.25fr)_minmax(390px,0.82fr)_minmax(390px,0.9fr)]">
           <section
             id="library-panel"
-            role="tabpanel"
-            aria-labelledby="library-tab"
+            role="region"
+            aria-label="Card library"
             className={panelClass(
               `min-w-0 overflow-hidden ${
                 mobileView === "library" ? "block" : "hidden xl:block"
@@ -2564,7 +2613,7 @@ export function DeckBuilder({
                             setLibraryPage(0);
                           }}
                           placeholder="Name, #, text"
-                          className="control-field h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/42 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                          className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/42 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         />
                       </div>
                     </label>
@@ -2627,7 +2676,7 @@ export function DeckBuilder({
                   )}
 
                   {advancedFiltersOpen && (
-                    <div className="workbench-scroll grid gap-2 md:grid-cols-4">
+                    <div className="workbench-scroll grid grid-cols-2 gap-2 md:grid-cols-4">
                       <div className="md:hidden">
                         <SelectFilter
                           label="Color"
@@ -2660,7 +2709,7 @@ export function DeckBuilder({
                             setSetFilter(event.target.value);
                             setLibraryPage(0);
                           }}
-                          className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                          className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         >
                           {setOptions.map((set) => (
                             <option key={set} value={set}>
@@ -2700,7 +2749,7 @@ export function DeckBuilder({
                             setBudgetLimit(Math.max(0, Number(event.target.value) || 0));
                             setLibraryPage(0);
                           }}
-                          className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                          className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         />
                       </label>
                     </div>
@@ -2784,6 +2833,14 @@ export function DeckBuilder({
                   <p className="mt-1 text-sm font-semibold text-[#f7f7f2]/62">
                     Clear a filter or broaden the search.
                   </p>
+                  <button
+                    type="button"
+                    className="interactive-control mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-4 font-display text-base font-black uppercase text-[#fff2bd]"
+                    onClick={clearLibraryFilters}
+                  >
+                    <RotateCcw size={15} />
+                    Clear All
+                  </button>
                 </div>
               )}
             </div>
@@ -2800,8 +2857,8 @@ export function DeckBuilder({
 
             <div
               id="card-panel"
-              role="tabpanel"
-              aria-labelledby="card-tab"
+              role="region"
+              aria-label="Card inspector"
               className={mobileView === "card" ? "block min-w-0" : "hidden min-w-0 xl:block"}
             >
               {selectedCard && selectedArtVariant ? (
@@ -2832,8 +2889,8 @@ export function DeckBuilder({
 
             <div
               id="stats-panel"
-              role="tabpanel"
-              aria-labelledby="stats-tab"
+              role="region"
+              aria-label="Deck stats"
               className={
                 mobileView === "stats"
                   ? "grid min-w-0 max-w-full gap-4"
@@ -2869,8 +2926,8 @@ export function DeckBuilder({
 
           <div
             id="deck-panel"
-            role="tabpanel"
-            aria-labelledby="deck-tab"
+            role="region"
+            aria-label="Deck list"
             className={`min-w-0 max-w-full gap-4 xl:grid ${
               mobileView === "deck" ? "grid" : "hidden"
             }`}
@@ -2928,6 +2985,7 @@ export function DeckBuilder({
           })
         }
         onImport={() => runMobileAction(() => importInputRef.current?.click())}
+        onClose={() => setMobileActionsOpen(false)}
       />
       <MobileCockpitNav activeView={mobileView} onChange={changeMobileView} />
       <ToastViewport
@@ -3085,7 +3143,7 @@ function SharedDeckBanner({
                 srcSet={cardImageSrcSet(card, undefined, [320, 480, 640])}
                 sizes="3.5rem"
                 alt=""
-                className="preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-cover object-top shadow-xl shadow-black/40"
+                className="preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 bg-black object-contain object-top shadow-xl shadow-black/40"
                 referrerPolicy="no-referrer"
                 onError={handleCardImageError}
               />
@@ -3200,13 +3258,12 @@ function MobileCockpitNav({
       className="fixed inset-x-0 bottom-0 z-30 border-t border-[#8bdcff]/30 bg-[#05060a]/96 px-2 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2 shadow-[0_-18px_44px_rgba(0,0,0,0.72)] backdrop-blur-xl xl:hidden"
       aria-label="Mobile workspace views"
     >
-      <div className="mx-auto grid max-w-lg grid-cols-4 gap-1.5" role="tablist">
+      <div className="mx-auto grid max-w-lg grid-cols-4 gap-1.5">
         {mobileViews.map((view) => (
           <button
             id={`${view.id}-tab`}
             key={view.id}
             type="button"
-            role="tab"
             className={`cockpit-tab grid h-14 place-items-center rounded-sm border font-display text-sm font-black uppercase ${
               activeView === view.id
                 ? "cockpit-tab-active border-[#8bdcff]/55 bg-[#1167d8]/28 text-[#d9ecff] shadow-lg shadow-[#1167d8]/22"
@@ -3215,7 +3272,7 @@ function MobileCockpitNav({
             onClick={() => onChange(view.id)}
             aria-label={`Show ${view.label}`}
             aria-controls={`${view.id}-panel`}
-            aria-selected={activeView === view.id}
+            aria-current={activeView === view.id ? "page" : undefined}
           >
             {view.icon}
             <span className="leading-none">{view.label}</span>
@@ -3237,6 +3294,7 @@ function MobileActionSheet({
   onExport,
   onSheet,
   onImport,
+  onClose,
 }: {
   open: boolean;
   copyState: string;
@@ -3248,11 +3306,36 @@ function MobileActionSheet({
   onExport: () => void;
   onSheet: () => void;
   onImport: () => void;
+  onClose: () => void;
 }) {
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    window.setTimeout(() => {
+      sheetRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    }, 0);
+
+    return () => {
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
-    <div className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden">
+    <div
+      ref={sheetRef}
+      id="mobile-action-sheet"
+      className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden"
+      role="dialog"
+      aria-label="More deck actions"
+      onKeyDown={(event) => trapDialogFocus(event, sheetRef.current, onClose)}
+    >
       <ToolbarButton label="Sample" title="Load sample deck" onClick={onSample} className="w-full">
         <ShieldCheck size={16} />
       </ToolbarButton>
@@ -3408,6 +3491,7 @@ function FallbackPanelView({
           <textarea
             readOnly
             value={panel.content}
+            aria-label={`${panel.title} content`}
             onFocus={(event) => event.currentTarget.select()}
             className="control-field min-h-28 w-full resize-y rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono text-sm font-bold leading-6 text-[#f7f7f2] outline-none focus:border-[#f6c542]"
           />
@@ -3531,9 +3615,10 @@ function CardLightbox({
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const lightboxCardNumber = item?.card.number;
 
   useEffect(() => {
-    if (!item) return undefined;
+    if (!lightboxCardNumber) return undefined;
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
@@ -3542,7 +3627,7 @@ function CardLightbox({
       previousFocusRef.current?.focus();
       previousFocusRef.current = null;
     };
-  }, [item]);
+  }, [lightboxCardNumber]);
 
   if (!item) return null;
 
@@ -3617,6 +3702,7 @@ function CardLightbox({
                       }`}
                       onClick={() => onVariantChange(variant)}
                       aria-label={`View ${artDisplayLabel(variant)} of ${card.name}`}
+                      aria-pressed={variant.id === artVariant.id}
                       title={`${artDisplayLabel(variant)} · ${formatPrintMoney(card, variant)}`}
                     >
                       <img
@@ -3624,7 +3710,7 @@ function CardLightbox({
                         srcSet={cardImageSrcSet(card, variant, [320, 480, 640])}
                         sizes="4.5rem"
                         alt=""
-                        className="aspect-[5/7] w-full object-cover object-top"
+                        className="aspect-[5/7] w-full bg-black object-contain object-top"
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={handleCardImageError}
@@ -3735,7 +3821,7 @@ function CostPanel({
         </div>
         <button
           type="button"
-          className="interactive-control mt-1 inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#28d17c]/35 bg-[#28d17c]/12 font-display text-base font-black uppercase text-[#d9ffe9] hover:bg-[#28d17c]/18"
+          className="interactive-control mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#28d17c]/35 bg-[#28d17c]/12 font-display text-base font-black uppercase text-[#d9ffe9] hover:bg-[#28d17c]/18"
           onClick={onMarkOwned}
         >
           <WalletCards size={16} />
@@ -3938,6 +4024,8 @@ function ToolbarButton({
   title,
   onClick,
   disabled = false,
+  ariaExpanded,
+  ariaControls,
   className = "",
 }: {
   children: React.ReactNode;
@@ -3946,6 +4034,8 @@ function ToolbarButton({
   title: string;
   onClick: () => void;
   disabled?: boolean;
+  ariaExpanded?: boolean;
+  ariaControls?: string;
   className?: string;
 }) {
   return (
@@ -3959,6 +4049,8 @@ function ToolbarButton({
       onClick={onClick}
       title={title}
       aria-label={title}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
       disabled={disabled}
     >
       {children}
@@ -4017,7 +4109,7 @@ function SelectFilter<T extends string>({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+        className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
       >
         {values.map((option) => (
           <option key={option} value={option}>
@@ -4310,7 +4402,7 @@ function DeckPanel({
                         </span>
                       ))}
                     </div>
-                    <div className="grid grid-cols-[minmax(3.75rem,1fr)_7.75rem_2.75rem] gap-1.5">
+                    <div className="grid grid-cols-1 gap-1.5 min-[380px]:grid-cols-[minmax(3.75rem,1fr)_7.75rem_2.75rem]">
                       <a
                         href={tcgplayerUrl(card, artVariant)}
                         target="_blank"
@@ -4408,94 +4500,102 @@ function LibraryCard({
         card.color,
       )} ${selected ? "active-scan-card ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
     >
-      <button
-        type="button"
-        className="scan-frame relative block h-40 w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-[#11141b] text-left shadow-lg shadow-black/35 sm:h-44"
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpenCard();
-        }}
-        aria-label={`Open large view of ${card.name}`}
-        title={`Open large view of ${card.name}`}
-      >
-        <img
-          src={cardImagePath(card, artVariant, 1000)}
-          srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
-          sizes="(min-width: 1280px) 20vw, (min-width: 640px) 44vw, 92vw"
-          alt={`${card.name} card`}
-          className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.035]"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={handleCardImageError}
-        />
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#06080d]/95 via-[#06080d]/28 to-transparent" />
-        {selected && (
-          <span className="permet-scanline pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#8bdcff]/0 via-[#8bdcff]/28 to-[#8bdcff]/0" />
-        )}
-        <span className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1">
-          <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-[11px] font-black leading-none text-black">
-            {card.number}
-          </span>
-          <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] font-black leading-none ${colorChipClass(card.color)}`}>
-            {card.color}
-          </span>
-          {artVariants.length > 1 && (
-            <span className="rounded-sm border border-[#f6c542]/35 bg-black/70 px-1.5 py-0.5 text-[11px] font-black leading-none text-[#fff2bd]">
-              {artDisplayLabel(artVariant)}
+      <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2.5 sm:grid-cols-[7rem_minmax(0,1fr)]">
+        <button
+          type="button"
+          className="scan-frame interactive-control relative aspect-[5/7] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-black text-left shadow-lg shadow-black/35"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenCard();
+          }}
+          aria-label={`Open large view of ${card.name}`}
+          title={`Open large view of ${card.name}`}
+        >
+          <img
+            src={cardImagePath(card, artVariant, 1000)}
+            srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
+            sizes="(min-width: 1280px) 7rem, 6rem"
+            alt={`${card.name} card`}
+            className="h-full w-full bg-black object-contain object-top transition duration-200 group-hover:scale-[1.035]"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={handleCardImageError}
+          />
+          {selected && (
+            <span className="permet-scanline pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#8bdcff]/0 via-[#8bdcff]/28 to-[#8bdcff]/0" />
+          )}
+          {quantity > 0 && (
+            <span className="absolute right-1 top-1 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
+              {quantity}
             </span>
           )}
-        </span>
-        {quantity > 0 && (
-          <span className="absolute right-2 top-2 grid size-7 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-base font-black leading-none text-white shadow-lg shadow-black/30">
-            {quantity}
+          <span className="pointer-events-none absolute bottom-1 right-1 grid size-7 place-items-center rounded-sm border border-[#8bdcff]/36 bg-black/70 text-[#d9ecff]">
+            <Maximize2 size={14} />
           </span>
-        )}
-        <span className="pointer-events-none absolute bottom-2 right-2 grid size-8 place-items-center rounded-sm border border-[#8bdcff]/36 bg-black/70 text-[#d9ecff]">
-          <Maximize2 size={15} />
-        </span>
-        <span className="pointer-events-none absolute bottom-2 left-2 right-12 min-w-0">
-          <span className="line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
-            {card.name}
-          </span>
-          <span className="mt-1 block truncate text-sm font-bold text-[#f7f7f2]/72">
-            {card.type} · {formatPrintMoney(card, artVariant)}
-          </span>
-        </span>
-      </button>
+        </button>
 
-      <div className="mt-2 flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
-        {quantity > 0 && (
-          <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
-            Deck {quantity}
-          </span>
-        )}
-        {ownedQuantity > 0 && (
-          <span
-            className="rounded-sm border border-[#28d17c]/24 bg-[#28d17c]/10 px-1.5 py-0.5 text-[#d9ffe9]"
-            title={`${ownedQuantity} owned across all prints`}
-          >
-            Owned {ownedQuantity}
-          </span>
-        )}
-        {missingQuantity > 0 && (
-          <span
-            className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 text-[#fff2bd]"
-            title={`${missingQuantity} missing selected-print copies`}
-          >
-            Need {missingQuantity}
-          </span>
-        )}
-        {rulesPending && (
-          <span
-            className="rounded-sm border border-[#e31b23]/35 bg-[#e31b23]/12 px-1.5 py-0.5 text-[#ffe3e3]"
-            title="This market-discovered card needs official color, level, and cost data before deck building."
-          >
-            Rules pending
-          </span>
-        )}
-      </div>
+        <div className="grid min-w-0 content-start gap-2">
+          <div className="flex min-w-0 flex-wrap gap-1.5 text-[11px] font-black uppercase">
+            <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 leading-none text-black">
+              {card.number}
+            </span>
+            <span className={`rounded-sm border px-1.5 py-0.5 leading-none ${colorChipClass(card.color)}`}>
+              {card.color}
+            </span>
+            <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/8 px-1.5 py-0.5 leading-none text-[#f7f7f2]/78">
+              {card.type}
+            </span>
+            {artVariants.length > 1 && (
+              <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 leading-none text-[#fff2bd]">
+                {artDisplayLabel(artVariant)}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h3 className="line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2] sm:text-2xl">
+              {card.name}
+            </h3>
+            <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/68">
+              {formatPrintMoney(card, artVariant)}
+            </p>
+          </div>
+          <p className="hidden line-clamp-2 text-sm font-semibold leading-5 text-[#f7f7f2]/54 sm:block">
+            {card.text}
+          </p>
+          <div className="flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
+            {quantity > 0 && (
+              <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
+                Deck {quantity}
+              </span>
+            )}
+            {ownedQuantity > 0 && (
+              <span
+                className="rounded-sm border border-[#28d17c]/24 bg-[#28d17c]/10 px-1.5 py-0.5 text-[#d9ffe9]"
+                title={`${ownedQuantity} owned across all prints`}
+              >
+                Owned {ownedQuantity}
+              </span>
+            )}
+            {missingQuantity > 0 && (
+              <span
+                className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 text-[#fff2bd]"
+                title={`${missingQuantity} missing selected-print copies`}
+              >
+                Need {missingQuantity}
+              </span>
+            )}
+            {rulesPending && (
+              <span
+                className="rounded-sm border border-[#e31b23]/35 bg-[#e31b23]/12 px-1.5 py-0.5 text-[#ffe3e3]"
+                title="This market-discovered card needs official color, level, and cost data before deck building."
+              >
+                Rules pending
+              </span>
+            )}
+          </div>
+        </div>
 
-      <div className="mt-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] gap-1.5">
+        <div className="col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] gap-1.5 sm:col-span-1 sm:col-start-2">
         {primaryZone && onAdjustPrimary ? (
           <MiniQuantityControl
             label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
@@ -4554,6 +4654,7 @@ function LibraryCard({
           <ShoppingCart size={15} />
           TCG
         </a>
+        </div>
       </div>
     </article>
   );
@@ -4630,7 +4731,7 @@ function InspectorPanel({
               srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
               sizes="7rem"
               alt={`${card.name} card`}
-              className="h-full w-full object-cover object-top"
+              className="h-full w-full bg-black object-contain object-top"
               loading="lazy"
               referrerPolicy="no-referrer"
               onError={handleCardImageError}
@@ -4708,7 +4809,7 @@ function InspectorPanel({
           <div className="grid grid-cols-2 gap-2 2xl:grid-cols-3">
             <button
               type="button"
-              className={`interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
+              className={`interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
                 canDowngradeArt
                   ? "border-[#a7b5c9]/25 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#f6c542]/45 hover:bg-[#f6c542]/12"
                   : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -4722,7 +4823,7 @@ function InspectorPanel({
             </button>
             <button
               type="button"
-              className={`interactive-control inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
+              className={`interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border px-3 font-display text-base font-black uppercase ${
                 canUpgradeArt
                   ? "border-[#f6c542]/40 bg-[#f6c542]/12 text-[#fff2bd] hover:bg-[#f6c542]/18"
                   : "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/28"
@@ -4738,8 +4839,9 @@ function InspectorPanel({
               href={tcgplayerUrl(card, artVariant)}
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className="interactive-control col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 2xl:col-span-1"
+              className="interactive-control col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 2xl:col-span-1"
               title={`Search TCGplayer for ${card.name} ${artDisplayLabel(artVariant)}`}
+              aria-label={`Search TCGplayer for ${card.name} ${artDisplayLabel(artVariant)}`}
             >
               <ShoppingCart size={15} />
               TCG
@@ -4825,7 +4927,7 @@ function CardThumb({
       srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
       sizes={size === "deck" ? "5rem" : "3rem"}
       alt={`${card.name} card`}
-      className="h-full w-full object-cover object-top"
+      className="h-full w-full bg-black object-contain object-top"
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={handleCardImageError}
