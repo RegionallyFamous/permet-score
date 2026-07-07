@@ -6008,11 +6008,6 @@ function CostPanel({
     <section className={panelClass()}>
       <PanelTitle icon={<BadgeDollarSign size={18} />} title="Market Cost" />
       <div className="grid gap-2 p-3">
-        <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-sm font-bold leading-6 text-[#d9ecff]/82">
-          {TCGPLAYER_LAST_SYNC
-            ? `Market snapshot synced ${TCGPLAYER_LAST_SYNC}. Unpriced prints use local estimates and direct TCGplayer search links.`
-            : "No market snapshot has been generated yet. Showing local estimates."}
-        </div>
         <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
         <CostRow label="Alt-art premium" value={formatMoney(summary.altPremium)} />
         <CostRow label="Owned prints" value={formatMoney(summary.ownedValue)} />
