@@ -2567,7 +2567,7 @@ export function DeckBuilder({
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
               <div className="flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
-                  src="/permet-link-logo-header.webp"
+                  src="/permet-link-logo.png"
                   alt="Permet Link"
                   width={1983}
                   height={793}
