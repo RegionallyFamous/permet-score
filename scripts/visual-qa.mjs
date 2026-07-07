@@ -17,13 +17,9 @@ await mkdir(outputDir, { recursive: true });
 
 async function launchBrowser() {
   try {
-    return await chromium.launch({ channel: "chrome" });
+    return await chromium.launch();
   } catch {
-    try {
-      return await chromium.launch({ channel: "chromium" });
-    } catch {
-      return chromium.launch();
-    }
+    return chromium.launch({ channel: "chrome" });
   }
 }
 
@@ -307,7 +303,12 @@ try {
         );
       }
 
-      await page.getByRole("button", { name: /Filters/i }).first().click();
+      const doneFilterButton = page.getByRole("button", { name: "Done" });
+      if (await doneFilterButton.isVisible().catch(() => false)) {
+        await doneFilterButton.click();
+      } else {
+        await page.getByRole("button", { name: /Filters/i }).first().click();
+      }
       await page.getByRole("button", { name: /Open large view of/i }).first().click();
       const lightboxAudit = await readAudit(page);
       if (lightboxAudit.overflow > 1 || lightboxAudit.overflowOffenders.length) {

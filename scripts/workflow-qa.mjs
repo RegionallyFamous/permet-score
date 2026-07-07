@@ -7,13 +7,9 @@ const isLocalBase = ["localhost", "127.0.0.1", "::1"].includes(baseHost);
 
 async function launchBrowser() {
   try {
-    return await chromium.launch({ channel: "chrome" });
+    return await chromium.launch();
   } catch {
-    try {
-      return await chromium.launch({ channel: "chromium" });
-    } catch {
-      return chromium.launch();
-    }
+    return chromium.launch({ channel: "chrome" });
   }
 }
 
@@ -875,7 +871,7 @@ async function assertMobileLibraryLayout(page) {
     throw new Error(`Mobile filters overlap bottom nav by ${filterGeometry.navOverlap}px`);
   }
 
-  await page.getByRole("button", { name: /Filters/i }).click();
+  await page.getByRole("button", { name: "Done" }).click();
   await page.setViewportSize({ width: 667, height: 375 });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /Filters/i }).click();
@@ -887,7 +883,7 @@ async function assertMobileLibraryLayout(page) {
     throw new Error(`Landscape mobile filters start offscreen: top=${landscapeTop}`);
   }
 
-  await page.getByRole("button", { name: /Filters/i }).click();
+  await page.getByRole("button", { name: "Done" }).click();
   await page.setViewportSize({ width: 320, height: 680 });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /Open large view of/i }).first().click();
@@ -1041,7 +1037,7 @@ async function assertShortMobileControlsClearNav(page) {
   if (budgetOverlap > 1) {
     throw new Error(`320x568 filter budget control overlaps bottom nav by ${budgetOverlap}px`);
   }
-  await page.getByRole("button", { name: /Filters/i }).click();
+  await page.getByRole("button", { name: "Done" }).click();
 
   await page.getByRole("tab", { name: "Show Library" }).click();
   await page.evaluate(() => {
@@ -1100,6 +1096,30 @@ async function assertShortMobileControlsClearNav(page) {
   });
   if (deckActionChildOverlap.length) {
     throw new Error(`320x568 deck action children overlap: ${JSON.stringify(deckActionChildOverlap)}`);
+  }
+
+  await page.setViewportSize({ width: 430, height: 320 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  const compactLandscapeCard = await page.evaluate(() => {
+    const card = document.querySelector(".library-result");
+    if (!card) return { visible: 0, top: 0, headerHeight: 0 };
+    const cardRect = card.getBoundingClientRect();
+    const headerRect = document
+      .querySelector(".app-content-shell > header")
+      ?.getBoundingClientRect();
+    return {
+      visible: Math.max(
+        0,
+        Math.min(window.innerHeight, cardRect.bottom) - Math.max(0, cardRect.top),
+      ),
+      top: cardRect.top,
+      headerHeight: headerRect?.height ?? 0,
+    };
+  });
+  if (compactLandscapeCard.visible < 72) {
+    throw new Error(
+      `430x320 landscape hides first library card: ${JSON.stringify(compactLandscapeCard)}`,
+    );
   }
 
   await page.setViewportSize({ width: 667, height: 375 });

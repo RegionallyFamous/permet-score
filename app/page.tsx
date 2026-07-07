@@ -100,6 +100,8 @@ type FallbackPanel = {
   href?: string;
   downloadName?: string;
   copyLabel?: string;
+  buyEntries?: MissingPrintEntry[];
+  autoSelectContent?: boolean;
 };
 
 type FocusableElement = HTMLElement & {
@@ -514,6 +516,20 @@ function sanitizeDeck(value: unknown): DeckState | null {
     prints: sanitizePrints(maybeDeck.prints, main, resource, art),
     collection: sanitizeCollection(maybeDeck.collection),
   };
+}
+
+function deckHasCards(deck: DeckState) {
+  return totalCards(deck.main) > 0 || totalCards(deck.resource) > 0;
+}
+
+function comparableDeckSnapshot(deck: DeckState) {
+  return JSON.stringify({
+    name: deck.name,
+    main: deck.main,
+    resource: deck.resource,
+    art: deck.art,
+    prints: deck.prints,
+  });
 }
 
 function sharePayload(deck: DeckState) {
@@ -1685,6 +1701,7 @@ export function DeckBuilder({
   const toastIdRef = useRef(0);
   const undoDeckRef = useRef<DeckState | null>(null);
   const storageTimerRef = useRef<number | null>(null);
+  const pendingStorageDeckRef = useRef<string | null>(null);
   const lastSavedDeckRef = useRef("");
   const deferredQuery = useDeferredValue(query);
 
@@ -1698,7 +1715,19 @@ export function DeckBuilder({
   const renderCardPanel = renderAllPanels || mobileView === "card";
   const renderStatsPanel = renderAllPanels || mobileView === "stats";
   const renderDeckPanel = renderAllPanels || mobileView === "deck";
-  const eagerDeckThumbnails = false;
+  const eagerDeckThumbnails = !mobileTabsEnabled || mobileView === "deck";
+
+  function flushPendingDeckStorage() {
+    const pendingDeck = pendingStorageDeckRef.current;
+    if (!pendingDeck) return;
+    window.localStorage.setItem(STORAGE_KEY, pendingDeck);
+    lastSavedDeckRef.current = pendingDeck;
+    pendingStorageDeckRef.current = null;
+    if (storageTimerRef.current) {
+      window.clearTimeout(storageTimerRef.current);
+      storageTimerRef.current = null;
+    }
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
@@ -1785,11 +1814,8 @@ export function DeckBuilder({
         window.clearTimeout(storageTimerRef.current);
       }
 
-      storageTimerRef.current = window.setTimeout(() => {
-        window.localStorage.setItem(STORAGE_KEY, serializedDeck);
-        lastSavedDeckRef.current = serializedDeck;
-        storageTimerRef.current = null;
-      }, 180);
+      pendingStorageDeckRef.current = serializedDeck;
+      storageTimerRef.current = window.setTimeout(flushPendingDeckStorage, 180);
 
       return () => {
         if (storageTimerRef.current) {
@@ -1803,7 +1829,17 @@ export function DeckBuilder({
   }, [deck, loaded, sharedDeckId]);
 
   useEffect(() => {
+    const flushOnPageExit = () => flushPendingDeckStorage();
+    const flushOnHidden = () => {
+      if (document.visibilityState === "hidden") flushPendingDeckStorage();
+    };
+    window.addEventListener("pagehide", flushOnPageExit);
+    document.addEventListener("visibilitychange", flushOnHidden);
+
     return () => {
+      flushPendingDeckStorage();
+      window.removeEventListener("pagehide", flushOnPageExit);
+      document.removeEventListener("visibilitychange", flushOnHidden);
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current);
       }
@@ -2156,6 +2192,8 @@ export function DeckBuilder({
 
   const isLegal = notices.every((notice) => notice.tone !== "bad");
   const activeAdvancedFilterCount = [
+    colorFilter !== "All",
+    typeFilter !== "All",
     setFilter !== "All",
     artFilter !== "All Art",
     buildStatusFilter !== "All",
@@ -2260,6 +2298,8 @@ export function DeckBuilder({
   }
 
   function resetAdvancedFilters() {
+    setColorFilter("All");
+    setTypeFilter("All");
     setSetFilter("All");
     setArtFilter("All Art");
     setBuildStatusFilter("All");
@@ -2292,6 +2332,7 @@ export function DeckBuilder({
       detail: "Review missing selected prints, then copy or download the list when ready.",
       content: buyListText,
       copyLabel: "Copy Buy List",
+      buyEntries: missingPrints,
       downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-buy-list.txt`,
     });
     showToast("good", "Buy list ready", "Review panel opened without changing your clipboard.");
@@ -2590,9 +2631,38 @@ export function DeckBuilder({
   }
 
   function cloneSharedDeck() {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(deck));
-    setSharedStatus("cloned");
-    window.location.assign("/");
+    let existing: DeckState | null = null;
+    try {
+      existing = sanitizeDeck(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null"));
+    } catch {
+      existing = null;
+    }
+    const wouldReplace =
+      existing &&
+      deckHasCards(existing) &&
+      comparableDeckSnapshot(existing) !== comparableDeckSnapshot(deck);
+
+    if (
+      wouldReplace &&
+      !window.confirm(
+        "Clone this shared deck and replace your current local deck? Export a backup first if you want to keep it.",
+      )
+    ) {
+      showToast("warn", "Clone cancelled", "Your current local deck was not changed.");
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(deck));
+      setSharedStatus("cloned");
+      window.location.assign("/");
+    } catch {
+      showToast(
+        "bad",
+        "Clone blocked",
+        "Browser storage is unavailable. Export this shared deck and import it locally instead.",
+      );
+    }
   }
 
   async function exportDeckImage() {
@@ -2734,6 +2804,7 @@ export function DeckBuilder({
       detail: "Clipboard access was blocked. The deck list is selected below.",
       content: deckList,
       copyLabel: "Copy Deck List",
+      autoSelectContent: true,
       downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-deck.txt`,
     });
     showToast("bad", "Copy failed", "Deck list opened in a manual copy panel.");
@@ -2764,6 +2835,7 @@ export function DeckBuilder({
           content: shareUrl,
           href: shareUrl,
           copyLabel: "Copy Share Link",
+          autoSelectContent: true,
         });
       }
       showToast(
@@ -2834,6 +2906,7 @@ export function DeckBuilder({
           content: shareUrl,
           href: shareUrl,
           copyLabel: "Copy Share Link",
+          autoSelectContent: true,
         });
       }
       showToast(
@@ -2995,7 +3068,7 @@ export function DeckBuilder({
         <header className="sticky top-0 z-30 border-b border-[#a7b5c9]/25 bg-[#05060a]/88 shadow-xl shadow-black/40 backdrop-blur-xl">
         <div className="mx-auto max-w-[1800px] px-3 py-1.5 sm:px-5 sm:py-2">
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
+            <div className="brand-status-cluster flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
               <div className="flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
                   src="/permet-link-logo.png"
@@ -3314,6 +3387,8 @@ export function DeckBuilder({
 
                   {activeAdvancedFilterCount > 0 && (
                     <div className="flex flex-wrap gap-1.5">
+                      {colorFilter !== "All" && <FilterChip label={`Color: ${colorFilter}`} />}
+                      {typeFilter !== "All" && <FilterChip label={`Type: ${typeFilter}`} />}
                       {setFilter !== "All" && <FilterChip label={`Set: ${setFilter}`} />}
                       {artFilter !== "All Art" && <FilterChip label={`Art: ${artFilter}`} />}
                       {buildStatusFilter !== "All" && (
@@ -3337,6 +3412,18 @@ export function DeckBuilder({
 
                   {advancedFiltersOpen && (
                     <div id="library-advanced-filters" className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4">
+                      <div className="filter-sheet-header col-span-full flex items-center justify-between gap-2 border-b border-[#a7b5c9]/16 pb-2 md:hidden">
+                        <span className="font-display text-base font-black uppercase text-[#d9ecff]">
+                          Filter Library
+                        </span>
+                        <button
+                          type="button"
+                          className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
+                          onClick={() => setAdvancedFiltersOpen(false)}
+                        >
+                          Done
+                        </button>
+                      </div>
                       <div className="md:hidden">
                         <SelectFilter
                           label="Color"
@@ -3668,7 +3755,7 @@ export function DeckBuilder({
               onAdjust={adjustCard}
               onRemove={removeCard}
               onOpenCard={openCardLightbox}
-              eagerImages={false}
+              eagerImages={eagerDeckThumbnails}
               onBrowseLibrary={() => changeMobileView("library")}
               readOnly={sharedPreviewLocked}
               compact
@@ -4389,6 +4476,7 @@ function FallbackPanelView({
 }) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -4396,7 +4484,14 @@ function FallbackPanelView({
     previousFocusRef.current =
       returnFocusElement ??
       (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-    window.setTimeout(() => closeButtonRef.current?.focus(), 0);
+    window.setTimeout(() => {
+      if (panel.autoSelectContent) {
+        textareaRef.current?.focus();
+        textareaRef.current?.select();
+        return;
+      }
+      closeButtonRef.current?.focus();
+    }, 0);
 
     return () => {
       if (previousFocusRef.current && document.contains(previousFocusRef.current)) {
@@ -4411,6 +4506,7 @@ function FallbackPanelView({
   const downloadHref = panel.downloadName
     ? `data:text/plain;charset=utf-8,${encodeURIComponent(panel.content)}`
     : "";
+  const hasBuyEntries = Boolean(panel.buyEntries?.length);
 
   return (
     <div
@@ -4422,7 +4518,11 @@ function FallbackPanelView({
     >
       <section
         ref={dialogRef}
-        className={panelClass("fallback-panel-shell flex w-full max-w-2xl flex-col overflow-hidden")}
+        className={panelClass(
+          `fallback-panel-shell flex w-full flex-col overflow-hidden ${
+            hasBuyEntries ? "max-w-4xl" : "max-w-2xl"
+          }`,
+        )}
       >
         <div className="flex items-start justify-between gap-3 border-b border-[#a7b5c9]/20 p-3">
           <div className="min-w-0">
@@ -4448,7 +4548,60 @@ function FallbackPanelView({
           </button>
         </div>
         <div className="fallback-panel-body grid min-h-0 gap-3 overflow-auto p-3">
+          {hasBuyEntries && (
+            <div className="grid gap-2">
+              {panel.buyEntries?.map((entry) => {
+                const priceSummary = printPriceSummary(entry.card, entry.variant);
+                return (
+                  <div
+                    key={`${entry.card.number}-${entry.variant.id}`}
+                    className={`mecha-row interactive-row grid gap-2 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.045] p-2 shadow-lg shadow-black/10 sm:grid-cols-[4.25rem_minmax(0,1fr)_auto] ${colorAccentClass(
+                      entry.card.color,
+                    )}`}
+                  >
+                    <CardThumb
+                      card={entry.card}
+                      artVariant={entry.variant}
+                      size="sm"
+                      badge={`${entry.missing}`}
+                      eager
+                      openLabel={`Missing ${entry.card.name} ${artDisplayLabel(entry.variant)}`}
+                    />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black leading-none text-black">
+                          {printDisplayId(entry.variant)}
+                        </span>
+                        <span className={`rounded-sm border px-1.5 py-0.5 text-xs font-black leading-none ${colorChipClass(entry.card.color)}`}>
+                          {entry.card.color}
+                        </span>
+                        <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 text-xs font-black leading-none text-[#fff2bd]">
+                          {artDisplayLabel(entry.variant)}
+                        </span>
+                      </div>
+                      <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
+                        {entry.card.name}
+                      </h3>
+                      <p className="text-sm font-bold leading-5 text-[#f7f7f2]/66">
+                        Need {entry.missing} · owned {entry.owned} / {entry.needed} · {priceSummary.full} each · {formatMoney(entry.totalCost)} total
+                      </p>
+                    </div>
+                    <a
+                      href={tcgplayerUrl(entry.card, entry.variant)}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] sm:self-center"
+                    >
+                      <ShoppingCart size={15} />
+                      TCG
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <textarea
+            ref={textareaRef}
             readOnly
             value={panel.content}
             aria-label={`${panel.title} content`}

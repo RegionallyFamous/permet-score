@@ -1169,7 +1169,7 @@ textarea {
 
   .library-filters-popover {
     position: fixed;
-    top: 9.25rem;
+    top: calc(env(safe-area-inset-top) + 10.25rem);
     right: 0.75rem;
     bottom: calc(env(safe-area-inset-bottom) + 5.25rem);
     left: 0.75rem;
@@ -1189,6 +1189,12 @@ textarea {
 
   .library-filters-popover .filter-cell > span {
     display: block;
+  }
+
+  .library-panel .sticky {
+    overflow: visible;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .library-pager {
@@ -1361,6 +1367,10 @@ textarea {
     padding-bottom: 0.35rem;
   }
 
+  .brand-status-cluster {
+    display: none;
+  }
+
   .app-content-shell > header img[alt="Permet Link"] {
     max-width: 8.5rem;
   }
@@ -1407,8 +1417,12 @@ textarea {
   }
 
   .library-panel .sticky h2 {
-    font-size: 1.1rem;
+    font-size: 0.98rem;
     line-height: 1;
+  }
+
+  .library-panel .sticky h2 + span {
+    display: none;
   }
 
   .library-panel .filter-cell > span {
@@ -1431,7 +1445,7 @@ textarea {
 
   .library-filters-popover {
     position: fixed;
-    inset: 0.5rem 6rem 0.5rem 0.5rem;
+    inset: 4rem 6rem 0.5rem 0.5rem;
     z-index: 85;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     max-height: none;
@@ -1541,24 +1555,24 @@ textarea {
   }
 
   .library-pager {
-    margin-bottom: 0.5rem;
-    padding-top: 0.375rem;
-    padding-bottom: 0.375rem;
+    margin-bottom: 0.25rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
   }
 
   .library-pager p {
-    font-size: 0.75rem;
-    line-height: 1rem;
+    font-size: 0.7rem;
+    line-height: 0.9rem;
   }
 
   .library-pager span {
-    min-width: 3.75rem;
-    padding: 0.375rem 0.5rem;
+    min-width: 3.35rem;
+    padding: 0.25rem 0.45rem;
   }
 
   .library-pager button {
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 2.45rem;
+    height: 2.45rem;
   }
 
   .cockpit-tab {
@@ -1657,7 +1671,7 @@ textarea {
 
 @media (max-height: 480px) and (orientation: landscape) {
   .library-filters-popover {
-    inset: 0.5rem 6rem 0.5rem 0.5rem;
+    inset: 4rem 6rem 0.5rem 0.5rem;
     max-height: none;
     padding-bottom: 0.5rem;
   }
