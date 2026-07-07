@@ -3,6 +3,7 @@ import {
   type DeckValidationCard,
   type ValidationCardType,
 } from "./deck-validation-data";
+import { SHARED_DECK_NAME } from "./deck-names";
 
 export type QuantityMap = Record<string, number>;
 export type ArtChoiceMap = Record<string, string>;
@@ -351,7 +352,7 @@ export function sanitizeSharedDeck(value: unknown): SharedDeckState | null {
     name:
       typeof maybeDeck.name === "string" && maybeDeck.name.trim()
         ? maybeDeck.name.trim().slice(0, 80)
-        : "Shared Deck",
+        : SHARED_DECK_NAME,
     main,
     resource,
     art,

@@ -51,6 +51,10 @@ import {
   type GundamCard,
 } from "./card-data";
 import {
+  DEFAULT_DECK_NAME,
+  IMPORTED_DECK_NAME,
+} from "./deck-names";
+import {
   CARD_ARTS_BY_NUMBER,
   CARD_BY_NUMBER,
   CARD_POOL,
@@ -255,7 +259,7 @@ function isStarterDeckState(deck: DeckState) {
 
 function emptyDeck(): DeckState {
   return {
-    name: "Untitled Deck",
+    name: DEFAULT_DECK_NAME,
     main: {},
     resource: {},
     art: {},
@@ -550,7 +554,7 @@ function sanitizeDeck(value: unknown): DeckState | null {
     name:
       typeof maybeDeck.name === "string" && maybeDeck.name.trim()
         ? maybeDeck.name.trim().slice(0, 80)
-        : "Imported Deck",
+        : IMPORTED_DECK_NAME,
     main,
     resource,
     art,
@@ -656,7 +660,9 @@ function parsePlainTextDeck(text: string): DeckImportResult | null {
       .toUpperCase();
 
     if (!number) {
-      if (!foundCardLine && deck.name === "Untitled Deck") deck.name = line.slice(0, 80);
+      if (!foundCardLine && deck.name === DEFAULT_DECK_NAME) {
+        deck.name = line.slice(0, 80);
+      }
       return;
     }
 
