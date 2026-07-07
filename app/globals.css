@@ -74,6 +74,62 @@ textarea {
   isolation: isolate;
 }
 
+.skip-links {
+  position: fixed;
+  z-index: 100;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: none;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  pointer-events: none;
+}
+
+.skip-links:not(:focus-within) {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.skip-links a {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip-links a:focus-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  pointer-events: auto;
+  border: 1px solid rgba(246, 197, 66, 0.58);
+  border-radius: 2px;
+  background: rgba(5, 6, 10, 0.96);
+  box-shadow:
+    0 0 0 3px rgba(246, 197, 66, 0.16),
+    0 12px 30px rgba(0, 0, 0, 0.42);
+  padding: 0.625rem 0.75rem;
+  font-family: var(--font-gundam-display), var(--font-gundam-ui), Arial, Helvetica, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #fff2bd;
+}
+
+@media (min-width: 1280px) {
+  .skip-links {
+    display: flex;
+  }
+}
+
 .cockpit-grid {
   background-image:
     linear-gradient(rgba(247, 247, 242, 0.035) 1px, transparent 1px),
@@ -660,6 +716,8 @@ textarea {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 178px;
 }
 
 .deck-entry::before {
@@ -988,6 +1046,53 @@ textarea {
   }
 }
 
+@media (max-height: 480px) and (orientation: landscape) {
+  .mobile-cockpit-nav {
+    position: fixed !important;
+    inset: 0 0 0 auto !important;
+    width: 5.25rem;
+    border-top: 0;
+    border-left: 1px solid rgba(139, 220, 255, 0.28);
+    padding: 0.5rem 0.45rem;
+    box-shadow: -16px 0 36px rgba(0, 0, 0, 0.58);
+  }
+
+  .mobile-cockpit-nav > div {
+    display: grid;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 0.375rem;
+  }
+
+  .mobile-cockpit-nav .cockpit-tab {
+    height: min(4.2rem, calc((100dvh - 2rem) / 4));
+    font-size: 0.68rem;
+  }
+
+  .mobile-cockpit-nav .cockpit-tab svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .app-content-shell > header,
+  .app-content-shell > section {
+    padding-right: 5.75rem;
+  }
+
+  .mobile-action-sheet {
+    right: 6rem;
+    bottom: 0.75rem;
+    max-height: calc(100dvh - 1.5rem);
+  }
+
+  .library-filters-popover {
+    max-height: min(62vh, 15rem);
+  }
+}
+
 @media (max-width: 767px) and (max-height: 620px) {
   header .max-w-\[1800px\] {
     padding-top: 0.375rem;
@@ -1007,16 +1112,16 @@ textarea {
   }
 
   .short-cockpit-actions .interactive-control {
-    height: 2.5rem;
+    height: 2.75rem;
     min-width: 2.5rem;
-    min-height: 2.5rem;
+    min-height: 2.75rem;
     padding-left: 0.375rem;
     padding-right: 0.375rem;
     font-size: 0.875rem;
   }
 
   .library-filters-popover {
-    max-height: min(34vh, 12rem);
+    max-height: min(46vh, 18rem);
     padding-bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
   }
 

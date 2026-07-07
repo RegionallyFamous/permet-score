@@ -3,16 +3,27 @@ const samples = Number(process.env.PERMET_ROUTE_SAMPLES ?? 3);
 
 const sampleDeck = {
   name: "Route Timing Probe",
-  main: { "ST01-001": 4, "ST01-002": 4 },
+  main: {
+    "ST01-001": 4,
+    "ST01-002": 3,
+    "ST01-003": 4,
+    "ST01-004": 4,
+    "ST01-005": 4,
+    "ST01-006": 3,
+    "ST01-007": 3,
+    "ST01-008": 2,
+    "ST01-009": 1,
+    "ST01-010": 4,
+    "ST01-011": 3,
+    "ST01-012": 3,
+    "ST01-013": 2,
+    "ST01-014": 4,
+    "ST01-015": 3,
+    "ST01-016": 3,
+  },
   resource: { "R-001": 10 },
   art: {},
-  prints: {
-    main: {
-      "ST01-001": { standard: 4 },
-      "ST01-002": { standard: 4 },
-    },
-    resource: { "R-001": { standard: 10 } },
-  },
+  prints: { main: {}, resource: { "R-001": { standard: 10 } } },
 };
 
 async function time(label, run) {

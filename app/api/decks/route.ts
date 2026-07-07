@@ -11,7 +11,11 @@ function randomShareId() {
 
 function hasJsonContentType(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
-  return /\bapplication\/json\b/i.test(contentType) || /\+json\b/i.test(contentType);
+  const mediaType = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return (
+    mediaType === "application/json" ||
+    (mediaType.startsWith("application/") && mediaType.endsWith("+json"))
+  );
 }
 
 export async function POST(request: Request) {

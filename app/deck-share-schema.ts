@@ -20,13 +20,13 @@ export type SharedDeckState = {
 const MAIN_TARGET = 50;
 const RESOURCE_TARGET = 10;
 const MAX_MAIN_COPIES = 4;
+const MAX_MAIN_COLORS = 2;
 const MAIN_TYPES: ValidationCardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
 const RESOURCE_TYPES: ValidationCardType[] = ["RESOURCE"];
 
 function clampQuantity(value: unknown) {
-  const quantity = Number(value);
-  if (!Number.isFinite(quantity)) return 0;
-  return Math.max(0, Math.floor(quantity));
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
 }
 
 function totalCards(quantities: QuantityMap) {
@@ -74,6 +74,14 @@ function canCardEnterZone(zone: "main" | "resource", card: DeckValidationCard) {
   return zone === "main"
     ? MAIN_TYPES.includes(card.type) && hasDeckRulesData(card)
     : RESOURCE_TYPES.includes(card.type);
+}
+
+function mainDeckColors(main: QuantityMap) {
+  return new Set(
+    Object.keys(main)
+      .map((number) => validationCard(number)?.color)
+      .filter((color): color is string => Boolean(color && color !== "-")),
+  );
 }
 
 function sanitizeQuantities(
@@ -152,7 +160,11 @@ function normalizePrintQuantities(
 
   if (total > targetQuantity) {
     let overflow = total - targetQuantity;
-    [...artIds].reverse().forEach((artId) => {
+    const removalOrder = [
+      ...artIds.filter((artId) => artId !== preferred).reverse(),
+      preferred,
+    ];
+    removalOrder.forEach((artId) => {
       if (overflow <= 0) return;
       const quantity = next[artId] ?? 0;
       const removed = Math.min(quantity, overflow);
@@ -199,7 +211,11 @@ export function sanitizeSharedDeck(value: unknown): SharedDeckState | null {
   const deckNumbers = new Set([...Object.keys(main), ...Object.keys(resource)]);
   const art = sanitizeArtChoices(maybeDeck.art, deckNumbers);
 
-  if (totalCards(main) === 0 && totalCards(resource) === 0) return null;
+  if (totalCards(main) !== MAIN_TARGET || totalCards(resource) !== RESOURCE_TARGET) {
+    return null;
+  }
+
+  if (mainDeckColors(main).size > MAX_MAIN_COLORS) return null;
 
   return {
     name:

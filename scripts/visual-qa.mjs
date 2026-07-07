@@ -112,7 +112,7 @@ async function readAudit(page) {
         overflowOffenders,
         visibleButtons,
         hasMobileNav: window.matchMedia("(max-width: 1279px)").matches
-          ? Boolean(document.querySelector("nav"))
+          ? Boolean(document.querySelector('nav[aria-label="Mobile workspace views"]'))
           : true,
       };
     });
@@ -158,7 +158,7 @@ async function readAudit(page) {
         overflowOffenders,
         visibleButtons,
         hasMobileNav: window.matchMedia("(max-width: 1279px)").matches
-          ? Boolean(document.querySelector("nav"))
+          ? Boolean(document.querySelector('nav[aria-label="Mobile workspace views"]'))
           : true,
       };
     });
@@ -204,7 +204,7 @@ try {
     if (viewport.width <= 360) {
       const compactActionAudit = await page.evaluate(() => {
         const actions = document.querySelector(".library-card-actions");
-        const nav = document.querySelector("nav");
+        const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
         if (!actions || !nav) return null;
         const actionsRect = actions.getBoundingClientRect();
         const navRect = nav.getBoundingClientRect();

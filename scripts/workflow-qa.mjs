@@ -18,17 +18,45 @@ function absoluteUrl(path) {
   return new URL(path, baseUrl);
 }
 
-async function assertSharePreservesPrints() {
-  const deck = {
-    name: "Workflow QA Alt Print",
-    main: { "ST01-001": 4 },
+const legalMain = {
+  "ST01-001": 4,
+  "ST01-002": 3,
+  "ST01-003": 4,
+  "ST01-004": 4,
+  "ST01-005": 4,
+  "ST01-006": 3,
+  "ST01-007": 3,
+  "ST01-008": 2,
+  "ST01-009": 1,
+  "ST01-010": 4,
+  "ST01-011": 3,
+  "ST01-012": 3,
+  "ST01-013": 2,
+  "ST01-014": 4,
+  "ST01-015": 3,
+  "ST01-016": 3,
+};
+
+function legalDeck(overrides = {}) {
+  return {
+    name: "Workflow QA Legal Deck",
+    main: legalMain,
     resource: { "R-001": 10 },
+    art: {},
+    prints: { main: {}, resource: { "R-001": { standard: 10 } } },
+    ...overrides,
+  };
+}
+
+async function assertSharePreservesPrints() {
+  const deck = legalDeck({
+    name: "Workflow QA Alt Print",
     art: { "ST01-001": "p1" },
     prints: {
       main: { "ST01-001": { p1: 4 } },
       resource: { "R-001": { standard: 10 } },
     },
-  };
+  });
 
   const saveResponse = await fetch(absoluteUrl("/api/decks"), {
     method: "POST",
@@ -54,16 +82,15 @@ async function assertSharePreservesPrints() {
 }
 
 async function assertShareDropsPendingRulesCards() {
-  const deck = {
+  const deck = legalDeck({
     name: "Workflow QA Pending Rules",
-    main: { "EB01-001": 4 },
-    resource: { "R-001": 10 },
+    main: { "EB01-001": 4, ...legalMain },
     art: { "EB01-001": "standard" },
     prints: {
       main: { "EB01-001": { standard: 4 } },
       resource: { "R-001": { standard: 10 } },
     },
-  };
+  });
 
   const saveResponse = await fetch(absoluteUrl("/api/decks"), {
     method: "POST",
@@ -100,10 +127,9 @@ async function assertShareDropsPendingRulesCards() {
 }
 
 async function assertSharePrunesOrphanArt() {
-  const deck = {
+  const deck = legalDeck({
     name: "Workflow QA Orphan Art",
-    main: { "EB01-001": 4, "ST01-001": 4 },
-    resource: { "R-001": 10 },
+    main: { "EB01-001": 4, ...legalMain },
     art: { "EB01-001": "standard", "ST01-001": "p1" },
     prints: {
       main: {
@@ -112,7 +138,7 @@ async function assertSharePrunesOrphanArt() {
       },
       resource: { "R-001": { standard: 10 } },
     },
-  };
+  });
 
   const saveResponse = await fetch(absoluteUrl("/api/decks"), {
     method: "POST",
@@ -144,15 +170,96 @@ async function assertShareRejectsNonJsonContentType() {
   const response = await fetch(absoluteUrl("/api/decks"), {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify({
-      name: "Workflow QA Text Plain",
-      main: { "ST01-001": 1 },
-      resource: { "R-001": 10 },
-    }),
+    body: JSON.stringify(legalDeck({ name: "Workflow QA Text Plain" })),
   });
 
   if (response.status !== 415) {
     throw new Error(`Expected text/plain share POST to return 415, got ${response.status}`);
+  }
+
+  const fakeJsonResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "text/not-really+json" },
+    body: JSON.stringify(legalDeck({ name: "Workflow QA Fake JSON" })),
+  });
+
+  if (fakeJsonResponse.status !== 415) {
+    throw new Error(
+      `Expected fake +json share POST to return 415, got ${fakeJsonResponse.status}`,
+    );
+  }
+}
+
+async function assertShareRejectsIncompleteDecksAndMalformedQuantities() {
+  const incompleteResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Workflow QA Incomplete", resource: { "R-001": 1 } }),
+  });
+  if (incompleteResponse.status !== 400) {
+    throw new Error(`Expected incomplete share to return 400, got ${incompleteResponse.status}`);
+  }
+
+  const boolQuantityResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      legalDeck({
+        name: "Workflow QA Bool Quantity",
+        main: { ...legalMain, "ST01-001": true, "ST02-001": 3 },
+      }),
+    ),
+  });
+  if (boolQuantityResponse.status !== 400) {
+    throw new Error(`Expected bool quantity share to return 400, got ${boolQuantityResponse.status}`);
+  }
+
+  const arrayQuantityResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      legalDeck({
+        name: "Workflow QA Array Quantity",
+        main: { ...legalMain, "ST01-001": [4] },
+      }),
+    ),
+  });
+  if (arrayQuantityResponse.status !== 400) {
+    throw new Error(`Expected array quantity share to return 400, got ${arrayQuantityResponse.status}`);
+  }
+}
+
+async function assertSharePreservesPreferredAltWhenTrimmingPrints() {
+  const deck = legalDeck({
+    name: "Workflow QA Alt Trim",
+    art: { "ST01-001": "p7" },
+    prints: {
+      main: { "ST01-001": { p7: 4, p5: 999 } },
+      resource: { "R-001": { standard: 10 } },
+    },
+  });
+
+  const saveResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deck),
+  });
+  if (!saveResponse.ok) {
+    throw new Error(`POST /api/decks alt-trim probe failed with ${saveResponse.status}`);
+  }
+
+  const saved = await saveResponse.json();
+  const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
+  if (!loadResponse.ok) {
+    throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
+  }
+
+  const loaded = await loadResponse.json();
+  if (loaded.deck?.art?.["ST01-001"] !== "p7") {
+    throw new Error("Shared deck sanitizer dropped preferred p7 art choice");
+  }
+  if (loaded.deck?.prints?.main?.["ST01-001"]?.p7 !== 4) {
+    throw new Error("Shared deck sanitizer trimmed preferred p7 print copies first");
   }
 }
 
@@ -204,6 +311,57 @@ async function assertLocalStorageDropsPendingRulesCards(page) {
         !deck.prints?.main?.["EB01-001"] &&
         deck.resource?.["R-001"] === 10
       );
+    },
+    null,
+    { timeout: 15000 },
+  );
+}
+
+async function assertLocalStorageCapsLongDeckNames(page) {
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.evaluate(() => {
+    window.localStorage.setItem(
+      "gundam-deck-builder-v1",
+      JSON.stringify({
+        name: "X".repeat(120000),
+        main: { "ST01-001": 1 },
+        resource: { "R-001": 1 },
+        art: {},
+        prints: { main: {}, resource: {} },
+      }),
+    );
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  const name = await page.locator("input").first().inputValue();
+  if (name.length > 80) {
+    throw new Error(`Imported deck name was not capped: ${name.length} characters`);
+  }
+}
+
+async function assertLibraryRowAddsFromBlankDeck(page) {
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await page.getByPlaceholder("Name, #, text").fill("ST01-001");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  await page.getByRole("button", { name: /Add one Gundam ST01-001 main copy/i }).first().click();
+  await page.waitForFunction(
+    () => {
+      const stored = window.localStorage.getItem("gundam-deck-builder-v1");
+      if (!stored) return false;
+      return JSON.parse(stored).main?.["ST01-001"] === 1;
+    },
+    null,
+    { timeout: 15000 },
+  );
+
+  await page.getByPlaceholder("Name, #, text").fill("R-001");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  await page.getByRole("button", { name: /Add one Resource R-001 resource copy/i }).first().click();
+  await page.waitForFunction(
+    () => {
+      const stored = window.localStorage.getItem("gundam-deck-builder-v1");
+      if (!stored) return false;
+      return JSON.parse(stored).resource?.["R-001"] === 1;
     },
     null,
     { timeout: 15000 },
@@ -332,7 +490,7 @@ async function assertMobileLibraryLayout(page) {
   await page.locator(".library-filters-popover").waitFor({ timeout: 15000 });
   const filterGeometry = await page.evaluate(() => {
     const popover = document.querySelector(".library-filters-popover");
-    const nav = document.querySelector("nav");
+    const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
     if (!popover || !nav) return { top: 0, navOverlap: 0 };
     const popoverRect = popover.getBoundingClientRect();
     const navRect = nav.getBoundingClientRect();
@@ -402,7 +560,7 @@ async function assertShortMobileControlsClearNav(page) {
 
   const libraryOverlap = await page.evaluate(() => {
     const actions = document.querySelector(".library-card-actions");
-    const nav = document.querySelector("nav");
+    const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
     if (!actions || !nav) return 0;
     return Math.max(0, actions.getBoundingClientRect().bottom - nav.getBoundingClientRect().top);
   });
@@ -416,7 +574,7 @@ async function assertShortMobileControlsClearNav(page) {
     node.scrollTop = node.scrollHeight;
   });
   const budgetOverlap = await page.locator('input[type="number"]').evaluate((input) => {
-    const nav = document.querySelector("nav");
+    const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
     if (!nav) return 0;
     return Math.max(0, input.getBoundingClientRect().bottom - nav.getBoundingClientRect().top);
   });
@@ -428,7 +586,7 @@ async function assertShortMobileControlsClearNav(page) {
   await page.getByRole("tab", { name: "Show Deck" }).click();
   const deckOverlap = await page.evaluate(() => {
     const actions = document.querySelector(".deck-card-actions");
-    const nav = document.querySelector("nav");
+    const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
     if (!actions || !nav) return 0;
     return Math.max(0, actions.getBoundingClientRect().bottom - nav.getBoundingClientRect().top);
   });
@@ -438,10 +596,33 @@ async function assertShortMobileControlsClearNav(page) {
 
   await page.setViewportSize({ width: 667, height: 375 });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
+  const landscapeCardOverlap = await page.evaluate(() => {
+    const firstCardButton = document.querySelector('.library-result button[aria-label^="Open large view"]');
+    const nav = document.querySelector('nav[aria-label="Mobile workspace views"]');
+    if (!firstCardButton || !nav) return 0;
+    const cardRect = firstCardButton.getBoundingClientRect();
+    const navRect = nav.getBoundingClientRect();
+    const xOverlap = Math.max(0, Math.min(cardRect.right, navRect.right) - Math.max(cardRect.left, navRect.left));
+    const yOverlap = Math.max(0, Math.min(cardRect.bottom, navRect.bottom) - Math.max(cardRect.top, navRect.top));
+    return xOverlap * yOverlap;
+  });
+  if (landscapeCardOverlap > 1) {
+    throw new Error(`667x375 first library card overlaps mobile nav by ${landscapeCardOverlap}px^2`);
+  }
+
   await page.getByRole("button", { name: /Filters/i }).click();
   const filterOpen = await page.locator(".library-filters-popover").isVisible();
   if (!filterOpen) {
     throw new Error("667x375 landscape filters did not open from the Library view");
+  }
+  const duplicateFilterLabels = await page.evaluate(() => ({
+    color: document.querySelectorAll('select[aria-label="Color"]').length,
+    type: document.querySelectorAll('select[aria-label="Type"]').length,
+  }));
+  if (duplicateFilterLabels.color !== 1 || duplicateFilterLabels.type !== 1) {
+    throw new Error(
+      `Duplicate filter aria labels found: ${JSON.stringify(duplicateFilterLabels)}`,
+    );
   }
 }
 
@@ -450,17 +631,17 @@ async function main() {
   await assertShareDropsPendingRulesCards();
   await assertSharePrunesOrphanArt();
   await assertShareRejectsNonJsonContentType();
+  await assertShareRejectsIncompleteDecksAndMalformedQuantities();
+  await assertSharePreservesPreferredAltWhenTrimmingPrints();
 
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    await page.goto(absoluteUrl("/decks/not-a-real-deck-id").toString(), {
+    const missingPageResponse = await page.goto(absoluteUrl("/decks/not-a-real-deck-id").toString(), {
       waitUntil: "networkidle",
     });
-    await page.getByText("Shared Deck Not Found").waitFor({ timeout: 15000 });
-    const missingDeckName = await page.locator("input").first().inputValue();
-    if (/Heroic Beginnings Shell/i.test(missingDeckName)) {
-      throw new Error(`Missing shared deck still shows starter deck: ${missingDeckName}`);
+    if (missingPageResponse?.status() !== 404) {
+      throw new Error(`Missing shared deck page returned ${missingPageResponse?.status()}`);
     }
 
     await page.goto(baseUrl, { waitUntil: "networkidle" });
@@ -493,6 +674,8 @@ async function main() {
     });
     await assertInvalidShareBlocked(desktop);
     await assertLocalStorageDropsPendingRulesCards(desktop);
+    await assertLocalStorageCapsLongDeckNames(desktop);
+    await assertLibraryRowAddsFromBlankDeck(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
     await assertResourceSearchRanksResourceCards(desktop);
     await assertMarketCatalogOnlyCardsAreLabeled(desktop);

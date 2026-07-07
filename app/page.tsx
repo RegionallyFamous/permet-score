@@ -263,9 +263,8 @@ function emptyDeck(): DeckState {
 }
 
 function clampQuantity(value: unknown) {
-  const quantity = Number(value);
-  if (!Number.isFinite(quantity)) return 0;
-  return Math.max(0, Math.floor(quantity));
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
 }
 
 function sanitizeQuantities(value: unknown, zone: Zone): QuantityMap {
@@ -399,11 +398,18 @@ function normalizePrintQuantities(
 
   if (total > targetQuantity) {
     let overflow = total - targetQuantity;
-    [...variants].reverse().forEach((variant) => {
+    const removalOrder = [
+      ...variants
+        .map((variant) => variant.id)
+        .filter((artId) => artId !== preferred)
+        .reverse(),
+      preferred,
+    ];
+    removalOrder.forEach((artId) => {
       if (overflow <= 0) return;
-      const quantity = next[variant.id] ?? 0;
+      const quantity = next[artId] ?? 0;
       const removed = Math.min(quantity, overflow);
-      next[variant.id] = quantity - removed;
+      next[artId] = quantity - removed;
       overflow -= removed;
     });
   }
@@ -469,7 +475,7 @@ function sanitizeDeck(value: unknown): DeckState | null {
   return {
     name:
       typeof maybeDeck.name === "string" && maybeDeck.name.trim()
-        ? maybeDeck.name
+        ? maybeDeck.name.trim().slice(0, 80)
         : "Imported Deck",
     main,
     resource,
@@ -2601,10 +2607,17 @@ export function DeckBuilder({
       <div className="cockpit-grid fixed inset-0 -z-10" />
 
       <div
+        className="app-content-shell"
         aria-hidden={isDialogOpen || undefined}
         inert={isDialogOpen || undefined}
       >
-      <header className="border-b border-[#a7b5c9]/25 bg-[#05060a]/82 shadow-xl shadow-black/40 backdrop-blur-xl">
+        <nav className="skip-links" aria-label="Skip links">
+          <a href="#library-panel">Skip to library</a>
+          <a href="#card-panel">Skip to card inspector</a>
+          <a href="#deck-panel">Skip to deck list</a>
+          <a href="#stats-panel">Skip to stats</a>
+        </nav>
+        <header className="border-b border-[#a7b5c9]/25 bg-[#05060a]/82 shadow-xl shadow-black/40 backdrop-blur-xl">
         <div className="mx-auto max-w-[1800px] px-3 py-1.5 sm:px-5 sm:py-2">
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
@@ -2614,7 +2627,7 @@ export function DeckBuilder({
                   alt="Permet Link"
                   width={1983}
                   height={793}
-                  fetchPriority="high"
+                  decoding="async"
                   className="h-auto w-full object-contain object-left"
                 />
               </div>
@@ -2900,6 +2913,7 @@ export function DeckBuilder({
                       <div className="md:hidden">
                         <SelectFilter
                           label="Color"
+                          ariaLabel="Advanced color"
                           value={colorFilter}
                           values={colorFilters}
                           onChange={(value) => {
@@ -2911,6 +2925,7 @@ export function DeckBuilder({
                       <div className="md:hidden">
                         <SelectFilter
                           label="Type"
+                          ariaLabel="Advanced type"
                           value={typeFilter}
                           values={typeFilters}
                           onChange={(value) => {
@@ -3407,6 +3422,7 @@ function SharedDeckBanner({
                 sizes="3.5rem"
                 alt=""
                 className="preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 bg-black object-contain object-top shadow-xl shadow-black/40"
+                decoding="async"
                 referrerPolicy="no-referrer"
                 onError={handleCardImageError}
               />
@@ -3589,7 +3605,7 @@ function MobileCockpitNav({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[#8bdcff]/30 bg-[#05060a]/96 px-2 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2 shadow-[0_-18px_44px_rgba(0,0,0,0.72)] backdrop-blur-xl xl:hidden"
+      className="mobile-cockpit-nav fixed inset-x-0 bottom-0 z-30 border-t border-[#8bdcff]/30 bg-[#05060a]/96 px-2 pb-[calc(env(safe-area-inset-bottom)+0.625rem)] pt-2 shadow-[0_-18px_44px_rgba(0,0,0,0.72)] backdrop-blur-xl xl:hidden"
       aria-label="Mobile workspace views"
     >
       <div
@@ -3680,61 +3696,90 @@ function MobileActionSheet({
   if (!open) return null;
 
   return (
-    <div
-      ref={sheetRef}
-      id="mobile-action-sheet"
-      className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="mobile-action-sheet-title"
-      onKeyDown={(event) => trapDialogFocus(event, sheetRef.current, onClose)}
-    >
-      <h2 id="mobile-action-sheet-title" className="sr-only">
-        More deck actions
-      </h2>
-      <label className="col-span-2 grid gap-1 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-2">
-        <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
-          Deck name
-        </span>
-        <input
-          value={deckName}
-          onChange={(event) => onDeckNameChange(event.target.value)}
-          className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/10 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
-        />
-      </label>
-      <ToolbarButton label="Close" title="Close more deck actions" onClick={onClose} className="col-span-2 w-full">
-        <X size={16} />
-      </ToolbarButton>
-      {canUndo && (
-        <ToolbarButton label="Undo" title="Restore previous deck state" onClick={onUndo} className="w-full">
-          <Undo2 size={16} />
+    <>
+      <button
+        type="button"
+        className="mobile-action-backdrop fixed inset-0 z-[64] cursor-default bg-black/20 xl:hidden"
+        onClick={onClose}
+        aria-label="Close more deck actions"
+        tabIndex={-1}
+      />
+      <div
+        ref={sheetRef}
+        id="mobile-action-sheet"
+        className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-action-sheet-title"
+        onKeyDown={(event) => trapDialogFocus(event, sheetRef.current, onClose)}
+      >
+        <h2 id="mobile-action-sheet-title" className="sr-only">
+          More deck actions
+        </h2>
+        <label className="col-span-2 grid gap-1 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-2">
+          <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+            Deck name
+          </span>
+          <input
+            value={deckName}
+            onChange={(event) => onDeckNameChange(event.target.value)}
+            className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/10 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+          />
+        </label>
+        <ToolbarButton
+          label="Close"
+          title="Close more deck actions"
+          onClick={onClose}
+          className="col-span-2 w-full"
+        >
+          <X size={16} />
         </ToolbarButton>
-      )}
-      <ToolbarButton label="Sample" title="Load sample deck" onClick={onSample} className="w-full">
-        <ShieldCheck size={16} />
-      </ToolbarButton>
-      <ToolbarButton label="New" title="Start a new deck" onClick={onNew} className="w-full">
-        <RotateCcw size={16} />
-      </ToolbarButton>
-      <ToolbarButton label="Art -" title="Downgrade deck art budget" onClick={onArtDown} className="w-full">
-        <ChevronDown size={16} />
-      </ToolbarButton>
-      <ToolbarButton label="Art +" title="Upgrade deck art budget" onClick={onArtUp} className="w-full">
-        <ChevronUp size={16} />
-      </ToolbarButton>
-      <ToolbarButton label={copyState} title="Copy deck list" onClick={onCopy} className="w-full">
-        <Clipboard size={16} />
-      </ToolbarButton>
-      <ToolbarButton label="Backup" title="Export backup JSON" onClick={onExport} className="w-full">
-        <Download size={16} />
-      </ToolbarButton>
-      <ToolbarButton label="Sheet" title="Export deck image" onClick={onSheet} className="w-full">
-        <Layers size={16} />
-      </ToolbarButton>
-      <ToolbarButton label="Import" title="Import JSON" onClick={onImport} className="w-full">
-        <Upload size={16} />
-      </ToolbarButton>
-    </div>
+        {canUndo && (
+          <ToolbarButton
+            label="Undo"
+            title="Restore previous deck state"
+            onClick={onUndo}
+            className="w-full"
+          >
+            <Undo2 size={16} />
+          </ToolbarButton>
+        )}
+        <ToolbarButton label="Sample" title="Load sample deck" onClick={onSample} className="w-full">
+          <ShieldCheck size={16} />
+        </ToolbarButton>
+        <ToolbarButton label="New" title="Start a new deck" onClick={onNew} className="w-full">
+          <RotateCcw size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Art -"
+          title="Downgrade deck art budget"
+          onClick={onArtDown}
+          className="w-full"
+        >
+          <ChevronDown size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Art +"
+          title="Upgrade deck art budget"
+          onClick={onArtUp}
+          className="w-full"
+        >
+          <ChevronUp size={16} />
+        </ToolbarButton>
+        <ToolbarButton label={copyState} title="Copy deck list" onClick={onCopy} className="w-full">
+          <Clipboard size={16} />
+        </ToolbarButton>
+        <ToolbarButton label="Backup" title="Export backup JSON" onClick={onExport} className="w-full">
+          <Download size={16} />
+        </ToolbarButton>
+        <ToolbarButton label="Sheet" title="Export deck image" onClick={onSheet} className="w-full">
+          <Layers size={16} />
+        </ToolbarButton>
+        <ToolbarButton label="Import" title="Import JSON" onClick={onImport} className="w-full">
+          <Upload size={16} />
+        </ToolbarButton>
+      </div>
+    </>
   );
 }
 
@@ -4054,6 +4099,7 @@ function CardLightbox({
                 sizes="(min-width: 1024px) 58vw, 94vw"
                 alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
                 className="mx-auto max-h-[58vh] max-w-full object-contain object-top lg:max-h-[66vh]"
+                decoding="async"
                 referrerPolicy="no-referrer"
                 onError={handleCardImageError}
               />
@@ -4099,6 +4145,7 @@ function CardLightbox({
                         sizes="4.5rem"
                         alt=""
                         className="aspect-[5/7] w-full bg-black object-contain object-top"
+                        decoding="async"
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={handleCardImageError}
@@ -4478,11 +4525,13 @@ function FilterChip({ label }: { label: string }) {
 
 function SelectFilter<T extends string>({
   label,
+  ariaLabel,
   value,
   values,
   onChange,
 }: {
   label: string;
+  ariaLabel?: string;
   value: T;
   values: readonly T[];
   onChange: (value: T) => void;
@@ -4493,7 +4542,7 @@ function SelectFilter<T extends string>({
         {label}
       </span>
       <select
-        aria-label={label}
+        aria-label={ariaLabel ?? label}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
         className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
@@ -4918,6 +4967,7 @@ function LibraryCard({
             sizes="(min-width: 1536px) 8.75rem, (min-width: 1280px) 8rem, (min-width: 640px) 8.75rem, (min-width: 380px) 8rem, 7.25rem"
             alt={`${card.name} card`}
             className="h-full w-full bg-black object-contain object-top transition duration-200 group-hover:scale-[1.035]"
+            decoding="async"
             loading="lazy"
             referrerPolicy="no-referrer"
             onError={handleCardImageError}
@@ -5141,6 +5191,7 @@ function InspectorPanel({
               sizes="7rem"
               alt={`${card.name} card`}
               className="h-full w-full bg-black object-contain object-top"
+              decoding="async"
               loading="lazy"
               referrerPolicy="no-referrer"
               onError={handleCardImageError}
@@ -5339,7 +5390,8 @@ function CardThumb({
       sizes={size === "deck" ? "5rem" : "3rem"}
       alt={`${card.name} card`}
       className="h-full w-full bg-black object-contain object-top"
-      loading="lazy"
+      decoding="async"
+      loading={size === "deck" ? "eager" : "lazy"}
       referrerPolicy="no-referrer"
       onError={handleCardImageError}
     />

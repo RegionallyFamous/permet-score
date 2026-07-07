@@ -1,5 +1,6 @@
 import { DeckBuilder } from "../../page";
 import { loadSharedDeck } from "../../share-store";
+import { notFound } from "next/navigation";
 
 type SharedDeckPageProps = {
   params: Promise<{
@@ -13,6 +14,10 @@ function isValidShareId(id: string) {
 
 export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
   const { id } = await params;
-  const deck = isValidShareId(id) ? await loadSharedDeck(id) : null;
+  if (!isValidShareId(id)) notFound();
+
+  const deck = await loadSharedDeck(id);
+  if (!deck) notFound();
+
   return <DeckBuilder sharedDeckId={id} initialSharedDeck={deck} />;
 }
