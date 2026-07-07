@@ -1,9 +1,11 @@
 import { chromium } from "@playwright/test";
 import { access } from "node:fs/promises";
+import { CARD_POOL } from "../app/card-pool.ts";
 
 const baseUrl = process.env.PERMET_BASE_URL ?? "http://localhost:3000";
 const baseHost = new URL(baseUrl).hostname;
 const isLocalBase = ["localhost", "127.0.0.1", "::1"].includes(baseHost);
+const libraryCount = CARD_POOL.length;
 
 async function launchBrowser() {
   try {
@@ -72,6 +74,15 @@ function legalDeck(overrides = {}) {
   };
 }
 
+function legalMainReplacing(replacements) {
+  const next = { ...legalMain };
+  Object.keys(replacements).forEach((number) => {
+    if (!(number in next)) delete next["ST01-001"];
+  });
+  Object.assign(next, replacements);
+  return next;
+}
+
 async function assertSharePreservesPrints() {
   const deck = legalDeck({
     name: "Workflow QA Alt Print",
@@ -106,10 +117,10 @@ async function assertSharePreservesPrints() {
   }
 }
 
-async function assertShareRejectsPendingRulesCards() {
+async function assertShareAcceptsOfficialRulesCards() {
   const deck = legalDeck({
-    name: "Workflow QA Pending Rules",
-    main: { "EB01-001": 4, ...legalMain },
+    name: "Workflow QA Official Rules",
+    main: legalMainReplacing({ "EB01-001": 4 }),
     art: { "EB01-001": "standard" },
     prints: {
       main: { "EB01-001": { standard: 4 } },
@@ -123,18 +134,16 @@ async function assertShareRejectsPendingRulesCards() {
     body: JSON.stringify(deck),
   });
 
-  if (saveResponse.status !== 400) {
-    throw new Error(
-      `Expected pending-rules share POST to return 400, got ${saveResponse.status}`,
-    );
+  if (!saveResponse.ok) {
+    throw new Error(`Expected official-rules share POST to pass, got ${saveResponse.status}`);
   }
 }
 
-async function assertShareRejectsGeneratedResourceCards() {
+async function assertShareRejectsNonDeckResourceObjects() {
   const deck = legalDeck({
-    name: "Workflow QA Generated Resource",
-    resource: { "R-002": 10 },
-    prints: { main: {}, resource: { "R-002": { standard: 10 } } },
+    name: "Workflow QA Non Deck Resource",
+    resource: { "EXR-003": 10 },
+    prints: { main: {}, resource: { "EXR-003": { standard: 10 } } },
   });
 
   const saveResponse = await fetch(absoluteUrl("/api/decks"), {
@@ -145,7 +154,7 @@ async function assertShareRejectsGeneratedResourceCards() {
 
   if (saveResponse.status !== 400) {
     throw new Error(
-      `Expected generated-resource share POST to return 400, got ${saveResponse.status}`,
+      `Expected non-deck-resource share POST to return 400, got ${saveResponse.status}`,
     );
   }
 }
@@ -153,7 +162,7 @@ async function assertShareRejectsGeneratedResourceCards() {
 async function assertShareRejectsOrphanArt() {
   const deck = legalDeck({
     name: "Workflow QA Orphan Art",
-    main: { "EB01-001": 4, ...legalMain },
+    main: legalMainReplacing({ "EB01-001": 4 }),
     art: { "EB01-001": "standard", "ST01-001": "p1" },
     prints: {
       main: {
@@ -309,14 +318,14 @@ async function assertInvalidShareBlocked(page) {
   await page.getByText("Share blocked").waitFor({ timeout: 15000 });
 }
 
-async function assertLocalStorageDropsPendingRulesCards(page) {
+async function assertLocalStorageDropsNonDeckCards(page) {
   const invalidDeck = {
-    name: "Workflow QA Local Pending Rules",
-    main: { "EB01-001": 4 },
+    name: "Workflow QA Local Non Deck",
+    main: { "T-025": 4 },
     resource: { "R-001": 10 },
-    art: { "EB01-001": "standard" },
+    art: { "T-025": "standard" },
     prints: {
-      main: { "EB01-001": { standard: 4 } },
+      main: { "T-025": { standard: 4 } },
       resource: { "R-001": { standard: 10 } },
     },
   };
@@ -332,9 +341,9 @@ async function assertLocalStorageDropsPendingRulesCards(page) {
       if (!stored) return false;
       const deck = JSON.parse(stored);
       return (
-        !deck.main?.["EB01-001"] &&
-        !deck.art?.["EB01-001"] &&
-        !deck.prints?.main?.["EB01-001"]
+        !deck.main?.["T-025"] &&
+        !deck.art?.["T-025"] &&
+        !deck.prints?.main?.["T-025"]
       );
     },
     null,
@@ -469,7 +478,9 @@ async function assertSampleDeckClearsLibraryFilters(page) {
     null,
     { timeout: 15000 },
   );
-  await page.getByText("Showing 1-6 of 808 cards").waitFor({ timeout: 15000 });
+  await page.getByText(`Showing 1-6 of ${libraryCount} cards`).waitFor({
+    timeout: 15000,
+  });
   await page.getByRole("heading", { name: "Gundam", exact: true }).first().waitFor({
     timeout: 15000,
   });
@@ -487,7 +498,9 @@ async function assertNoResultSearchShowsRecovery(page) {
     timeout: 15000,
   });
   await page.locator("#card-panel").getByRole("button", { name: "Clear All" }).click();
-  await page.getByText("Showing 1-6 of 808 cards").waitFor({ timeout: 15000 });
+  await page.getByText(`Showing 1-6 of ${libraryCount} cards`).waitFor({
+    timeout: 15000,
+  });
   if (!(await page.locator("#card-panel h2", { hasText: "Gundam" }).first().isVisible())) {
     throw new Error("Clear All from empty inspector did not restore the selected card");
   }
@@ -788,10 +801,17 @@ async function assertResourceSearchRanksResourceCards(page) {
 async function assertMarketCatalogOnlyCardsAreLabeled(page) {
   await page.setViewportSize({ width: 1280, height: 720 });
   await gotoApp(page);
-  await page.getByPlaceholder("Name, #, text").fill("EB01-001");
+  await page.getByPlaceholder("Name, #, text").fill("T-025");
   await page.locator(".library-result").first().waitFor({ timeout: 15000 });
   await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
-  await page.getByText("Rules pending").first().waitFor({ timeout: 15000 });
+  const tokenChipVisible = await page.locator(".library-result").first().evaluate((card) =>
+    Array.from(card.querySelectorAll("span")).some(
+      (chip) => chip.textContent?.trim() === "UNIT TOKEN",
+    ),
+  );
+  if (!tokenChipVisible) {
+    throw new Error("Catalog-only token result is missing the visible UNIT TOKEN type chip.");
+  }
 
   await page.getByRole("button", { name: /Filters/i }).click();
   await page.getByLabel("Build").selectOption("Deck Ready");
@@ -1176,8 +1196,8 @@ async function assertShortMobileControlsClearNav(page) {
 
 async function main() {
   await assertSharePreservesPrints();
-  await assertShareRejectsPendingRulesCards();
-  await assertShareRejectsGeneratedResourceCards();
+  await assertShareAcceptsOfficialRulesCards();
+  await assertShareRejectsNonDeckResourceObjects();
   await assertShareRejectsOrphanArt();
   await assertShareRejectsNonJsonContentType();
   await assertShareRejectsIncompleteDecksAndMalformedQuantities();
@@ -1225,7 +1245,7 @@ async function main() {
       acceptDownloads: true,
     });
     await assertInvalidShareBlocked(desktop);
-    await assertLocalStorageDropsPendingRulesCards(desktop);
+    await assertLocalStorageDropsNonDeckCards(desktop);
     await assertLocalStorageCapsLongDeckNames(desktop);
     await assertLibraryRowAddsFromBlankDeck(desktop);
     await assertImportRejectsEmptyObject(desktop);

@@ -65,7 +65,10 @@ function hasRulesValue(value: string) {
 }
 
 function hasDeckRulesData(card: DeckValidationCard) {
-  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") {
+  if (card.type === "RESOURCE") {
+    return true;
+  }
+  if (card.type === "EX RESOURCE") {
     return hasRulesValue(card.text);
   }
   if (!MAIN_TYPES.includes(card.type)) return false;

@@ -1,4 +1,4 @@
-name: Sync TCGplayer Gundam Data
+name: Sync Gundam Card Data
 
 on:
   workflow_dispatch:
@@ -7,6 +7,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: gundam-card-data-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -18,11 +22,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "26"
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Sync official Gundam card build data
+        run: npm run data:sync:official
 
       - name: Sync TCGplayer market snapshot
         run: npm run data:sync:tcgplayer
@@ -39,5 +46,5 @@ jobs:
       - name: Commit generated data
         uses: stefanzweifel/git-auto-commit-action@v6
         with:
-          commit_message: "Sync TCGplayer Gundam card data"
-          file_pattern: "app/tcgplayer-data.ts app/tcgplayer-card-data.ts app/deck-validation-data.ts data/tcgplayer-gundam-sync.json"
+          commit_message: "Sync Gundam card data"
+          file_pattern: "app/official-rules-card-data.ts app/deck-validation-data.ts app/tcgplayer-data.ts app/tcgplayer-meta.ts app/tcgplayer-card-data.ts data/official-gundam-rules-sync.json data/official-gundam-rules-review.json data/tcgplayer-gundam-sync.json"

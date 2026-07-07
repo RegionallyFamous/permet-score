@@ -46,17 +46,21 @@ import {
   useRef,
   useState,
 } from "react";
+import { type CardArtVariant } from "./card-art-data";
 import {
-  CARD_ART_VARIANTS,
-  type CardArtVariant,
-} from "./card-art-data";
-import {
-  CARD_POOL as CURATED_CARD_POOL,
   type CardColor,
   type CardType,
   type GundamCard,
 } from "./card-data";
-import { TCGPLAYER_CARD_POOL } from "./tcgplayer-card-data";
+import {
+  CARD_ARTS_BY_NUMBER,
+  CARD_BY_NUMBER,
+  CARD_POOL,
+  CURATED_CARD_NUMBERS,
+  CURATED_CARD_POOL,
+  OFFICIAL_CARD_POOL,
+  TCGPLAYER_CARD_POOL,
+} from "./card-pool";
 import {
   TCGPLAYER_CARD_PRINTS,
   TCGPLAYER_LAST_SYNC,
@@ -158,6 +162,8 @@ const TYPE_ORDER: Record<CardType, number> = {
   BASE: 3,
   RESOURCE: 4,
   "EX RESOURCE": 5,
+  "EX BASE": 6,
+  "UNIT TOKEN": 7,
 };
 
 const colorFilters = ["All", "Blue", "Green", "Red", "White", "Purple"] as const;
@@ -169,6 +175,8 @@ const typeFilters = [
   "BASE",
   "RESOURCE",
   "EX RESOURCE",
+  "EX BASE",
+  "UNIT TOKEN",
 ] as const;
 const artFilters = [
   "All Art",
@@ -184,18 +192,6 @@ const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
 const LIBRARY_PAGE_SIZE = 6;
 
-const CARD_POOL = [
-  ...CURATED_CARD_POOL,
-  ...TCGPLAYER_CARD_POOL.filter(
-    (card) => !CURATED_CARD_POOL.some((curated) => curated.number === card.number),
-  ),
-];
-const CARD_BY_NUMBER = new Map(CARD_POOL.map((card) => [card.number, card]));
-const CURATED_CARD_NUMBERS = new Set(CURATED_CARD_POOL.map((card) => card.number));
-const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
-  string,
-  readonly CardArtVariant[]
->;
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
 const CARD_IMAGE_FALLBACK = "/permet-link-logo-fallback.webp";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
@@ -1138,6 +1134,7 @@ function tcgplayerSyncAgeHours(now?: number) {
 
 function databaseStatus(now?: number) {
   const totalCards = CARD_POOL.length;
+  const officialCards = OFFICIAL_CARD_POOL.length;
   const curatedCards = CURATED_CARD_POOL.length;
   const tcgCards = TCGPLAYER_CARD_POOL.length;
   const tcgPrints = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
@@ -1177,6 +1174,7 @@ function databaseStatus(now?: number) {
 
   return {
     totalCards,
+    officialCards,
     curatedCards,
     tcgCards,
     tcgPrints,
@@ -1217,7 +1215,10 @@ function hasRulesValue(value: string) {
 }
 
 function hasDeckRulesData(card: GundamCard) {
-  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") {
+  if (card.type === "RESOURCE") {
+    return true;
+  }
+  if (card.type === "EX RESOURCE") {
     return hasRulesValue(card.text);
   }
   if (!MAIN_TYPES.includes(card.type)) return false;

@@ -59,28 +59,36 @@ Available tools:
 - `get_market_coverage`: TCGplayer sync and price/product-link coverage.
 - `check_live_site`: read-only smoke check for the public site, SEO files, and `llms.txt`.
 
-## TCGplayer Market Source
+## Card Data Sources
 
-Permet Link uses a private bridge to TCGplayer product/catalog data, so the app
-does not need its own public TCGplayer credentials. The sync writes generated
-market files so the app stays fast on Vercel:
+Permet Link uses the official Gundam Card Game card search for rules/build
+fields and a private bridge to TCGplayer product/catalog data for market
+enrichment. The app does not need public TCGplayer credentials in the browser,
+and both syncs write generated files so the app stays fast on Vercel:
 
 ```bash
+npm run data:sync:official
 TCGPLAYER_BRIDGE_TOKEN=... npm run data:sync:tcgplayer
+npm run data:audit:strict
 ```
 
-The sync writes:
+The syncs write:
 
+- `app/official-rules-card-data.ts`: official card numbers, names, rules text, build fields, and official art variants.
+- `app/deck-validation-data.ts`: deck validation data generated from the official rules snapshot.
 - `app/tcgplayer-data.ts`: TCGplayer product IDs, buy links, image URLs when available, and market prices.
-- `app/tcgplayer-card-data.ts`: new market rows that are not in the curated rules file yet.
+- `app/tcgplayer-card-data.ts`: market-only catalog rows that are not in the official/curated rules pool yet.
+- `data/official-gundam-rules-sync.json`: official sync counts and parser review status.
 - `data/tcgplayer-gundam-sync.json`: release coverage, search coverage, warnings, and unmatched products.
 
 In GitHub, add repository secret `TCGPLAYER_BRIDGE_TOKEN`. The optional
 repository variables are `TCGPLAYER_BRIDGE_ORIGIN` and
 `TCGPLAYER_BRIDGE_GAME_NAME`; by default they point at the hosted bridge and
 `Gundam Card Game`. The scheduled workflow `.github/workflows/sync-tcgplayer.yml`
-runs daily and commits generated updates back to `main` when new Gundam
-products or prices are available.
+runs daily, refreshes official build data first, refreshes TCGplayer market data
+second, audits the generated snapshot, and commits updates back to `main`.
+When Vercel is connected to the GitHub repo, those commits trigger production
+deploys automatically.
 
 ## Share Links
 

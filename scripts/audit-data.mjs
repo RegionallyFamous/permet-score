@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 
-import { CARD_POOL as CURATED_CARD_POOL } from "../app/card-data.ts";
+import { readFileSync } from "node:fs";
 import { CARD_ART_VARIANTS } from "../app/card-art-data.ts";
-import { TCGPLAYER_CARD_POOL } from "../app/tcgplayer-card-data.ts";
+import {
+  CARD_POOL,
+  CURATED_CARD_POOL,
+  OFFICIAL_CARD_POOL,
+  OFFICIAL_RULES_LAST_SYNC,
+  TCGPLAYER_CARD_POOL,
+} from "../app/card-pool.ts";
 import {
   TCGPLAYER_CARD_PRINTS,
   TCGPLAYER_LAST_SYNC,
@@ -11,16 +17,34 @@ import {
 const strict = process.argv.includes("--strict");
 const minCardCount = Number(process.env.MIN_GUNDAM_CARD_COUNT ?? 700);
 const minPrintCount = Number(process.env.MIN_GUNDAM_PRINT_COUNT ?? minCardCount);
+const minDirectProductPrints = Number(
+  process.env.MIN_GUNDAM_DIRECT_PRODUCT_PRINTS ?? 1000,
+);
+const minMarketPriceCount = Number(process.env.MIN_GUNDAM_MARKET_PRICE_COUNT ?? 1000);
+const minCardsWithPrints = Number(process.env.MIN_GUNDAM_CARDS_WITH_PRINTS ?? 750);
+const maxQueueLength = Number(process.env.MAX_TCGPLAYER_SYNC_QUEUE_LENGTH ?? 1000);
 const legacyBridgePrefix = ["JA", "NIE"].join("");
 const maxSyncAgeHours = Number(
   process.env.TCGPLAYER_MAX_SYNC_HOURS ??
     process.env[`${legacyBridgePrefix}_MAX_SYNC_HOURS`] ??
     48,
 );
-const validTypes = new Set(["UNIT", "PILOT", "COMMAND", "BASE", "RESOURCE", "EX RESOURCE"]);
+const maxOfficialSyncAgeHours = Number(process.env.OFFICIAL_GUNDAM_MAX_SYNC_HOURS ?? 72);
+const officialSyncReport = readJson("data/official-gundam-rules-sync.json");
+const marketSyncReport = readJson("data/tcgplayer-gundam-sync.json");
+const validTypes = new Set([
+  "UNIT",
+  "PILOT",
+  "COMMAND",
+  "BASE",
+  "RESOURCE",
+  "EX RESOURCE",
+  "EX BASE",
+  "UNIT TOKEN",
+]);
 const validColors = new Set(["Blue", "Green", "Red", "White", "Purple", "-"]);
 
-const cards = [...CURATED_CARD_POOL, ...TCGPLAYER_CARD_POOL];
+const cards = CARD_POOL;
 const cardsByNumber = new Map(cards.map((card) => [card.number, card]));
 const printCount = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
   (sum, prints) => sum + prints.length,
@@ -113,9 +137,20 @@ const cardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
 const syncAgeHours = TCGPLAYER_LAST_SYNC
   ? Math.max(0, (Date.now() - new Date(TCGPLAYER_LAST_SYNC).getTime()) / 3_600_000)
   : null;
+const officialSyncAgeHours = OFFICIAL_RULES_LAST_SYNC
+  ? Math.max(0, (Date.now() - new Date(OFFICIAL_RULES_LAST_SYNC).getTime()) / 3_600_000)
+  : null;
 
 const errors = [];
 const warnings = [];
+
+function readJson(path) {
+  try {
+    return JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
+  } catch {
+    return null;
+  }
+}
 
 function report(condition, message) {
   if (condition) return;
@@ -168,6 +203,30 @@ function isVolatileMarketPrice(price, estimatedPrice) {
   return price >= Math.max(250, estimatedPrice * 25);
 }
 
+function hasRulesValue(value) {
+  return Boolean(value && value.trim() !== "-");
+}
+
+function parseCost(card) {
+  const cost = Number(card.cost);
+  return Number.isFinite(cost) ? cost : null;
+}
+
+function hasDeckRulesData(card) {
+  if (card.type === "RESOURCE") return true;
+  if (card.type === "EX RESOURCE") return hasRulesValue(card.text);
+  if (!["UNIT", "PILOT", "COMMAND", "BASE"].includes(card.type)) return false;
+  return hasRulesValue(card.color) && hasRulesValue(card.level) && parseCost(card) !== null;
+}
+
+function isDeckReadyCard(card) {
+  return (
+    (["UNIT", "PILOT", "COMMAND", "BASE"].includes(card.type) ||
+      card.type === "RESOURCE") &&
+    hasDeckRulesData(card)
+  );
+}
+
 const seen = new Set();
 const duplicateNumbers = [];
 for (const card of cards) {
@@ -186,10 +245,85 @@ if (duplicateNumbers.length) {
 report(cards.length >= minCardCount, `Only ${cards.length} cards loaded; expected at least ${minCardCount}.`);
 report(printCount >= minPrintCount, `Only ${printCount} market print records loaded; expected at least ${minPrintCount}.`);
 report(Boolean(TCGPLAYER_LAST_SYNC), "Market snapshot is missing.");
+report(Boolean(OFFICIAL_RULES_LAST_SYNC), "Official rules snapshot is missing.");
 report(
   syncAgeHours !== null && syncAgeHours <= maxSyncAgeHours,
   `Market snapshot is stale or missing; expected <= ${maxSyncAgeHours}h.`,
 );
+report(
+  officialSyncAgeHours !== null && officialSyncAgeHours <= maxOfficialSyncAgeHours,
+  `Official rules snapshot is stale or missing; expected <= ${maxOfficialSyncAgeHours}h.`,
+);
+report(Boolean(officialSyncReport), "Official rules sync report is missing.");
+report(Boolean(marketSyncReport), "TCGplayer sync report is missing.");
+report(
+  cardsWithPrints >= minCardsWithPrints,
+  `Only ${cardsWithPrints} cards have market print records; expected at least ${minCardsWithPrints}.`,
+);
+report(
+  directProductPrints >= minDirectProductPrints,
+  `Only ${directProductPrints} direct TCGplayer product links loaded; expected at least ${minDirectProductPrints}.`,
+);
+report(
+  marketPriceAudit.rawMarketPrices >= minMarketPriceCount,
+  `Only ${marketPriceAudit.rawMarketPrices} raw TCGplayer market prices loaded; expected at least ${minMarketPriceCount}.`,
+);
+
+if (officialSyncReport) {
+  if (officialSyncReport.updatedAt !== OFFICIAL_RULES_LAST_SYNC) {
+    errors.push("Official rules report timestamp does not match imported app data.");
+  }
+  if (officialSyncReport.reviewCount) {
+    errors.push(
+      `Official rules sync has ${officialSyncReport.reviewCount} card(s) queued for parser review.`,
+    );
+  }
+  if (officialSyncReport.officialCardCount !== OFFICIAL_CARD_POOL.length) {
+    errors.push(
+      `Official rules report card count (${officialSyncReport.officialCardCount}) does not match imported app data (${OFFICIAL_CARD_POOL.length}).`,
+    );
+  }
+}
+
+if (marketSyncReport) {
+  const queueLength = marketSyncReport.catalogDiscovery?.summary?.queueLength;
+  if (marketSyncReport.updatedAt !== TCGPLAYER_LAST_SYNC) {
+    errors.push("TCGplayer report timestamp does not match imported app data.");
+  }
+  if (marketSyncReport.productCount < minPrintCount) {
+    errors.push(
+      `TCGplayer report has only ${marketSyncReport.productCount} products; expected at least ${minPrintCount}.`,
+    );
+  }
+  if (marketSyncReport.cardsWithPrints !== cardsWithPrints) {
+    errors.push(
+      `TCGplayer report cards-with-prints (${marketSyncReport.cardsWithPrints}) does not match imported app data (${cardsWithPrints}).`,
+    );
+  }
+  if (marketSyncReport.printRecordCount !== printCount) {
+    errors.push(
+      `TCGplayer report print count (${marketSyncReport.printRecordCount}) does not match imported app data (${printCount}).`,
+    );
+  }
+  if (marketSyncReport.catalogDiscovery?.status === "error") {
+    errors.push("TCGplayer catalog discovery reported an error status.");
+  }
+  if (typeof queueLength === "number" && queueLength > maxQueueLength) {
+    errors.push(
+      `TCGplayer catalog discovery queue has ${queueLength} pending job(s); expected <= ${maxQueueLength}.`,
+    );
+  }
+  if (marketSyncReport.releaseAudit?.status && marketSyncReport.releaseAudit.status !== "ok") {
+    warnings.push(
+      `TCGplayer release audit is ${marketSyncReport.releaseAudit.status}; using direct product and price coverage gates for launch safety.`,
+    );
+  }
+  if (marketSyncReport.searchReports?.some((report) => report.limitHit)) {
+    warnings.push(
+      "One or more TCGplayer market searches hit the endpoint limit; direct product coverage gates are still passing.",
+    );
+  }
+}
 
 if (sourceOnlyProductIds.length) {
   const message = `${sourceOnlyProductIds.length} market print records have source-only IDs where TCGplayer product IDs are expected.`;
@@ -255,6 +389,21 @@ const summary = {
   minCardCount,
   minPrintCount,
   maxSyncAgeHours,
+  minDirectProductPrints,
+  minMarketPriceCount,
+  minCardsWithPrints,
+  maxQueueLength,
+  officialRulesCards: OFFICIAL_CARD_POOL.length,
+  deckReadyCards: cards.filter(isDeckReadyCard).length,
+  officialRulesLastSync: OFFICIAL_RULES_LAST_SYNC,
+  officialRulesSyncAgeHours:
+    officialSyncAgeHours === null ? null : Math.round(officialSyncAgeHours * 10) / 10,
+  maxOfficialSyncAgeHours,
+  officialRulesReviewCount: officialSyncReport?.reviewCount ?? null,
+  marketReleaseAuditStatus: marketSyncReport?.releaseAudit?.status ?? null,
+  marketCatalogDiscoveryStatus: marketSyncReport?.catalogDiscovery?.status ?? null,
+  marketCatalogQueueLength:
+    marketSyncReport?.catalogDiscovery?.summary?.queueLength ?? null,
   warnings,
   errors,
 };

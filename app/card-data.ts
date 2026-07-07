@@ -6,7 +6,9 @@ export type CardType =
   | "COMMAND"
   | "BASE"
   | "RESOURCE"
-  | "EX RESOURCE";
+  | "EX RESOURCE"
+  | "EX BASE"
+  | "UNIT TOKEN";
 
 export type GundamCard = {
   number: string;

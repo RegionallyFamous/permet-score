@@ -6,8 +6,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import * as z from "zod/v4";
 
 import { CARD_ART_VARIANTS } from "../app/card-art-data.ts";
-import { CARD_POOL as CURATED_CARD_POOL } from "../app/card-data.ts";
-import { TCGPLAYER_CARD_POOL } from "../app/tcgplayer-card-data.ts";
+import {
+  CARD_POOL,
+  CURATED_CARD_POOL,
+  OFFICIAL_CARD_ARTS_BY_NUMBER,
+  OFFICIAL_CARD_POOL,
+  OFFICIAL_RULES_LAST_SYNC,
+  TCGPLAYER_CARD_POOL,
+} from "../app/card-pool.ts";
 import {
   TCGPLAYER_CARD_PRINTS,
   TCGPLAYER_LAST_SYNC,
@@ -19,7 +25,6 @@ const TCGPLAYER_FRESH_HOURS = 48;
 const COMPLETE_DATABASE_CARD_TARGET = 700;
 const MAIN_TYPES = ["UNIT", "PILOT", "COMMAND", "BASE"];
 const RESOURCE_TYPES = ["RESOURCE"];
-const CARD_POOL = [...CURATED_CARD_POOL, ...TCGPLAYER_CARD_POOL];
 const CARD_BY_NUMBER = new Map(CARD_POOL.map((card) => [card.number, card]));
 
 const packageJson = JSON.parse(
@@ -48,7 +53,10 @@ function parseCost(card) {
 }
 
 function hasDeckRulesData(card) {
-  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") {
+  if (card.type === "RESOURCE") {
+    return true;
+  }
+  if (card.type === "EX RESOURCE") {
     return hasRulesValue(card.text);
   }
   if (!MAIN_TYPES.includes(card.type)) return false;
@@ -141,6 +149,8 @@ function readinessSummary() {
     deckReadyCards,
     catalogOnlyCards,
     curatedRulesCards: CURATED_CARD_POOL.length,
+    officialRulesCards: OFFICIAL_CARD_POOL.length,
+    officialRulesLastSync: OFFICIAL_RULES_LAST_SYNC,
     marketCatalogCards: TCGPLAYER_CARD_POOL.length,
     marketCardsWithPrints: Object.keys(TCGPLAYER_CARD_PRINTS).length,
     marketPrints,
@@ -375,7 +385,15 @@ server.registerTool(
       found: true,
       card,
       status: cardStatus(card),
-      artVariants: CARD_ART_VARIANTS[card.number] ?? [],
+      artVariants: [
+        ...(OFFICIAL_CARD_ARTS_BY_NUMBER[card.number] ?? []),
+        ...(CARD_ART_VARIANTS[card.number] ?? []).filter(
+          (variant) =>
+            !(OFFICIAL_CARD_ARTS_BY_NUMBER[card.number] ?? []).some(
+              (officialVariant) => officialVariant.id === variant.id,
+            ),
+        ),
+      ],
       tcgplayerPrints: TCGPLAYER_CARD_PRINTS[card.number] ?? [],
       printSummary: printSummary(card),
     });
