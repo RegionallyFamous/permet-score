@@ -994,7 +994,7 @@ function databaseStatus(now?: number) {
   const isFresh =
     isSynced && syncAgeHours !== null && syncAgeHours <= TCGPLAYER_FRESH_HOURS;
   const coverageTone: Notice["tone"] =
-    rulesReadyCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
+    totalCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
   const syncTone: Notice["tone"] = isFresh ? "good" : isSynced ? "warn" : "bad";
 
   return {
@@ -1529,7 +1529,7 @@ export function DeckBuilder({
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
-  const [statusTimestamp, setStatusTimestamp] = useState<number | null>(null);
+  const [statusTimestamp, setStatusTimestamp] = useState(() => Date.now());
   const [fallbackReturnFocusElement, setFallbackReturnFocusElement] =
     useState<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -3826,6 +3826,7 @@ function MobileCockpitNav({
       <div
         className="mx-auto grid max-w-lg grid-cols-4 gap-1.5"
         role={tabsEnabled ? "tablist" : undefined}
+        aria-label={tabsEnabled ? "Mobile workspace views" : undefined}
       >
         {mobileViews.map((view, index) => (
           <button
@@ -4050,6 +4051,7 @@ function ToastViewport({
             type="button"
             className="interactive-control inline-flex min-h-11 shrink-0 items-center rounded-sm border border-current/35 bg-current/10 px-3 font-display text-base font-black uppercase"
             onClick={onAction}
+            tabIndex={-1}
           >
             {toast.actionLabel}
           </button>
@@ -4061,6 +4063,7 @@ function ToastViewport({
             onClick={onDismiss}
             aria-label="Dismiss status"
             title="Dismiss status"
+            tabIndex={-1}
           >
             <X size={15} />
           </button>
@@ -4195,9 +4198,9 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
       : `${Math.round(status.syncAgeHours)}h old`
     : "Not synced";
   const coverageDetail =
-    status.rulesReadyCards >= COMPLETE_DATABASE_CARD_TARGET
-      ? "Rules target met"
-      : `${status.pendingRulesCards} market cards need official rules data`;
+    status.pendingRulesCards === 0
+      ? "All catalog records are deck-ready"
+      : `${status.rulesReadyCards} deck-ready cards · ${status.pendingRulesCards} catalog-only listings indexed`;
 
   return (
     <section className={panelClass()}>
@@ -4208,7 +4211,7 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
         >
           <div className="flex items-center justify-between gap-3">
             <span className="font-display text-lg font-black uppercase">
-              Card Database
+              Catalog Online
             </span>
             <span className="text-base font-black">{status.totalCards}</span>
           </div>
@@ -5063,8 +5066,10 @@ function DeckPanel({
                       <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {card.name}
                       </h3>
-                      <p className="truncate text-sm font-bold text-[#f7f7f2]/58">
-                        {card.number} · {formatPrintMoney(card, artVariant)}
+                      <p className="text-sm font-bold leading-5 text-[#f7f7f2]/58">
+                        <span className="font-black text-[#f7f7f2]/66">{card.number}</span>
+                        <span aria-hidden="true"> · </span>
+                        <span>{formatPrintMoney(card, artVariant)}</span>
                       </p>
                     </div>
                     <div className="flex min-w-0 flex-wrap gap-1">
@@ -5414,7 +5419,7 @@ function InspectorPanel({
         <div className="flex items-start gap-3">
           <button
             type="button"
-            className="scan-frame interactive-control relative h-36 w-[103px] shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black text-left shadow-2xl shadow-black/40"
+            className="scan-frame interactive-control relative h-48 w-[137px] shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black text-left shadow-2xl shadow-black/40 sm:h-56 sm:w-40 xl:h-52 xl:w-[149px] 2xl:h-60 2xl:w-[171px]"
             onClick={onOpenCard}
             aria-label={`Open large view of selected card ${card.name} ${card.number}`}
             title={`Open large view of selected card ${card.name} ${card.number}`}
@@ -5422,7 +5427,7 @@ function InspectorPanel({
             <img
               src={cardImagePath(card, artVariant, 1000)}
               srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
-              sizes="7rem"
+              sizes="(min-width: 1536px) 11rem, (min-width: 1280px) 9.5rem, (min-width: 640px) 10rem, 8.6rem"
               alt={`${card.name} card`}
               className="card-image-surface h-full w-full object-contain object-top"
               decoding="async"

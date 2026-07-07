@@ -133,12 +133,14 @@ textarea {
     linear-gradient(rgba(247, 247, 242, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(167, 181, 201, 0.045) 1px, transparent 1px);
   background-size: 44px 44px;
-  opacity: 0.46;
+  opacity: 0.34;
   mask-image: linear-gradient(180deg, black, rgba(0, 0, 0, 0.42) 72%, transparent);
   animation: none;
 }
 
 .ambient-field {
+  opacity: 0.16;
+  mix-blend-mode: normal;
   animation: none;
 }
 
@@ -501,7 +503,7 @@ textarea {
     border-color 170ms ease,
     background-color 170ms ease,
     box-shadow 170ms ease,
-    transform 170ms ease;
+    filter 170ms ease;
 }
 
 .cockpit-tab::after {
@@ -518,9 +520,8 @@ textarea {
     transform 170ms ease;
 }
 
-.cockpit-tab:hover,
-.cockpit-tab-active {
-  transform: translateY(-2px);
+.cockpit-tab:hover {
+  filter: brightness(1.08);
 }
 
 .cockpit-tab-active::after {
@@ -1025,17 +1026,49 @@ textarea {
   }
 }
 
+@media (max-width: 1279px) {
+  .app-content-shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-content-shell > header {
+    position: relative;
+    top: auto;
+  }
+
+  .app-content-shell > section {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 0.75rem;
+    scrollbar-width: none;
+  }
+
+  .app-content-shell > section::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-cockpit-nav {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    background: #05060a;
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.62);
+    backdrop-filter: none;
+  }
+}
+
 @media (max-width: 767px) {
   .ambient-field {
     display: none;
   }
 
-  .app-content-shell > section {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 7.75rem);
-  }
-
   .library-filters-popover {
-    position: static;
+    position: relative;
     z-index: 55;
     max-height: min(36dvh, 18rem);
     overflow-y: auto;
@@ -1218,8 +1251,7 @@ textarea {
   }
 
   .mobile-deck-title-chip {
-    display: block;
-    max-width: min(14rem, 58vw);
+    display: none;
   }
 
   .short-cockpit-actions .grid {
@@ -1297,6 +1329,7 @@ textarea {
   }
 
   .library-result .library-card-rules {
+    -webkit-line-clamp: 1;
     line-height: 1.05rem;
   }
 
