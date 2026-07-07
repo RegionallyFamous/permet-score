@@ -84,6 +84,10 @@ const nextConfig: NextConfig = {
         headers: staticAssetHeaders,
       },
       {
+        source: "/permet-link-logo-header.webp",
+        headers: staticAssetHeaders,
+      },
+      {
         source: "/permet-link-logo.png",
         headers: staticAssetHeaders,
       },

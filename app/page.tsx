@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import {
   type SyntheticEvent,
+  useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
@@ -1434,6 +1435,28 @@ function cloneCollection(collection: CollectionMap): CollectionMap {
   );
 }
 
+function collectionHasCards(collection: CollectionMap) {
+  return Object.values(collection).some((quantities) =>
+    Object.values(quantities).some((quantity) => quantity > 0),
+  );
+}
+
+function mergeCollections(base: CollectionMap, incoming: CollectionMap): CollectionMap {
+  const next = cloneCollection(base);
+
+  Object.entries(incoming).forEach(([number, quantities]) => {
+    const current = { ...(next[number] ?? {}) };
+    Object.entries(quantities).forEach(([artId, quantity]) => {
+      current[artId] = Math.max(current[artId] ?? 0, quantity);
+    });
+    next[number] = cleanQuantityMap(current);
+  });
+
+  return Object.fromEntries(
+    Object.entries(next).filter(([, quantities]) => Object.keys(quantities).length),
+  );
+}
+
 function cloneDeckState(deck: DeckState): DeckState {
   return {
     name: deck.name,
@@ -1692,10 +1715,14 @@ export function DeckBuilder({
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
+  const [compactFiltersEnabled, setCompactFiltersEnabled] = useState(false);
   const [statusTimestamp, setStatusTimestamp] = useState<number | null>(null);
   const [fallbackReturnFocusElement, setFallbackReturnFocusElement] =
     useState<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const advancedFiltersRef = useRef<HTMLDivElement | null>(null);
+  const advancedFiltersTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const advancedFiltersDoneRef = useRef<HTMLButtonElement | null>(null);
   const openingHandRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const toastIdRef = useRef(0);
@@ -1705,6 +1732,7 @@ export function DeckBuilder({
   const lastSavedDeckRef = useRef("");
   const deferredQuery = useDeferredValue(query);
 
+  const advancedFiltersModalOpen = advancedFiltersOpen && compactFiltersEnabled;
   const isDialogOpen = Boolean(fallbackPanel || lightbox || mobileActionsOpen);
   const sharedPreviewLocked = Boolean(sharedDeckId && sharedStatus === "ready");
   const sharedPreviewEditReason = "Clone this shared deck before editing";
@@ -1717,17 +1745,44 @@ export function DeckBuilder({
   const renderDeckPanel = renderAllPanels || mobileView === "deck";
   const eagerDeckThumbnails = !mobileTabsEnabled || mobileView === "deck";
 
-  function flushPendingDeckStorage() {
+  const clearStorageTimer = useCallback(() => {
+    if (storageTimerRef.current) {
+      window.clearTimeout(storageTimerRef.current);
+      storageTimerRef.current = null;
+    }
+  }, []);
+
+  const flushPendingDeckStorage = useCallback(() => {
     const pendingDeck = pendingStorageDeckRef.current;
     if (!pendingDeck) return;
     window.localStorage.setItem(STORAGE_KEY, pendingDeck);
     lastSavedDeckRef.current = pendingDeck;
     pendingStorageDeckRef.current = null;
-    if (storageTimerRef.current) {
-      window.clearTimeout(storageTimerRef.current);
-      storageTimerRef.current = null;
-    }
-  }
+    clearStorageTimer();
+  }, [clearStorageTimer]);
+
+  const queueDeckStorage = useCallback(
+    (deckSnapshot: DeckState, mode: "defer" | "immediate" = "defer") => {
+      if (sharedDeckId) return;
+
+      const serializedDeck = JSON.stringify(deckSnapshot);
+      clearStorageTimer();
+
+      if (serializedDeck === lastSavedDeckRef.current) {
+        pendingStorageDeckRef.current = null;
+        return;
+      }
+
+      pendingStorageDeckRef.current = serializedDeck;
+      if (mode === "immediate") {
+        flushPendingDeckStorage();
+        return;
+      }
+
+      storageTimerRef.current = window.setTimeout(flushPendingDeckStorage, 180);
+    },
+    [clearStorageTimer, flushPendingDeckStorage, sharedDeckId],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
@@ -1740,6 +1795,14 @@ export function DeckBuilder({
       setMobileTabsEnabled(query.matches);
       if (!query.matches) setMobileActionsOpen(false);
     };
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setCompactFiltersEnabled(query.matches);
     update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
@@ -1807,26 +1870,37 @@ export function DeckBuilder({
 
   useEffect(() => {
     if (loaded && !sharedDeckId) {
-      const serializedDeck = JSON.stringify(deck);
-      if (serializedDeck === lastSavedDeckRef.current) return undefined;
-
-      if (storageTimerRef.current) {
-        window.clearTimeout(storageTimerRef.current);
-      }
-
-      pendingStorageDeckRef.current = serializedDeck;
-      storageTimerRef.current = window.setTimeout(flushPendingDeckStorage, 180);
+      queueDeckStorage(deck);
 
       return () => {
-        if (storageTimerRef.current) {
-          window.clearTimeout(storageTimerRef.current);
-          storageTimerRef.current = null;
-        }
+        clearStorageTimer();
       };
     }
 
     return undefined;
-  }, [deck, loaded, sharedDeckId]);
+  }, [clearStorageTimer, deck, loaded, sharedDeckId, queueDeckStorage]);
+
+  useEffect(() => {
+    if (!advancedFiltersModalOpen) return undefined;
+
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const triggerElement = advancedFiltersTriggerRef.current;
+    window.setTimeout(() => {
+      const firstFilter = advancedFiltersRef.current?.querySelector<HTMLElement>(
+        "select, input, button",
+      );
+      (advancedFiltersDoneRef.current ?? firstFilter)?.focus();
+    }, 0);
+
+    return () => {
+      if (previousFocus && document.contains(previousFocus)) {
+        previousFocus.focus();
+        return;
+      }
+      triggerElement?.focus();
+    };
+  }, [advancedFiltersModalOpen]);
 
   useEffect(() => {
     const flushOnPageExit = () => flushPendingDeckStorage();
@@ -1847,7 +1921,7 @@ export function DeckBuilder({
         window.clearTimeout(storageTimerRef.current);
       }
     };
-  }, []);
+  }, [flushPendingDeckStorage]);
 
   useEffect(() => {
     if (!lightbox) return;
@@ -2240,13 +2314,21 @@ export function DeckBuilder({
     setToast(null);
   }
 
+  function clearUndoCheckpoint() {
+    undoDeckRef.current = null;
+    setCanUndo(false);
+    setToast((current) => (current?.actionLabel === "Undo" ? null : current));
+  }
+
   function restoreUndoDeck() {
     const previousDeck = undoDeckRef.current;
     if (!previousDeck) return;
+    const nextDeck = cloneDeckState(previousDeck);
 
     undoDeckRef.current = null;
     setCanUndo(false);
-    setDeck(cloneDeckState(previousDeck));
+    queueDeckStorage(nextDeck, "immediate");
+    setDeck(nextDeck);
     setOpeningHand([]);
     showToast("good", "Deck restored", "Previous deck is back in the builder.");
   }
@@ -2257,10 +2339,12 @@ export function DeckBuilder({
     detail: string,
   ) {
     if (blockSharedPreviewEdit()) return;
+    const nextDeck = cloneDeckState(createNextDeck());
     setDeck((current) => {
       undoDeckRef.current = cloneDeckState(current);
-      return cloneDeckState(createNextDeck());
+      return nextDeck;
     });
+    queueDeckStorage(nextDeck, "immediate");
     setCanUndo(true);
     setOpeningHand([]);
     showToast("warn", label, detail, "Undo");
@@ -2347,6 +2431,7 @@ export function DeckBuilder({
 
   function stepCardArt(number: string, delta: number) {
     if (blockSharedPreviewEdit()) return;
+    clearUndoCheckpoint();
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card) return current;
@@ -2447,6 +2532,7 @@ export function DeckBuilder({
 
   function adjustCard(zone: Zone, number: string, delta: number) {
     if (blockSharedPreviewEdit()) return;
+    clearUndoCheckpoint();
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card) return current;
@@ -2526,6 +2612,7 @@ export function DeckBuilder({
       return;
     }
 
+    clearUndoCheckpoint();
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card || !validArtId(card, artId)) return current;
@@ -2637,15 +2724,20 @@ export function DeckBuilder({
     } catch {
       existing = null;
     }
+    const clonedDeck = cloneDeckState(deck);
+    if (existing && collectionHasCards(existing.collection)) {
+      clonedDeck.collection = mergeCollections(existing.collection, clonedDeck.collection);
+    }
+
     const wouldReplace =
       existing &&
       deckHasCards(existing) &&
-      comparableDeckSnapshot(existing) !== comparableDeckSnapshot(deck);
+      comparableDeckSnapshot(existing) !== comparableDeckSnapshot(clonedDeck);
 
     if (
       wouldReplace &&
       !window.confirm(
-        "Clone this shared deck and replace your current local deck? Export a backup first if you want to keep it.",
+        "Clone this shared deck and replace your current local deck? Your owned-card collection will be kept.",
       )
     ) {
       showToast("warn", "Clone cancelled", "Your current local deck was not changed.");
@@ -2653,7 +2745,7 @@ export function DeckBuilder({
     }
 
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(deck));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clonedDeck));
       setSharedStatus("cloned");
       window.location.assign("/");
     } catch {
@@ -3069,12 +3161,12 @@ export function DeckBuilder({
         <div className="mx-auto max-w-[1800px] px-3 py-1.5 sm:px-5 sm:py-2">
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="brand-status-cluster flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
-              <div className="flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
+              <div className="brand-logo-lockup flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
-                  src="/permet-link-logo.png"
+                  src="/permet-link-logo-header.webp"
                   alt="Permet Link"
-                  width={1983}
-                  height={793}
+                  width={960}
+                  height={384}
                   decoding="async"
                   className="h-auto w-full object-contain object-left"
                 />
@@ -3369,6 +3461,7 @@ export function DeckBuilder({
                       />
                     </div>
                     <button
+                      ref={advancedFiltersTriggerRef}
                       type="button"
                       className="interactive-control inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-2.5 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:min-h-16 md:px-3"
                       onClick={() => setAdvancedFiltersOpen((open) => !open)}
@@ -3410,13 +3503,43 @@ export function DeckBuilder({
                     </div>
                   )}
 
+                  {advancedFiltersModalOpen && (
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-[54] cursor-default bg-black/45 md:hidden"
+                      onClick={() => setAdvancedFiltersOpen(false)}
+                      aria-label="Close library filters"
+                      tabIndex={-1}
+                    />
+                  )}
                   {advancedFiltersOpen && (
-                    <div id="library-advanced-filters" className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4">
+                    <div
+                      ref={advancedFiltersRef}
+                      id="library-advanced-filters"
+                      className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4"
+                      role={advancedFiltersModalOpen ? "dialog" : undefined}
+                      aria-modal={advancedFiltersModalOpen || undefined}
+                      aria-labelledby={
+                        advancedFiltersModalOpen ? "library-advanced-filters-title" : undefined
+                      }
+                      onKeyDown={
+                        advancedFiltersModalOpen
+                          ? (event) =>
+                              trapDialogFocus(event, advancedFiltersRef.current, () =>
+                                setAdvancedFiltersOpen(false),
+                              )
+                          : undefined
+                      }
+                    >
                       <div className="filter-sheet-header col-span-full flex items-center justify-between gap-2 border-b border-[#a7b5c9]/16 pb-2 md:hidden">
-                        <span className="font-display text-base font-black uppercase text-[#d9ecff]">
+                        <h2
+                          id="library-advanced-filters-title"
+                          className="font-display text-base font-black uppercase text-[#d9ecff]"
+                        >
                           Filter Library
-                        </span>
+                        </h2>
                         <button
+                          ref={advancedFiltersDoneRef}
                           type="button"
                           className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
                           onClick={() => setAdvancedFiltersOpen(false)}
@@ -4268,7 +4391,9 @@ function MobileActionSheet({
     }, 0);
 
     return () => {
-      previousFocusRef.current?.focus();
+      if (previousFocusRef.current && document.contains(previousFocusRef.current)) {
+        previousFocusRef.current.focus();
+      }
       previousFocusRef.current = null;
     };
   }, [open]);
@@ -4549,11 +4674,11 @@ function FallbackPanelView({
         </div>
         <div className="fallback-panel-body grid min-h-0 gap-3 overflow-auto p-3">
           {hasBuyEntries && (
-            <div className="grid gap-2">
+            <ul className="grid gap-2" aria-label="Missing selected prints">
               {panel.buyEntries?.map((entry) => {
                 const priceSummary = printPriceSummary(entry.card, entry.variant);
                 return (
-                  <div
+                  <li
                     key={`${entry.card.number}-${entry.variant.id}`}
                     className={`mecha-row interactive-row grid gap-2 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.045] p-2 shadow-lg shadow-black/10 sm:grid-cols-[4.25rem_minmax(0,1fr)_auto] ${colorAccentClass(
                       entry.card.color,
@@ -4591,14 +4716,17 @@ function FallbackPanelView({
                       target="_blank"
                       rel="noopener noreferrer nofollow"
                       className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] sm:self-center"
+                      aria-label={`View on TCGplayer for ${entry.card.name}, ${artDisplayLabel(
+                        entry.variant,
+                      )}, ${entry.missing} missing`}
                     >
                       <ShoppingCart size={15} />
                       TCG
                     </a>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
           <textarea
             ref={textareaRef}
@@ -4752,7 +4880,9 @@ function CardLightbox({
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     return () => {
-      previousFocusRef.current?.focus();
+      if (previousFocusRef.current && document.contains(previousFocusRef.current)) {
+        previousFocusRef.current.focus();
+      }
       previousFocusRef.current = null;
     };
   }, [lightboxCardNumber]);
@@ -5564,7 +5694,7 @@ function DeckPanel({
                         <span>{formatPrintMoney(card, artVariant)}</span>
                       </p>
                     </div>
-                    <div className="flex min-w-0 flex-wrap gap-1">
+                    <div className="deck-print-chips flex min-w-0 flex-wrap gap-1">
                       {printEntries.map((entry) => (
                         <span
                           key={entry.variant.id}
@@ -5838,7 +5968,7 @@ function LibraryCard({
         </button>
         <button
           type="button"
-          className="interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#8bdcff]/10 text-[#d9ecff] hover:bg-[#8bdcff]/16"
+          className="library-open-action interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#8bdcff]/10 text-[#d9ecff] hover:bg-[#8bdcff]/16"
           onClick={(event) => {
             event.stopPropagation();
             onOpenCard();
