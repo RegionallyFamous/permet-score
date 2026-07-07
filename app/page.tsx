@@ -4242,9 +4242,6 @@ export function DeckBuilder({
                   <h2 className="whitespace-nowrap font-display text-xl font-black uppercase text-[#f7f7f2] sm:text-2xl">
                     Card Library
                   </h2>
-                  <span className="rounded-sm border border-[#f6c542]/25 bg-[#f6c542]/12 px-2.5 py-1 text-sm font-black text-[#fff2bd]">
-                    {libraryRangeStart}-{libraryRangeEnd}
-                  </span>
                 </div>
                 <div className="grid gap-2">
                   <div className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,auto)] gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
