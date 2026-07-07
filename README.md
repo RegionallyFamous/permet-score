@@ -32,6 +32,33 @@ API, and shared deck page. `perf:lighthouse` expects the app to already be
 running on `http://localhost:3000`, ideally with `npm run build && npm run start`.
 `analyze` uses the Turbopack analyzer built into current Next.js.
 
+## MCP Site Inspector
+
+Permet Link includes a read-only MCP server for querying site health, card
+readiness, market coverage, and individual card records from MCP-compatible
+clients:
+
+```bash
+npm run mcp:site
+```
+
+For MCP client configuration, use the direct node command or npm's silent mode
+so stdout stays reserved for MCP messages:
+
+```bash
+node scripts/mcp-site-inspector.mjs
+npm run --silent mcp:site
+```
+
+Available tools:
+
+- `get_site_summary`: launch, stack, route, readiness, and market summary.
+- `get_card_readiness`: deck-ready versus catalog-only counts.
+- `search_cards`: filter cards by query, type, color, set, or readiness.
+- `get_card_detail`: inspect one card's rules, art variants, and TCGplayer prints.
+- `get_market_coverage`: TCGplayer sync and price/product-link coverage.
+- `check_live_site`: read-only smoke check for the public site, SEO files, and `llms.txt`.
+
 ## TCGplayer Market Source
 
 Permet Link uses a private bridge to TCGplayer product/catalog data, so the app
