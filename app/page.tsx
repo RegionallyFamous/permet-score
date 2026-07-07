@@ -55,13 +55,9 @@ import {
   CARD_BY_NUMBER,
   CARD_POOL,
   CURATED_CARD_NUMBERS,
-  CURATED_CARD_POOL,
-  OFFICIAL_CARD_POOL,
-  TCGPLAYER_CARD_POOL,
 } from "./card-pool";
 import {
   TCGPLAYER_CARD_PRINTS,
-  TCGPLAYER_LAST_SYNC,
   type TcgplayerPrint,
 } from "./tcgplayer-data";
 
@@ -163,8 +159,6 @@ const MAIN_TARGET = 50;
 const RESOURCE_TARGET = 10;
 const MAX_MAIN_COPIES = 4;
 const MAX_MAIN_COLORS = 2;
-const TCGPLAYER_FRESH_HOURS = 48;
-const COMPLETE_DATABASE_CARD_TARGET = 700;
 const MAIN_TYPES: CardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
 const RESOURCE_TYPES: CardType[] = ["RESOURCE"];
 const TYPE_ORDER: Record<CardType, number> = {
@@ -201,9 +195,9 @@ const artFilters = [
 const collectionFilters = ["All", "Owned", "Budget"] as const;
 const buildStatusFilters = ["All", "Deck Ready", "Catalog Only"] as const;
 const DEFAULT_BUDGET_LIMIT = 5;
-const LIBRARY_PAGE_SIZE = 6;
+const LIBRARY_PAGE_SIZE = 12;
 const MAX_IMPORT_BYTES = 64 * 1024;
-const libraryPageSizeOptions = [6, 12, 24] as const;
+const libraryPageSizeOptions = [12, 24] as const;
 
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
 const CARD_IMAGE_FALLBACK = "/permet-link-logo-fallback.webp";
@@ -1020,38 +1014,6 @@ function tcgplayerPrint(card: GundamCard, variant: CardArtVariant): TcgplayerPri
   );
 }
 
-function cardVariantForTcgplayerPrint(card: GundamCard, print: TcgplayerPrint) {
-  const variants = cardArtVariants(card);
-  return (
-    variants.find((variant) => variant.id === print.variantId) ??
-    variants.find((variant) => variant.officialId === print.officialId) ??
-    (print.variantId === "standard" ? variants.find((variant) => variant.id === "standard") : undefined) ??
-    null
-  );
-}
-
-function positiveMarketPrice(print: TcgplayerPrint) {
-  return typeof print.marketPrice === "number" &&
-    Number.isFinite(print.marketPrice) &&
-    print.marketPrice > 0
-    ? print.marketPrice
-    : null;
-}
-
-function hasUsableMarketPriceForPrint(card: GundamCard, print: TcgplayerPrint) {
-  const price = positiveMarketPrice(print);
-  if (price === null) return false;
-  const variant = cardVariantForTcgplayerPrint(card, print);
-  return variant ? !isVolatileMarketPrice(price, estimatePrintCost(card, variant)) : false;
-}
-
-function hasVolatileMarketPriceForPrint(card: GundamCard, print: TcgplayerPrint) {
-  const price = positiveMarketPrice(print);
-  if (price === null) return false;
-  const variant = cardVariantForTcgplayerPrint(card, print);
-  return variant ? isVolatileMarketPrice(price, estimatePrintCost(card, variant)) : false;
-}
-
 function rawTcgplayerMarketPrice(card: GundamCard, variant: CardArtVariant) {
   const price = tcgplayerPrint(card, variant)?.marketPrice;
   return typeof price === "number" && Number.isFinite(price) && price > 0
@@ -1523,75 +1485,6 @@ function selectedAltPrintCopies(deck: DeckState) {
       }, 0)
     );
   }, 0);
-}
-
-function tcgplayerSyncAgeHours(now?: number) {
-  if (!TCGPLAYER_LAST_SYNC) return null;
-  if (now === undefined) return null;
-  const syncedAt = new Date(TCGPLAYER_LAST_SYNC).getTime();
-  if (!Number.isFinite(syncedAt)) return null;
-  return Math.max(0, (now - syncedAt) / 3_600_000);
-}
-
-function databaseStatus(now?: number) {
-  const totalCards = CARD_POOL.length;
-  const officialCards = OFFICIAL_CARD_POOL.length;
-  const curatedCards = CURATED_CARD_POOL.length;
-  const tcgCards = TCGPLAYER_CARD_POOL.length;
-  const tcgPrints = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
-    (sum, prints) => sum + prints.length,
-    0,
-  );
-  const tcgCardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
-  let pricedPrints = 0;
-  let volatilePricedPrints = 0;
-  Object.entries(TCGPLAYER_CARD_PRINTS).forEach(([number, prints]) => {
-    const card = CARD_BY_NUMBER.get(number);
-    if (!card) return;
-    prints.forEach((print) => {
-      if (hasUsableMarketPriceForPrint(card, print)) {
-        pricedPrints += 1;
-      } else if (hasVolatileMarketPriceForPrint(card, print)) {
-        volatilePricedPrints += 1;
-      }
-    });
-  });
-  const rulesReadyCards = CARD_POOL.filter(hasDeckRulesData).length;
-  const pendingRulesCards = Math.max(0, totalCards - rulesReadyCards);
-  const syncAgeHours = tcgplayerSyncAgeHours(now);
-  const isSynced = Boolean(TCGPLAYER_LAST_SYNC && tcgPrints > 0);
-  const isMarketCoverageLimited = tcgPrints > 0 && pricedPrints < tcgPrints;
-  const isFresh =
-    isSynced && (syncAgeHours === null || syncAgeHours <= TCGPLAYER_FRESH_HOURS);
-  const coverageTone: Notice["tone"] =
-    totalCards >= COMPLETE_DATABASE_CARD_TARGET ? "good" : isSynced ? "warn" : "bad";
-  const syncTone: Notice["tone"] = isFresh
-    ? isMarketCoverageLimited
-      ? "warn"
-      : "good"
-    : isSynced
-      ? "warn"
-      : "bad";
-
-  return {
-    totalCards,
-    officialCards,
-    curatedCards,
-    tcgCards,
-    tcgPrints,
-    tcgCardsWithPrints,
-    pricedPrints,
-    volatilePricedPrints,
-    rulesReadyCards,
-    pendingRulesCards,
-    lastSync: TCGPLAYER_LAST_SYNC,
-    syncAgeHours,
-    isSynced,
-    isFresh,
-    isMarketCoverageLimited,
-    coverageTone,
-    syncTone,
-  };
 }
 
 function countByType(entries: DeckEntry[]) {
@@ -2182,7 +2075,6 @@ export function DeckBuilder({
   const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
   const [compactFiltersEnabled, setCompactFiltersEnabled] = useState(false);
   const [bootState, setBootState] = useState<"active" | "exit" | "hidden">("active");
-  const [statusTimestamp, setStatusTimestamp] = useState<number | null>(null);
   const [fallbackReturnFocusElement, setFallbackReturnFocusElement] =
     useState<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -2301,11 +2193,6 @@ export function DeckBuilder({
     },
     [clearStorageTimer, flushPendingDeckStorage, sharedDeckId],
   );
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setStatusTimestamp(Date.now()), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 1279px)");
@@ -2476,10 +2363,6 @@ export function DeckBuilder({
   const deckList = useMemo(() => buildDeckList(deck), [deck]);
   const costSummary = useMemo(() => summarizeDeckCosts(deck), [deck]);
   const tcgListEntries = useMemo(() => getTcgListEntries(deck), [deck]);
-  const dataStatus = useMemo(
-    () => databaseStatus(statusTimestamp ?? undefined),
-    [statusTimestamp],
-  );
   const tcgListTotal = useMemo(
     () => tcgListEntries.reduce((sum, entry) => sum + entry.totalCost, 0),
     [tcgListEntries],
@@ -2817,24 +2700,6 @@ export function DeckBuilder({
       });
     }
 
-    messages.push(
-      dataStatus.isSynced
-        ? {
-            tone: dataStatus.syncTone,
-            label: "Card DB",
-            detail: dataStatus.isFresh
-              ? dataStatus.isMarketCoverageLimited
-                ? "Fresh scan"
-                : "Fresh market"
-              : "Market stale",
-          }
-        : {
-            tone: "warn",
-            label: "Card DB",
-            detail: "Market pending",
-          },
-    );
-
     if (mainTotal === MAIN_TARGET) {
       const checks = [
         ["Units", typeCounts.UNIT, 25, 28],
@@ -2856,10 +2721,6 @@ export function DeckBuilder({
 
     return messages;
   }, [
-    dataStatus.isFresh,
-    dataStatus.isMarketCoverageLimited,
-    dataStatus.isSynced,
-    dataStatus.syncTone,
     deckColors,
     mainEntries,
     mainTotal,
@@ -3918,6 +3779,15 @@ export function DeckBuilder({
     setFallbackReturnFocusElement(null);
   }
 
+  function resetWorkspaceScroll() {
+    const workspaceScroller = document.querySelector(".app-content-shell > section");
+    if (workspaceScroller instanceof HTMLElement) {
+      workspaceScroller.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
   function focusWorkspacePanel(view: MobileView) {
     const panel = document.getElementById(`${view}-panel`);
     if (!(panel instanceof HTMLElement)) return;
@@ -3941,18 +3811,14 @@ export function DeckBuilder({
       });
       return;
     }
+    resetWorkspaceScroll();
     setMobileView(view);
     window.requestAnimationFrame(() => {
       if (options.focusPanel) {
         focusWorkspacePanel(view);
         return;
       }
-      const workspaceScroller = document.querySelector(".app-content-shell > section");
-      if (workspaceScroller instanceof HTMLElement) {
-        workspaceScroller.scrollTo({ top: 0, behavior: "auto" });
-      } else {
-        window.scrollTo({ top: 0, behavior: "auto" });
-      }
+      resetWorkspaceScroll();
     });
   }
 
@@ -3960,6 +3826,7 @@ export function DeckBuilder({
     event.preventDefault();
     if (mobileTabsEnabled) {
       setMobileActionsOpen(false);
+      resetWorkspaceScroll();
       setMobileView(view);
     }
     window.requestAnimationFrame(() => {
@@ -5137,9 +5004,9 @@ function BootOverlay({
           </div>
           <h2>Launch Sequence</h2>
           <div className="boot-status-row" aria-hidden="true">
-            <span>Card DB</span>
-            <span>TCG Link</span>
-            <span>Deck Bay</span>
+            <span>Cards</span>
+            <span>Links</span>
+            <span>Decks</span>
           </div>
           <div className="boot-progress" aria-hidden="true">
             <i />

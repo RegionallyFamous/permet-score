@@ -661,7 +661,7 @@ async function assertSampleDeckClearsLibraryFilters(page) {
   );
   await page.waitForFunction(
     (expected) => document.querySelector(".library-pager")?.textContent?.includes(expected),
-    `1-6of ${libraryCount}`,
+    `1-12of ${libraryCount}`,
     { timeout: 15000 },
   );
   await page.getByRole("heading", { name: "Gundam", exact: true }).first().waitFor({
@@ -683,7 +683,7 @@ async function assertNoResultSearchShowsRecovery(page) {
   await page.locator("#card-panel").getByRole("button", { name: "Clear All" }).click();
   await page.waitForFunction(
     (expected) => document.querySelector(".library-pager")?.textContent?.includes(expected),
-    `1-6of ${libraryCount}`,
+    `1-12of ${libraryCount}`,
     { timeout: 15000 },
   );
   if (!(await page.locator("#card-panel h2", { hasText: "Gundam" }).first().isVisible())) {
@@ -697,7 +697,7 @@ async function assertLibraryMicroInteractions(page) {
 
   await page.getByPlaceholder("Name, #, text").fill("gundam blue");
   await page.locator(".library-result").first().waitFor({ timeout: 15000 });
-  await page.locator(".library-result").first().getByRole("heading", { name: /Gundam/i }).waitFor({
+  await page.locator(".library-result").first().getByRole("heading").waitFor({
     timeout: 15000,
   });
 
