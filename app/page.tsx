@@ -1235,6 +1235,30 @@ function noticeClass(tone: Notice["tone"]) {
   }
 }
 
+function issueBadgeText(notice: Notice) {
+  const detail = notice.detail.replace(/\s*cards$/i, "");
+  switch (notice.label) {
+    case "Main deck":
+      return `Main ${detail}`;
+    case "Resource":
+      return `Resource ${detail}`;
+    case "Colors":
+      return notice.detail === "No colors" ? "No colors" : `Colors ${notice.detail}`;
+    case "Copies":
+      return `${notice.detail} copies`;
+    case "Zones":
+      return "Zone mismatch";
+    case "Rules Data":
+      return `Rules ${notice.detail}`;
+    default:
+      return `${notice.label} ${detail}`;
+  }
+}
+
+function issueDetailText(notice: Notice) {
+  return `${notice.label}: ${notice.detail}`;
+}
+
 function panelClass(extra = "") {
   return `gcg-panel rounded-sm shadow-sm shadow-black/10 ${extra}`;
 }
@@ -2770,6 +2794,7 @@ export function DeckBuilder({
   ]);
 
   const isLegal = notices.every((notice) => notice.tone !== "bad");
+  const primaryDeckIssue = notices.find((notice) => notice.tone === "bad") ?? null;
   const activeAdvancedFilterCount = [
     colorFilter !== "All",
     typeFilter !== "All",
@@ -4005,7 +4030,7 @@ export function DeckBuilder({
                   <h1 className="sr-only">
                     Permet Link
                   </h1>
-                  <StatusBadge isLegal={isLegal} />
+                  <StatusBadge isLegal={isLegal} issue={primaryDeckIssue} />
                   {isStarterTemplate && (
                     <span className="inline-flex h-8 items-center rounded-sm border border-[#8bdcff]/34 bg-[#1167d8]/14 px-2.5 font-display text-sm font-black uppercase text-[#d9ecff]">
                       Starter Template
@@ -4193,6 +4218,7 @@ export function DeckBuilder({
             deckName={deck.name}
             isStarterTemplate={isStarterTemplate}
             selectedCard={selectedCard}
+            issue={primaryDeckIssue}
             marketTotal={costSummary.artTotal}
           />
         </div>
@@ -4838,6 +4864,7 @@ function HudStrip({
   deckName,
   isStarterTemplate,
   selectedCard,
+  issue,
   marketTotal,
 }: {
   isLegal: boolean;
@@ -4845,6 +4872,7 @@ function HudStrip({
   deckName: string;
   isStarterTemplate: boolean;
   selectedCard: GundamCard | null;
+  issue: Notice | null;
   marketTotal: number;
 }) {
   const statusLabel =
@@ -4878,7 +4906,7 @@ function HudStrip({
                 : "border-[#e31b23]/40 bg-[#e31b23]/14 text-[#ffe3e3]"
             }`}
           >
-            {isLegal ? "Sortie Ready" : "Tune Required"}
+            {isLegal ? "Sortie Ready" : issue ? issueBadgeText(issue) : "Review Deck"}
           </span>
           <span className="rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-2 py-1 text-[#fff2bd]">
             {deckName}
@@ -6168,10 +6196,17 @@ function SynergyPanel({ notices }: { notices: SynergyNotice[] }) {
   );
 }
 
-function StatusBadge({ isLegal }: { isLegal: boolean }) {
+function StatusBadge({ isLegal, issue }: { isLegal: boolean; issue: Notice | null }) {
+  const label = isLegal ? "Legal" : issue ? issueBadgeText(issue) : "Review Deck";
+  const ariaLabel = isLegal
+    ? "Deck legal"
+    : issue
+      ? `Deck issue: ${issueDetailText(issue)}`
+      : "Deck issue: review deck";
+
   return (
     <span
-      aria-label={isLegal ? "Deck legal" : "Deck needs work"}
+      aria-label={ariaLabel}
       className={`status-badge inline-flex h-8 w-fit items-center gap-2 rounded-sm border px-2.5 font-display text-base font-black uppercase ${
         isLegal
           ? "status-badge-legal border-[#2e8cff]/45 bg-[#1167d8]/18 text-[#d9ecff]"
@@ -6179,7 +6214,7 @@ function StatusBadge({ isLegal }: { isLegal: boolean }) {
       }`}
     >
       {isLegal ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-      <span>{isLegal ? "Legal" : "Needs work"}</span>
+      <span>{label}</span>
     </span>
   );
 }
