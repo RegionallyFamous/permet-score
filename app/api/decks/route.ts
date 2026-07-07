@@ -9,8 +9,20 @@ function randomShareId() {
   return randomBytes(8).toString("base64url");
 }
 
+function hasJsonContentType(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  return /\bapplication\/json\b/i.test(contentType) || /\+json\b/i.test(contentType);
+}
+
 export async function POST(request: Request) {
   let body: unknown;
+
+  if (!hasJsonContentType(request)) {
+    return NextResponse.json(
+      { error: "Content-Type must be application/json." },
+      { status: 415 },
+    );
+  }
 
   try {
     body = await request.json();

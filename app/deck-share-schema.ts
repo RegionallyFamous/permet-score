@@ -1,14 +1,8 @@
 import {
-  CARD_ART_VARIANTS,
-  type CardArtVariant,
-} from "./card-art-data";
-import {
-  CARD_POOL,
-  type CardType,
-  type GundamCard,
-} from "./card-data";
-import { TCGPLAYER_CARD_POOL } from "./tcgplayer-card-data";
-import { TCGPLAYER_CARD_PRINTS } from "./tcgplayer-data";
+  DECK_VALIDATION_CARDS,
+  type DeckValidationCard,
+  type ValidationCardType,
+} from "./deck-validation-data";
 
 export type QuantityMap = Record<string, number>;
 export type ArtChoiceMap = Record<string, string>;
@@ -23,22 +17,11 @@ export type SharedDeckState = {
   prints: DeckPrints;
 };
 
-const SHARE_CARD_POOL = [
-  ...CARD_POOL,
-  ...TCGPLAYER_CARD_POOL.filter(
-    (card) => !CARD_POOL.some((curated) => curated.number === card.number),
-  ),
-];
-const CARD_BY_NUMBER = new Map(SHARE_CARD_POOL.map((card) => [card.number, card]));
-const CARD_ARTS_BY_NUMBER = CARD_ART_VARIANTS as Record<
-  string,
-  readonly CardArtVariant[]
->;
 const MAIN_TARGET = 50;
 const RESOURCE_TARGET = 10;
 const MAX_MAIN_COPIES = 4;
-const MAIN_TYPES: CardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
-const RESOURCE_TYPES: CardType[] = ["RESOURCE"];
+const MAIN_TYPES: ValidationCardType[] = ["UNIT", "PILOT", "COMMAND", "BASE"];
+const RESOURCE_TYPES: ValidationCardType[] = ["RESOURCE"];
 
 function clampQuantity(value: unknown) {
   const quantity = Number(value);
@@ -56,34 +39,19 @@ function cleanQuantityMap(map: QuantityMap) {
   );
 }
 
-function cardArtVariants(card: GundamCard) {
-  const standardVariant = {
-    id: "standard",
-    label: "Standard",
-    image: `/card-images/${card.number}.webp`,
-    tier: 0,
-    officialId: card.number,
-  };
-  const localVariants = CARD_ARTS_BY_NUMBER[card.number] ?? [];
-  const marketVariants = (TCGPLAYER_CARD_PRINTS[card.number] ?? []).map((print, index) => ({
-    id: print.variantId,
-    label: print.variantId === "standard" ? "Standard" : `Market Print ${index + 1}`,
-    image: print.imageUrl ?? standardVariant.image,
-    tier: index,
-    officialId: print.officialId,
-  }));
-  const variants = [standardVariant, ...localVariants, ...marketVariants];
-  return variants.filter(
-    (variant, index) =>
-      variants.findIndex((candidate) => candidate.id === variant.id) === index,
-  );
+function cardArtIds(card: DeckValidationCard) {
+  return card.artIds.length ? card.artIds : ["standard"];
 }
 
-function validArtId(card: GundamCard, artId: string) {
-  return cardArtVariants(card).some((variant) => variant.id === artId);
+function validArtId(card: DeckValidationCard, artId: string) {
+  return cardArtIds(card).includes(artId);
 }
 
-function parseCost(card: GundamCard) {
+function validationCard(number: string) {
+  return DECK_VALIDATION_CARDS[number];
+}
+
+function parseCost(card: DeckValidationCard) {
   const cost = Number(card.cost);
   return Number.isFinite(cost) ? cost : null;
 }
@@ -92,7 +60,7 @@ function hasRulesValue(value: string) {
   return Boolean(value && value.trim() !== "-");
 }
 
-function hasDeckRulesData(card: GundamCard) {
+function hasDeckRulesData(card: DeckValidationCard) {
   if (card.type === "RESOURCE" || card.type === "EX RESOURCE") return true;
   if (!MAIN_TYPES.includes(card.type)) return false;
   return (
@@ -102,7 +70,7 @@ function hasDeckRulesData(card: GundamCard) {
   );
 }
 
-function canCardEnterZone(zone: "main" | "resource", card: GundamCard) {
+function canCardEnterZone(zone: "main" | "resource", card: DeckValidationCard) {
   return zone === "main"
     ? MAIN_TYPES.includes(card.type) && hasDeckRulesData(card)
     : RESOURCE_TYPES.includes(card.type);
@@ -120,7 +88,7 @@ function sanitizeQuantities(
 
   Object.entries(value as Record<string, unknown>).forEach(([number, quantity]) => {
     if (remaining <= 0) return;
-    const card = CARD_BY_NUMBER.get(number);
+    const card = validationCard(number);
     if (!card || !canCardEnterZone(zone, card)) return;
     const safeQuantity = Math.min(clampQuantity(quantity), maxCopies, remaining);
     if (safeQuantity <= 0) return;
@@ -131,14 +99,18 @@ function sanitizeQuantities(
   return next;
 }
 
-function sanitizeArtChoices(value: unknown): ArtChoiceMap {
+function sanitizeArtChoices(
+  value: unknown,
+  allowedNumbers: ReadonlySet<string>,
+): ArtChoiceMap {
   if (!value || typeof value !== "object") return {};
 
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .filter(([number, artId]) => {
+        if (!allowedNumbers.has(number)) return false;
         if (typeof artId !== "string") return false;
-        const card = CARD_BY_NUMBER.get(number);
+        const card = validationCard(number);
         return Boolean(card && validArtId(card, artId));
       })
       .map(([number, artId]) => [number, artId as string]),
@@ -151,10 +123,10 @@ function normalizePrintQuantities(
   rawValue: unknown,
   preferredArtId: string | undefined,
 ) {
-  const card = CARD_BY_NUMBER.get(number);
+  const card = validationCard(number);
   if (!card || targetQuantity <= 0) return {};
 
-  const variants = cardArtVariants(card);
+  const artIds = cardArtIds(card);
   const preferred =
     preferredArtId && validArtId(card, preferredArtId) ? preferredArtId : "standard";
   const next: QuantityMap = {};
@@ -180,11 +152,11 @@ function normalizePrintQuantities(
 
   if (total > targetQuantity) {
     let overflow = total - targetQuantity;
-    [...variants].reverse().forEach((variant) => {
+    [...artIds].reverse().forEach((artId) => {
       if (overflow <= 0) return;
-      const quantity = next[variant.id] ?? 0;
+      const quantity = next[artId] ?? 0;
       const removed = Math.min(quantity, overflow);
-      next[variant.id] = quantity - removed;
+      next[artId] = quantity - removed;
       overflow -= removed;
     });
   }
@@ -224,7 +196,8 @@ export function sanitizeSharedDeck(value: unknown): SharedDeckState | null {
   const maybeDeck = value as Partial<SharedDeckState>;
   const main = sanitizeQuantities(maybeDeck.main, "main");
   const resource = sanitizeQuantities(maybeDeck.resource, "resource");
-  const art = sanitizeArtChoices(maybeDeck.art);
+  const deckNumbers = new Set([...Object.keys(main), ...Object.keys(resource)]);
+  const art = sanitizeArtChoices(maybeDeck.art, deckNumbers);
 
   if (totalCards(main) === 0 && totalCards(resource) === 0) return null;
 

@@ -89,7 +89,11 @@ export async function loadSharedDeck(id: string) {
   const result = await get(blobPath(id), { access: "private" });
   if (result?.statusCode !== 200) return null;
 
-  const text = await new Response(result.stream).text();
-  const parsed = JSON.parse(text) as Partial<SharedDeckRecord>;
-  return sanitizeSharedDeck(parsed.deck);
+  try {
+    const text = await new Response(result.stream).text();
+    const parsed = JSON.parse(text) as Partial<SharedDeckRecord>;
+    return sanitizeSharedDeck(parsed.deck);
+  } catch {
+    return null;
+  }
 }

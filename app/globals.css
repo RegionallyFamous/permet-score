@@ -94,6 +94,10 @@ textarea {
   background:
     linear-gradient(180deg, rgba(247, 247, 242, 0.055), rgba(247, 247, 242, 0) 30%),
     rgba(7, 9, 14, 0.96);
+  box-shadow:
+    inset 1px 1px 0 rgba(247, 247, 242, 0.08),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.54),
+    0 10px 28px rgba(0, 0, 0, 0.22);
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
@@ -127,7 +131,11 @@ textarea {
 
 .gcg-panel:hover {
   border-color: rgba(139, 220, 255, 0.34);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  box-shadow:
+    inset 1px 1px 0 rgba(247, 247, 242, 0.1),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.6),
+    0 18px 38px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(139, 220, 255, 0.06);
 }
 
 .gcg-panel:hover::after {
@@ -272,6 +280,12 @@ textarea {
   animation: none;
 }
 
+.scan-frame:hover::after,
+.scan-frame:focus-visible::after,
+.active-scan-card .scan-frame::after {
+  animation: scan-frame-sweep 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 .permet-sweep {
   animation: permet-sweep 2.8s ease-in-out infinite;
   will-change: transform;
@@ -294,7 +308,7 @@ textarea {
 }
 
 .interactive-control::after {
-  content: none;
+  content: "";
   pointer-events: none;
   position: absolute;
   inset: -1px;
@@ -466,12 +480,12 @@ textarea {
 .mobile-action-sheet {
   position: fixed;
   z-index: 65;
-  top: max(0.75rem, calc(100vh - env(safe-area-inset-bottom) - 18.5rem));
+  top: auto;
   right: 0.75rem;
-  bottom: auto;
+  bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
   left: 0.75rem;
   width: auto;
-  max-height: calc(100vh - env(safe-area-inset-bottom) - 7rem);
+  max-height: calc(100dvh - env(safe-area-inset-bottom) - 6.5rem);
   overflow-y: auto;
 }
 
@@ -485,6 +499,32 @@ textarea {
 .interactive-row:hover {
   border-color: rgba(139, 220, 255, 0.34);
   background-color: rgba(247, 247, 242, 0.08);
+}
+
+.panel-title {
+  position: relative;
+  background:
+    linear-gradient(90deg, rgba(139, 220, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(247, 247, 242, 0.055), rgba(0, 0, 0, 0));
+  box-shadow:
+    inset 0 1px 0 rgba(247, 247, 242, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.46);
+}
+
+.panel-title::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: min(46%, 13rem);
+  height: 2px;
+  background: linear-gradient(90deg, rgba(246, 197, 66, 0.72), rgba(139, 220, 255, 0.48), transparent);
+}
+
+.mecha-row {
+  clip-path: polygon(0 0, calc(100% - 0.72rem) 0, 100% 0.72rem, 100% 100%, 0.72rem 100%, 0 calc(100% - 0.72rem));
+  box-shadow:
+    inset 1px 1px 0 rgba(247, 247, 242, 0.06),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.48);
 }
 
 .meter-fill {
@@ -614,6 +654,41 @@ textarea {
 .library-result.active-scan-card::before {
   opacity: 0.92;
   box-shadow: 0 0 18px rgba(246, 197, 66, 0.35);
+}
+
+.deck-entry {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.deck-entry::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: currentColor;
+  opacity: 0.55;
+  z-index: 1;
+}
+
+.deck-entry::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, currentColor 14%, transparent), transparent 26%),
+    linear-gradient(315deg, rgba(246, 197, 66, 0.07), transparent 20%);
+  opacity: 0;
+  transition: opacity 180ms ease;
+  z-index: -1;
+}
+
+.deck-entry:hover::after,
+.deck-entry:focus-within::after {
+  opacity: 1;
 }
 
 .toast-shell {

@@ -86,33 +86,81 @@ async function assertShareDropsPendingRulesCards() {
     throw new Error("Shared deck sanitizer kept pending-rules EB01-001 in the main deck");
   }
 
+  if (loaded.deck?.art?.["EB01-001"]) {
+    throw new Error("Shared deck sanitizer kept orphan art for pending-rules EB01-001");
+  }
+
+  if (loaded.deck?.prints?.main?.["EB01-001"]) {
+    throw new Error("Shared deck sanitizer kept orphan prints for pending-rules EB01-001");
+  }
+
   if (loaded.deck?.resource?.["R-001"] !== 10) {
     throw new Error("Shared deck sanitizer dropped valid resource cards");
   }
 }
 
+async function assertSharePrunesOrphanArt() {
+  const deck = {
+    name: "Workflow QA Orphan Art",
+    main: { "EB01-001": 4, "ST01-001": 4 },
+    resource: { "R-001": 10 },
+    art: { "EB01-001": "standard", "ST01-001": "p1" },
+    prints: {
+      main: {
+        "EB01-001": { standard: 4 },
+        "ST01-001": { p1: 4 },
+      },
+      resource: { "R-001": { standard: 10 } },
+    },
+  };
+
+  const saveResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deck),
+  });
+
+  if (!saveResponse.ok) {
+    throw new Error(`POST /api/decks orphan-art probe failed with ${saveResponse.status}`);
+  }
+
+  const saved = await saveResponse.json();
+  const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
+  if (!loadResponse.ok) {
+    throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
+  }
+
+  const loaded = await loadResponse.json();
+  if (loaded.deck?.main?.["EB01-001"] || loaded.deck?.art?.["EB01-001"]) {
+    throw new Error("Shared deck sanitizer kept orphan pending-rules card/art data");
+  }
+
+  if (loaded.deck?.art?.["ST01-001"] !== "p1") {
+    throw new Error("Shared deck sanitizer dropped valid surviving art choice");
+  }
+}
+
+async function assertShareRejectsNonJsonContentType() {
+  const response = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({
+      name: "Workflow QA Text Plain",
+      main: { "ST01-001": 1 },
+      resource: { "R-001": 10 },
+    }),
+  });
+
+  if (response.status !== 415) {
+    throw new Error(`Expected text/plain share POST to return 415, got ${response.status}`);
+  }
+}
+
 async function assertInvalidShareBlocked(page) {
   const invalidDeck = {
-    name: "Workflow QA Invalid Deck",
-    main: {
-      "ST01-001": 4,
-      "ST01-002": 3,
-      "ST01-003": 4,
-      "ST01-004": 4,
-      "ST01-005": 4,
-      "ST01-006": 3,
-      "ST01-007": 3,
-      "ST01-008": 2,
-      "ST01-009": 2,
-      "ST01-010": 4,
-      "ST01-011": 3,
-      "ST01-012": 3,
-      "ST01-013": 2,
-      "ST01-014": 4,
-      "ST01-015": 3,
-      "ST01-016": 3,
-    },
-    resource: { "R-001": 10 },
+    name: "Workflow QA Empty Deck",
+    main: {},
+    resource: {},
     art: {},
     prints: { main: {}, resource: {} },
     collection: {},
@@ -125,6 +173,41 @@ async function assertInvalidShareBlocked(page) {
   await page.reload({ waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Share" }).click();
   await page.getByText("Share blocked").waitFor({ timeout: 15000 });
+}
+
+async function assertLocalStorageDropsPendingRulesCards(page) {
+  const invalidDeck = {
+    name: "Workflow QA Local Pending Rules",
+    main: { "EB01-001": 4 },
+    resource: { "R-001": 10 },
+    art: { "EB01-001": "standard" },
+    prints: {
+      main: { "EB01-001": { standard: 4 } },
+      resource: { "R-001": { standard: 10 } },
+    },
+  };
+
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.evaluate((deck) => {
+    window.localStorage.setItem("gundam-deck-builder-v1", JSON.stringify(deck));
+  }, invalidDeck);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForFunction(
+    () => {
+      const stored = window.localStorage.getItem("gundam-deck-builder-v1");
+      if (!stored) return false;
+      const deck = JSON.parse(stored);
+      return (
+        deck.name === "Workflow QA Local Pending Rules" &&
+        !deck.main?.["EB01-001"] &&
+        !deck.art?.["EB01-001"] &&
+        !deck.prints?.main?.["EB01-001"] &&
+        deck.resource?.["R-001"] === 10
+      );
+    },
+    null,
+    { timeout: 15000 },
+  );
 }
 
 async function assertArtUpgradeKeepsBuyList(page) {
@@ -365,6 +448,8 @@ async function assertShortMobileControlsClearNav(page) {
 async function main() {
   await assertSharePreservesPrints();
   await assertShareDropsPendingRulesCards();
+  await assertSharePrunesOrphanArt();
+  await assertShareRejectsNonJsonContentType();
 
   const browser = await launchBrowser();
   try {
@@ -407,6 +492,7 @@ async function main() {
       acceptDownloads: true,
     });
     await assertInvalidShareBlocked(desktop);
+    await assertLocalStorageDropsPendingRulesCards(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
     await assertResourceSearchRanksResourceCards(desktop);
     await assertMarketCatalogOnlyCardsAreLabeled(desktop);

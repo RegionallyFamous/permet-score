@@ -268,13 +268,24 @@ function clampQuantity(value: unknown) {
   return Math.max(0, Math.floor(quantity));
 }
 
-function sanitizeQuantities(value: unknown): QuantityMap {
+function sanitizeQuantities(value: unknown, zone: Zone): QuantityMap {
   if (!value || typeof value !== "object") return {};
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([number, quantity]) => [number, clampQuantity(quantity)] as const)
-      .filter(([number, quantity]) => quantity > 0 && CARD_BY_NUMBER.has(number)),
-  );
+  const maxCopies = zone === "main" ? MAX_MAIN_COPIES : RESOURCE_TARGET;
+  const maxTotal = zone === "main" ? MAIN_TARGET : RESOURCE_TARGET;
+  const next: QuantityMap = {};
+  let remaining = maxTotal;
+
+  Object.entries(value as Record<string, unknown>).forEach(([number, quantity]) => {
+    if (remaining <= 0) return;
+    const card = CARD_BY_NUMBER.get(number);
+    if (!card || !canCardEnterZone(zone, card)) return;
+    const safeQuantity = Math.min(clampQuantity(quantity), maxCopies, remaining);
+    if (safeQuantity <= 0) return;
+    next[number] = safeQuantity;
+    remaining -= safeQuantity;
+  });
+
+  return next;
 }
 
 function tcgplayerProductImageUrl(productId: number, size = 1500) {
@@ -323,12 +334,16 @@ function cardArtVariants(card: GundamCard) {
   );
 }
 
-function sanitizeArtChoices(value: unknown): ArtChoiceMap {
+function sanitizeArtChoices(
+  value: unknown,
+  allowedNumbers?: ReadonlySet<string>,
+): ArtChoiceMap {
   if (!value || typeof value !== "object") return {};
 
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .filter(([number, artId]) => {
+        if (allowedNumbers && !allowedNumbers.has(number)) return false;
         if (typeof artId !== "string") return false;
         const card = CARD_BY_NUMBER.get(number);
         return Boolean(
@@ -447,9 +462,10 @@ function sanitizeCollection(value: unknown): CollectionMap {
 function sanitizeDeck(value: unknown): DeckState | null {
   if (!value || typeof value !== "object") return null;
   const maybeDeck = value as Partial<DeckState>;
-  const main = sanitizeQuantities(maybeDeck.main);
-  const resource = sanitizeQuantities(maybeDeck.resource);
-  const art = sanitizeArtChoices(maybeDeck.art);
+  const main = sanitizeQuantities(maybeDeck.main, "main");
+  const resource = sanitizeQuantities(maybeDeck.resource, "resource");
+  const deckNumbers = new Set([...Object.keys(main), ...Object.keys(resource)]);
+  const art = sanitizeArtChoices(maybeDeck.art, deckNumbers);
   return {
     name:
       typeof maybeDeck.name === "string" && maybeDeck.name.trim()
@@ -1426,6 +1442,8 @@ export function DeckBuilder({
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
   const [statusTimestamp, setStatusTimestamp] = useState<number | null>(null);
+  const [fallbackReturnFocusElement, setFallbackReturnFocusElement] =
+    useState<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const openingHandRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -1444,7 +1462,10 @@ export function DeckBuilder({
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 1279px)");
-    const update = () => setMobileTabsEnabled(query.matches);
+    const update = () => {
+      setMobileTabsEnabled(query.matches);
+      if (!query.matches) setMobileActionsOpen(false);
+    };
     update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
@@ -1671,6 +1692,8 @@ export function DeckBuilder({
       const rankDelta =
         queryMatchRank(a, normalizedQuery) - queryMatchRank(b, normalizedQuery);
       if (rankDelta !== 0) return rankDelta;
+      const readyDelta = Number(isDeckReadyCard(b)) - Number(isDeckReadyCard(a));
+      if (readyDelta !== 0) return readyDelta;
       return a.name.localeCompare(b.name);
     });
   }, [
@@ -2192,7 +2215,7 @@ export function DeckBuilder({
     const nextHand = drawOpeningHandNumbers(deck.main);
     setOpeningHand(nextHand);
     setMobileView("stats");
-    if (nextHand.length) {
+    if (nextHand.length && mobileTabsEnabled) {
       window.setTimeout(() => {
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         openingHandRef.current?.focus({ preventScroll: true });
@@ -2376,6 +2399,7 @@ export function DeckBuilder({
   }
 
   async function copyDeckList() {
+    rememberFallbackReturnFocus();
     const copied = await writeClipboardText(deckList);
     if (copied) {
       setCopyState("Copied");
@@ -2396,6 +2420,7 @@ export function DeckBuilder({
   }
 
   async function copyBuyList() {
+    rememberFallbackReturnFocus();
     if (!buyListText) {
       showToast("good", "Buy list clear", "No missing selected prints to copy.");
       return;
@@ -2418,13 +2443,17 @@ export function DeckBuilder({
   }
 
   async function copyShareUrl() {
+    rememberFallbackReturnFocus();
     if (shareState === "Saving") return;
     if (!isLegal) {
       setShareState("Fix Deck");
+      const blockingNotice = notices.find((notice) => notice.tone === "bad");
       showToast(
         "bad",
         "Share blocked",
-        "Fix the red deck checks first so the shared link matches this list.",
+        blockingNotice
+          ? `${blockingNotice.label}: ${blockingNotice.detail}. Fix this before sharing.`
+          : "Fix the red deck checks first so the shared link matches this list.",
       );
       window.setTimeout(() => setShareState("Share"), 1800);
       return;
@@ -2527,6 +2556,20 @@ export function DeckBuilder({
   function runMobileAction(action: () => void) {
     setMobileActionsOpen(false);
     action();
+  }
+
+  function rememberFallbackReturnFocus() {
+    setFallbackReturnFocusElement(
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : null,
+    );
+  }
+
+  function closeFallbackPanel() {
+    setFallbackPanel(null);
+    setFallbackReturnFocusElement(null);
   }
 
   function changeMobileView(view: MobileView) {
@@ -3215,7 +3258,8 @@ export function DeckBuilder({
       />
       <FallbackPanelView
         panel={fallbackPanel}
-        onClose={() => setFallbackPanel(null)}
+        returnFocusElement={fallbackReturnFocusElement}
+        onClose={closeFallbackPanel}
       />
       <CardLightbox
         item={lightbox}
@@ -3620,7 +3664,11 @@ function MobileActionSheet({
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     window.setTimeout(() => {
-      sheetRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      const sampleButton = sheetRef.current?.querySelector<HTMLButtonElement>(
+        'button[title="Load sample deck"]',
+      );
+      const firstButton = sheetRef.current?.querySelector<HTMLButtonElement>("button");
+      (sampleButton ?? firstButton)?.focus();
     }, 0);
 
     return () => {
@@ -3654,6 +3702,9 @@ function MobileActionSheet({
           className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/10 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
         />
       </label>
+      <ToolbarButton label="Close" title="Close more deck actions" onClick={onClose} className="col-span-2 w-full">
+        <X size={16} />
+      </ToolbarButton>
       {canUndo && (
         <ToolbarButton label="Undo" title="Restore previous deck state" onClick={onUndo} className="w-full">
           <Undo2 size={16} />
@@ -3682,9 +3733,6 @@ function MobileActionSheet({
       </ToolbarButton>
       <ToolbarButton label="Import" title="Import JSON" onClick={onImport} className="w-full">
         <Upload size={16} />
-      </ToolbarButton>
-      <ToolbarButton label="Close" title="Close more deck actions" onClick={onClose} className="col-span-2 w-full">
-        <X size={16} />
       </ToolbarButton>
     </div>
   );
@@ -3751,9 +3799,11 @@ function ToastViewport({
 
 function FallbackPanelView({
   panel,
+  returnFocusElement,
   onClose,
 }: {
   panel: FallbackPanel | null;
+  returnFocusElement: HTMLElement | null;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLElement | null>(null);
@@ -3763,14 +3813,17 @@ function FallbackPanelView({
   useEffect(() => {
     if (!panel) return undefined;
     previousFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      returnFocusElement ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     return () => {
-      previousFocusRef.current?.focus();
+      if (previousFocusRef.current && document.contains(previousFocusRef.current)) {
+        previousFocusRef.current.focus();
+      }
       previousFocusRef.current = null;
     };
-  }, [panel]);
+  }, [panel, returnFocusElement]);
 
   if (!panel) return null;
 
@@ -3819,7 +3872,7 @@ function FallbackPanelView({
             value={panel.content}
             aria-label={`${panel.title} content`}
             onFocus={(event) => event.currentTarget.select()}
-            className="control-field min-h-28 w-full resize-y rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono text-sm font-bold leading-6 text-[#f7f7f2] outline-none focus:border-[#f6c542]"
+            className="control-field min-h-64 w-full resize-y rounded-sm border border-[#8bdcff]/24 bg-black/42 p-3 font-mono text-sm font-bold leading-6 text-[#f7f7f2] outline-none focus:border-[#f6c542]"
           />
           <div className="grid gap-2 sm:grid-cols-2">
             {panel.href && (
@@ -4081,15 +4134,6 @@ function CardLightbox({
                   {card.set} · {sourceLabel}
                 </p>
               </div>
-              <button
-                type="button"
-                className="hidden"
-                onClick={onClose}
-                aria-label="Close card view"
-                title="Close"
-              >
-                <X size={18} />
-              </button>
             </div>
 
             <div className="grid grid-cols-4 gap-2">
@@ -4406,7 +4450,7 @@ function ToolbarButton({
 
 function PanelTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 border-b border-[#a7b5c9]/20 p-3 text-[#f6c542]">
+    <div className="panel-title flex items-center gap-2 border-b border-[#a7b5c9]/20 p-3 text-[#f6c542]">
       {icon}
       <h2 className="font-display text-2xl font-black uppercase text-[#f7f7f2]">{title}</h2>
     </div>
@@ -4713,7 +4757,7 @@ function DeckPanel({
             return (
               <div
                 key={card.number}
-                className={`deck-entry interactive-row rounded-sm border bg-[#f7f7f2]/[0.045] p-2 shadow-lg shadow-black/10 ${colorAccentClass(
+                className={`deck-entry mecha-row interactive-row rounded-sm border bg-[#f7f7f2]/[0.045] p-2 shadow-lg shadow-black/10 ${colorAccentClass(
                   card.color,
                 )}`}
               >
@@ -4843,6 +4887,7 @@ function LibraryCard({
   const rulesPending =
     primaryZone === "main" && MAIN_TYPES.includes(card.type) && !hasDeckRulesData(card);
   const deckReady = isDeckReadyCard(card);
+  const cardActionLabel = `${card.name} ${card.number}`;
   const onAdjustPrimary =
     primaryZone === "main"
       ? onAdjustMain
@@ -4852,7 +4897,7 @@ function LibraryCard({
 
   return (
     <article
-      className={`library-result interactive-row group overflow-hidden rounded-sm border bg-[#080b11]/96 p-2.5 shadow-sm shadow-black/12 transition duration-150 hover:border-[#8bdcff]/45 hover:bg-[#0d131d] ${colorAccentClass(
+      className={`library-result mecha-row interactive-row group overflow-hidden rounded-sm border bg-[#080b11]/96 p-2.5 shadow-sm shadow-black/12 transition duration-150 hover:border-[#8bdcff]/45 hover:bg-[#0d131d] ${colorAccentClass(
         card.color,
       )} ${selected ? "active-scan-card ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
     >
@@ -4864,8 +4909,8 @@ function LibraryCard({
             event.stopPropagation();
             onOpenCard();
           }}
-          aria-label={`Open large view of ${card.name}`}
-          title={`Open large view of ${card.name}`}
+          aria-label={`Open large view of ${cardActionLabel}`}
+          title={`Open large view of ${cardActionLabel}`}
         >
           <img
             src={cardImagePath(card, artVariant, 1000)}
@@ -4962,7 +5007,7 @@ function LibraryCard({
         <div className="library-card-actions col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.5rem_2.5rem_2.5rem] gap-1 min-[380px]:grid-cols-[minmax(0,1fr)_2.5rem_2.5rem_3.25rem] sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
         {primaryZone && onAdjustPrimary ? (
           <MiniQuantityControl
-            label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
+            label={`${cardActionLabel} ${zoneLabel(primaryZone).toLowerCase()} copy`}
             quantity={primaryQuantity}
             tone={primaryZone}
             dense
@@ -4989,8 +5034,8 @@ function LibraryCard({
           }`}
           onClick={onSelect}
           aria-pressed={selected}
-          title={`Select ${card.name}`}
-          aria-label={`Select ${card.name}`}
+          title={`Select ${cardActionLabel}`}
+          aria-label={`Select ${cardActionLabel}`}
         >
           <CheckCircle2 size={15} />
         </button>
@@ -5001,8 +5046,8 @@ function LibraryCard({
             event.stopPropagation();
             onOpenCard();
           }}
-          title={`Open ${card.name} from action row`}
-          aria-label={`Open ${card.name} details from action row`}
+          title={`Open ${cardActionLabel} from action row`}
+          aria-label={`Open ${cardActionLabel} details from action row`}
         >
           <Maximize2 size={15} />
         </button>
@@ -5012,8 +5057,8 @@ function LibraryCard({
           rel="noopener noreferrer nofollow"
           className="interactive-control inline-flex h-11 min-h-11 items-center justify-center gap-0.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-xs font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 sm:gap-1 sm:text-sm"
           onClick={(event) => event.stopPropagation()}
-          title={`Search TCGplayer for ${card.name}`}
-          aria-label={`Search TCGplayer for ${card.name}`}
+          title={`Search TCGplayer for ${cardActionLabel}`}
+          aria-label={`Search TCGplayer for ${cardActionLabel}`}
         >
           <ShoppingCart size={15} />
           <span className="hidden min-[380px]:inline sm:inline">TCG</span>
