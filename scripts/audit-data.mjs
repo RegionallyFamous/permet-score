@@ -27,8 +27,8 @@ const sourceOnlyProductIds = Object.entries(TCGPLAYER_CARD_PRINTS).flatMap(
       .filter((print) =>
         Boolean(
           print.productId &&
-            print.janieProductId &&
-            print.productId === print.janieProductId &&
+            print.sourceProductId &&
+            print.productId === print.sourceProductId &&
             !/tcgplayer\.com\/product\/\d+/i.test(print.url),
         ),
       )
@@ -72,9 +72,9 @@ report(
 );
 
 if (sourceOnlyProductIds.length) {
-  warnings.push(
-    `${sourceOnlyProductIds.length} market print records have source-only IDs where TCGplayer product IDs are expected; runtime image guards will ignore those CDN paths until the next sync repairs them.`,
-  );
+  const message = `${sourceOnlyProductIds.length} market print records have source-only IDs where TCGplayer product IDs are expected.`;
+  if (strict) errors.push(message);
+  else warnings.push(`${message} Runtime image guards will ignore those CDN paths until the next sync repairs them.`);
 }
 
 const summary = {

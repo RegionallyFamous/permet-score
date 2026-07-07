@@ -1198,9 +1198,21 @@ function shiftOnePrint(
   return null;
 }
 
-function shiftAllPrints(printMap: PrintChoiceMap, card: GundamCard, delta: number) {
+function shiftAllPrints(
+  printMap: PrintChoiceMap,
+  card: GundamCard,
+  delta: number,
+  targetQuantity: number,
+) {
   const variants = cardArtVariants(card);
-  const current = printMap[card.number] ?? {};
+  const current =
+    printMap[card.number] ??
+    normalizePrintQuantities(card.number, targetQuantity, null, undefined);
+  if (!current || totalCards(current) === 0) {
+    delete printMap[card.number];
+    return;
+  }
+
   const next: QuantityMap = {};
 
   variants.forEach((variant, index) => {
@@ -1211,7 +1223,12 @@ function shiftAllPrints(printMap: PrintChoiceMap, card: GundamCard, delta: numbe
     next[target.id] = (next[target.id] ?? 0) + quantity;
   });
 
-  printMap[card.number] = cleanQuantityMap(next);
+  const cleaned = cleanQuantityMap(next);
+  if (Object.keys(cleaned).length) {
+    printMap[card.number] = cleaned;
+  } else {
+    delete printMap[card.number];
+  }
 }
 
 function addPrintCopies(
@@ -1933,8 +1950,8 @@ export function DeckBuilder({
       cardNumbers.forEach((number) => {
         const card = CARD_BY_NUMBER.get(number);
         if (!card) return;
-        shiftAllPrints(nextPrints.main, card, delta);
-        shiftAllPrints(nextPrints.resource, card, delta);
+        shiftAllPrints(nextPrints.main, card, delta, current.main[number] ?? 0);
+        shiftAllPrints(nextPrints.resource, card, delta, current.resource[number] ?? 0);
         const activeVariant =
           printEntriesForCard({ ...current, prints: nextPrints }, "main", card)[0]
             ?.variant ??
@@ -2055,8 +2072,10 @@ export function DeckBuilder({
     setMobileView("stats");
     if (nextHand.length) {
       window.setTimeout(() => {
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        openingHandRef.current?.focus({ preventScroll: true });
         openingHandRef.current?.scrollIntoView({
-          behavior: "smooth",
+          behavior: reducedMotion ? "auto" : "smooth",
           block: "start",
         });
       }, 0);
@@ -2259,22 +2278,34 @@ export function DeckBuilder({
     }
 
     const copied = await writeClipboardText(buyListText);
-    if (copied) {
-      showToast("good", "Buy list copied", "Missing print list is on your clipboard.");
-      return;
-    }
-
     setFallbackPanel({
       title: "Buy List",
-      detail: "Clipboard access was blocked. The missing-print buy list is selected below.",
+      detail: copied
+        ? "Missing selected prints were copied. Review the buy list below before purchasing."
+        : "Clipboard access was blocked. The missing-print buy list is selected below.",
       content: buyListText,
       downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-buy-list.txt`,
     });
-    showToast("warn", "Buy list ready", "Manual copy panel opened.");
+    showToast(
+      copied ? "good" : "warn",
+      copied ? "Buy list copied" : "Buy list ready",
+      copied ? "Review panel opened." : "Manual copy panel opened.",
+    );
   }
 
   async function copyShareUrl() {
     if (shareState === "Saving") return;
+    if (!isLegal) {
+      setShareState("Fix Deck");
+      showToast(
+        "bad",
+        "Share blocked",
+        "Fix the red deck checks first so the shared link matches this list.",
+      );
+      window.setTimeout(() => setShareState("Share"), 1800);
+      return;
+    }
+
     setShareState("Saving");
 
     try {
@@ -2409,10 +2440,10 @@ export function DeckBuilder({
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
               <div className="flex w-40 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
-                  src="/permet-link-logo-header.webp"
+                  src="/permet-link-logo.png"
                   alt="Permet Link"
-                  width={640}
-                  height={256}
+                  width={1983}
+                  height={793}
                   fetchPriority="high"
                   className="h-auto w-full object-contain object-left"
                 />
@@ -2579,7 +2610,7 @@ export function DeckBuilder({
             role="region"
             aria-label="Card library"
             className={panelClass(
-              `min-w-0 overflow-hidden ${
+              `library-panel min-w-0 ${
                 mobileView === "library" ? "block" : "hidden xl:block"
               }`,
             )}
@@ -2603,7 +2634,7 @@ export function DeckBuilder({
                       </span>
                       <div className="relative mt-1">
                         <Search
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#f7f7f2]/42"
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#f7f7f2]/58"
                           size={16}
                         />
                         <input
@@ -2613,7 +2644,7 @@ export function DeckBuilder({
                             setLibraryPage(0);
                           }}
                           placeholder="Name, #, text"
-                          className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/42 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+                          className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/54 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         />
                       </div>
                     </label>
@@ -2676,7 +2707,7 @@ export function DeckBuilder({
                   )}
 
                   {advancedFiltersOpen && (
-                    <div className="workbench-scroll grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <div className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4">
                       <div className="md:hidden">
                         <SelectFilter
                           label="Color"
@@ -2758,7 +2789,7 @@ export function DeckBuilder({
               </div>
             </div>
 
-            <div className="border-b border-[#a7b5c9]/14 bg-[#0d1118]/86 px-2.5 py-2 sm:px-3">
+            <div className="library-pager border-b border-[#a7b5c9]/14 bg-[#0d1118]/86 px-2.5 py-2 sm:px-3">
               <div className="flex items-center justify-between gap-2">
                 <div aria-live="polite">
                   <p className="hidden font-display text-xs font-black uppercase text-[#8bdcff] sm:block">
@@ -2905,7 +2936,12 @@ export function DeckBuilder({
 
               <SynergyPanel notices={synergyNotices} />
 
-              <div ref={openingHandRef} className="scroll-mt-24">
+              <div
+                ref={openingHandRef}
+                className="scroll-mt-24"
+                tabIndex={-1}
+                aria-label="Opening hand results"
+              >
                 <HandSimulatorPanel
                   cards={openingHandEntries}
                   onDraw={drawHand}
@@ -3332,9 +3368,14 @@ function MobileActionSheet({
       ref={sheetRef}
       id="mobile-action-sheet"
       className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden"
-      role="dialog"
+      role="group"
       aria-label="More deck actions"
-      onKeyDown={(event) => trapDialogFocus(event, sheetRef.current, onClose)}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      }}
     >
       <ToolbarButton label="Sample" title="Load sample deck" onClick={onSample} className="w-full">
         <ShieldCheck size={16} />
@@ -3612,7 +3653,7 @@ function CardLightbox({
   onClose: () => void;
   onVariantChange: (artVariant: CardArtVariant) => void;
 }) {
-  const dialogRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const lightboxCardNumber = item?.card.number;
@@ -3640,29 +3681,32 @@ function CardLightbox({
 
   return (
     <div
-      className="card-lightbox fixed inset-0 z-[70] overflow-y-auto bg-[#020305]/88 px-3 py-4 backdrop-blur-xl sm:px-5 sm:py-6"
+      ref={dialogRef}
+      className="fixed inset-0 z-[70] bg-[#020305]/88 backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
       aria-labelledby="card-lightbox-title"
       onClick={onClose}
       onKeyDown={(event) => trapDialogFocus(event, dialogRef.current, onClose)}
     >
-      <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
+      <button
+        ref={closeButtonRef}
+        type="button"
+        className="lightbox-close interactive-control inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-[#a7b5c9]/28 bg-[#05070c]/94 text-[#f7f7f2] shadow-xl shadow-black/45"
+        onClick={onClose}
+        aria-label="Close card view"
+        title="Close"
+      >
+        <X size={19} />
+      </button>
+      <div className="card-lightbox h-full overflow-y-auto px-3 py-4 sm:px-5 sm:py-6">
+      <div
+        className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center"
+        onClick={(event) => event.stopPropagation()}
+      >
         <section
-          ref={dialogRef}
           className="lightbox-shell relative grid w-full gap-3 rounded-sm border border-[#8bdcff]/34 bg-[#05070c]/96 p-3 shadow-2xl shadow-black/70 lg:grid-cols-[minmax(280px,0.9fr)_minmax(320px,0.68fr)] lg:p-4"
-          onClick={(event) => event.stopPropagation()}
         >
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="lightbox-close interactive-control absolute right-2 top-2 z-20 inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-[#a7b5c9]/28 bg-[#05070c]/94 text-[#f7f7f2] shadow-xl shadow-black/45"
-            onClick={onClose}
-            aria-label="Close card view"
-            title="Close"
-          >
-            <X size={19} />
-          </button>
           <div className="grid min-w-0 gap-3">
             <div className="lightbox-card-stage scan-frame relative grid place-items-center overflow-hidden rounded-sm border border-[#8bdcff]/38 bg-black/88 p-2 shadow-2xl shadow-black/60">
               <img
@@ -3789,6 +3833,7 @@ function CardLightbox({
             </a>
           </div>
         </section>
+      </div>
       </div>
     </div>
   );
@@ -3937,11 +3982,17 @@ function HandSimulatorPanel({
     type,
     count: cards.filter((card) => card.type === type).length,
   })).filter((item) => item.count > 0);
+  const handSummary = cards.length
+    ? `Opening hand: ${cards.map((card) => `${card.name}, ${card.type}`).join("; ")}.`
+    : "No opening hand drawn.";
 
   return (
     <section className={panelClass("min-w-0 max-w-full overflow-hidden")}>
       <PanelTitle icon={<Shuffle size={18} />} title="Opening Hand" />
       <div className="grid min-w-0 gap-3 p-3">
+        <p className="sr-only" aria-live="polite">
+          {handSummary}
+        </p>
         <div className="grid min-w-0 grid-cols-2 gap-2">
           <button
             type="button"
@@ -3961,7 +4012,7 @@ function HandSimulatorPanel({
         </div>
         <div className="grid min-w-0 gap-2">
           {cards.length === 0 ? (
-            <div className="rounded-sm border border-dashed border-[#f7f7f2]/15 p-3 text-center font-display text-lg font-black uppercase text-[#f7f7f2]/42">
+            <div className="rounded-sm border border-dashed border-[#f7f7f2]/15 p-3 text-center font-display text-lg font-black uppercase text-[#f7f7f2]/58">
               No hand drawn
             </div>
           ) : (
@@ -4183,7 +4234,7 @@ function QuantityStepper({
           className={buttonClass(decrementDisabled)}
           disabled={decrementDisabled}
           title={decrementDisabled ? decrementReason : `Remove one ${label} copy`}
-          aria-label={`Remove one ${label} copy`}
+          aria-label={decrementDisabled && decrementReason ? decrementReason : `Remove one ${label} copy`}
           onClick={(event) => {
             event.stopPropagation();
             onDecrement();
@@ -4204,7 +4255,7 @@ function QuantityStepper({
           className={buttonClass(incrementDisabled)}
           disabled={incrementDisabled}
           title={incrementDisabled ? incrementReason : `Add one ${label} copy`}
-          aria-label={`Add one ${label} copy`}
+          aria-label={incrementDisabled && incrementReason ? incrementReason : `Add one ${label} copy`}
           onClick={(event) => {
             event.stopPropagation();
             onIncrement();
@@ -4347,7 +4398,7 @@ function DeckPanel({
         }`}
       >
         {entries.length === 0 ? (
-          <div className="flex h-32 items-center justify-center rounded-sm border border-dashed border-[#f7f7f2]/15 font-display text-lg font-black uppercase text-[#f7f7f2]/45">
+          <div className="flex h-32 items-center justify-center rounded-sm border border-dashed border-[#f7f7f2]/15 font-display text-lg font-black uppercase text-[#f7f7f2]/58">
             Empty
           </div>
         ) : (
@@ -4595,7 +4646,7 @@ function LibraryCard({
           </div>
         </div>
 
-        <div className="col-span-2 grid grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] gap-1.5 sm:col-span-1 sm:col-start-2">
+        <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_2.5rem_2.5rem_3.25rem] gap-1 sm:col-span-1 sm:col-start-2 sm:grid-cols-[minmax(7.5rem,1fr)_2.75rem_2.75rem_3.4rem] sm:gap-1.5">
         {primaryZone && onAdjustPrimary ? (
           <MiniQuantityControl
             label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
@@ -4611,7 +4662,7 @@ function LibraryCard({
           />
         ) : (
           <div className="grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2">
-            <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/35">
+            <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/58">
               Locked
             </div>
           </div>
@@ -4646,7 +4697,7 @@ function LibraryCard({
           href={tcgplayerUrl(card, artVariant)}
           target="_blank"
           rel="noopener noreferrer nofollow"
-          className="interactive-control inline-flex h-11 min-h-11 items-center justify-center gap-1 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-sm font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18"
+          className="interactive-control inline-flex h-11 min-h-11 items-center justify-center gap-0.5 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 font-display text-xs font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 sm:gap-1 sm:text-sm"
           onClick={(event) => event.stopPropagation()}
           title={`Search TCGplayer for ${card.name}`}
           aria-label={`Search TCGplayer for ${card.name}`}

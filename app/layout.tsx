@@ -1,4 +1,7 @@
-import type { Metadata } from "next";
+import type {
+  Metadata,
+  Viewport,
+} from "next";
 import { Rajdhani } from "next/font/google";
 import "./globals.css";
 
@@ -10,8 +13,17 @@ const rajdhani = Rajdhani({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://permetlink.com"),
+  applicationName: "Permet Link",
   title: "Permet Link",
   description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
+  keywords: [
+    "Gundam Card Game",
+    "Gundam deck builder",
+    "Gundam TCG",
+    "deck list",
+    "alt art",
+    "TCGplayer",
+  ],
   alternates: {
     canonical: "/",
   },
@@ -21,7 +33,27 @@ export const metadata: Metadata = {
     url: "https://permetlink.com",
     siteName: "Permet Link",
     type: "website",
+    images: [
+      {
+        url: "/permet-link-logo.png",
+        width: 1983,
+        height: 793,
+        alt: "Permet Link",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Permet Link",
+    description: "A fast local-first Gundam Card Game deck builder and alt-art planner.",
+    images: ["/permet-link-logo.png"],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Permet Link",
+    statusBarStyle: "black-translucent",
+  },
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -33,6 +65,14 @@ export const metadata: Metadata = {
       { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
     ],
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#05060a",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
