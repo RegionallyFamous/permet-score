@@ -1,5 +1,5 @@
 import { chromium } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 const baseUrl = process.env.PERMET_BASE_URL ?? "http://localhost:3000";
@@ -12,6 +12,7 @@ const viewports = [
   { name: "wide", width: 1440, height: 900 },
 ];
 
+await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 
 async function launchBrowser() {

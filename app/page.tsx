@@ -192,6 +192,7 @@ const artFilters = [
   "Premium Alt",
 ] as const;
 const collectionFilters = ["All", "Owned", "Missing", "Budget"] as const;
+const buildStatusFilters = ["All", "Deck Ready", "Catalog Only"] as const;
 const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
 const LIBRARY_PAGE_SIZE = 6;
@@ -1045,6 +1046,24 @@ function canCardEnterZone(zone: Zone, card: GundamCard) {
   return RESOURCE_TYPES.includes(card.type);
 }
 
+function isDeckReadyCard(card: GundamCard) {
+  return canCardEnterZone("main", card) || canCardEnterZone("resource", card);
+}
+
+function cardMatchesBuildStatusFilter(
+  card: GundamCard,
+  filter: (typeof buildStatusFilters)[number],
+) {
+  switch (filter) {
+    case "Deck Ready":
+      return isDeckReadyCard(card);
+    case "Catalog Only":
+      return !isDeckReadyCard(card);
+    default:
+      return true;
+  }
+}
+
 function zoneLabel(zone: Zone) {
   return zone === "main" ? "Main" : "Resource";
 }
@@ -1391,6 +1410,8 @@ export function DeckBuilder({
     useState<(typeof artFilters)[number]>("All Art");
   const [collectionFilter, setCollectionFilter] =
     useState<(typeof collectionFilters)[number]>("All");
+  const [buildStatusFilter, setBuildStatusFilter] =
+    useState<(typeof buildStatusFilters)[number]>("All");
   const [budgetLimit, setBudgetLimit] = useState(DEFAULT_BUDGET_LIMIT);
   const [openingHand, setOpeningHand] = useState<string[]>([]);
   const [selectedNumber, setSelectedNumber] = useState("ST01-001");
@@ -1623,6 +1644,10 @@ export function DeckBuilder({
       const matchesType = typeFilter === "All" || card.type === typeFilter;
       const matchesSet = setFilter === "All" || card.set === setFilter;
       const matchesArt = variantMatchesArtFilter(card, artFilter);
+      const matchesBuildStatus = cardMatchesBuildStatusFilter(
+        card,
+        buildStatusFilter,
+      );
       const matchesCollection = cardMatchesCollectionFilter(
         deck,
         card,
@@ -1635,6 +1660,7 @@ export function DeckBuilder({
         matchesType &&
         matchesSet &&
         matchesArt &&
+        matchesBuildStatus &&
         matchesCollection
       );
     });
@@ -1649,6 +1675,7 @@ export function DeckBuilder({
     });
   }, [
     artFilter,
+    buildStatusFilter,
     budgetLimit,
     collectionFilter,
     colorFilter,
@@ -1670,6 +1697,19 @@ export function DeckBuilder({
     filteredCards.length,
     (safeLibraryPage + 1) * LIBRARY_PAGE_SIZE,
   );
+  const catalogOnlySummary = useMemo(() => {
+    const catalogCards = filteredCards.filter((card) => !isDeckReadyCard(card)).length;
+    const shouldShow =
+      catalogCards > 0 &&
+      (buildStatusFilter === "Catalog Only" ||
+        (deferredQuery.trim().length > 0 && catalogCards / filteredCards.length >= 0.5));
+
+    return {
+      catalogCards,
+      deckReadyCards: filteredCards.length - catalogCards,
+      shouldShow,
+    };
+  }, [buildStatusFilter, deferredQuery, filteredCards]);
   const visibleLibraryCards = useMemo(
     () =>
       filteredCards.slice(
@@ -1857,6 +1897,7 @@ export function DeckBuilder({
   const activeAdvancedFilterCount = [
     setFilter !== "All",
     artFilter !== "All Art",
+    buildStatusFilter !== "All",
     collectionFilter !== "All",
     budgetLimit !== DEFAULT_BUDGET_LIMIT,
   ].filter(Boolean).length;
@@ -1944,6 +1985,7 @@ export function DeckBuilder({
   function resetAdvancedFilters() {
     setSetFilter("All");
     setArtFilter("All Art");
+    setBuildStatusFilter("All");
     setCollectionFilter("All");
     setBudgetLimit(DEFAULT_BUDGET_LIMIT);
     setLibraryPage(0);
@@ -1955,6 +1997,7 @@ export function DeckBuilder({
     setTypeFilter("All");
     setSetFilter("All");
     setArtFilter("All Art");
+    setBuildStatusFilter("All");
     setCollectionFilter("All");
     setBudgetLimit(DEFAULT_BUDGET_LIMIT);
     setLibraryPage(0);
@@ -2451,7 +2494,7 @@ export function DeckBuilder({
     anchor.href = url;
     anchor.download = `${
       deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"
-    }.json`;
+    }-backup.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     showToast(
@@ -2592,7 +2635,7 @@ export function DeckBuilder({
                     title="More deck actions"
                     onClick={() => setMobileActionsOpen((open) => !open)}
                     ariaExpanded={mobileActionsOpen}
-                    ariaControls="mobile-action-sheet"
+                    ariaControls={mobileActionsOpen ? "mobile-action-sheet" : undefined}
                     className="w-full xl:hidden"
                   >
                     {mobileActionsOpen ? <X size={16} /> : <MoreHorizontal size={16} />}
@@ -2737,6 +2780,7 @@ export function DeckBuilder({
                         />
                         <input
                           value={query}
+                          aria-label="Search cards"
                           onChange={(event) => {
                             setQuery(event.target.value);
                             setLibraryPage(0);
@@ -2773,7 +2817,7 @@ export function DeckBuilder({
                       className="interactive-control inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-2.5 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:min-h-16 md:px-3"
                       onClick={() => setAdvancedFiltersOpen((open) => !open)}
                       aria-expanded={advancedFiltersOpen}
-                      aria-controls="library-advanced-filters"
+                      aria-controls={advancedFiltersOpen ? "library-advanced-filters" : undefined}
                     >
                       <Filter size={16} />
                       Filters
@@ -2789,6 +2833,9 @@ export function DeckBuilder({
                     <div className="flex flex-wrap gap-1.5">
                       {setFilter !== "All" && <FilterChip label={`Set: ${setFilter}`} />}
                       {artFilter !== "All Art" && <FilterChip label={`Art: ${artFilter}`} />}
+                      {buildStatusFilter !== "All" && (
+                        <FilterChip label={`Build: ${buildStatusFilter}`} />
+                      )}
                       {collectionFilter !== "All" && (
                         <FilterChip label={`Collection: ${collectionFilter}`} />
                       )}
@@ -2866,6 +2913,15 @@ export function DeckBuilder({
                           setLibraryPage(0);
                         }}
                       />
+                      <SelectFilter
+                        label="Build"
+                        value={buildStatusFilter}
+                        values={buildStatusFilters}
+                        onChange={(value) => {
+                          setBuildStatusFilter(value);
+                          setLibraryPage(0);
+                        }}
+                      />
                       <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
                         <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
                           Est. Price &lt;=
@@ -2930,6 +2986,21 @@ export function DeckBuilder({
                 </div>
               </div>
             </div>
+
+            {catalogOnlySummary.shouldShow && (
+              <CatalogOnlyBanner
+                catalogCards={catalogOnlySummary.catalogCards}
+                deckReadyCards={catalogOnlySummary.deckReadyCards}
+                onDeckReady={() => {
+                  setBuildStatusFilter("Deck Ready");
+                  setLibraryPage(0);
+                }}
+                onCatalogOnly={() => {
+                  setBuildStatusFilter("Catalog Only");
+                  setLibraryPage(0);
+                }}
+              />
+            )}
 
             <div className="grid grid-cols-1 gap-2.5 p-2.5 sm:gap-3 sm:p-3">
               {visibleLibraryCards.length ? (
@@ -3117,8 +3188,12 @@ export function DeckBuilder({
       </div>
       <MobileActionSheet
         open={mobileActionsOpen}
+        deckName={deck.name}
         copyState={copyState}
         canUndo={canUndo}
+        onDeckNameChange={(name) =>
+          setDeck((current) => ({ ...current, name }))
+        }
         onSample={() => runMobileAction(loadSampleDeck)}
         onNew={() => runMobileAction(startNewDeck)}
         onUndo={() => runMobileAction(restoreUndoDeck)}
@@ -3308,6 +3383,51 @@ function SharedDeckBanner({
   );
 }
 
+function CatalogOnlyBanner({
+  catalogCards,
+  deckReadyCards,
+  onDeckReady,
+  onCatalogOnly,
+}: {
+  catalogCards: number;
+  deckReadyCards: number;
+  onDeckReady: () => void;
+  onCatalogOnly: () => void;
+}) {
+  return (
+    <div className="border-b border-[#f6c542]/18 bg-[#221807]/86 px-2.5 py-2 sm:px-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 font-display text-base font-black uppercase text-[#fff2bd]">
+            <AlertTriangle size={16} />
+            Market Catalog
+          </div>
+          <p className="mt-0.5 text-sm font-bold leading-5 text-[#f7f7f2]/72">
+            {catalogCards} cards have TCGplayer market data but need official rules before deck building.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+          <button
+            type="button"
+            className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
+            onClick={onDeckReady}
+            disabled={deckReadyCards === 0}
+          >
+            Deck Ready {deckReadyCards}
+          </button>
+          <button
+            type="button"
+            className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
+            onClick={onCatalogOnly}
+          >
+            Catalog {catalogCards}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LegalityPanel({ notices }: { notices: Notice[] }) {
   return (
     <section className={panelClass()}>
@@ -3461,8 +3581,10 @@ function MobileCockpitNav({
 
 function MobileActionSheet({
   open,
+  deckName,
   copyState,
   canUndo,
+  onDeckNameChange,
   onSample,
   onNew,
   onUndo,
@@ -3475,8 +3597,10 @@ function MobileActionSheet({
   onClose,
 }: {
   open: boolean;
+  deckName: string;
   copyState: string;
   canUndo: boolean;
+  onDeckNameChange: (name: string) => void;
   onSample: () => void;
   onNew: () => void;
   onUndo: () => void;
@@ -3520,6 +3644,16 @@ function MobileActionSheet({
       <h2 id="mobile-action-sheet-title" className="sr-only">
         More deck actions
       </h2>
+      <label className="col-span-2 grid gap-1 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-2">
+        <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+          Deck name
+        </span>
+        <input
+          value={deckName}
+          onChange={(event) => onDeckNameChange(event.target.value)}
+          className="control-field h-11 w-full rounded-sm border border-[#a7b5c9]/28 bg-[#f7f7f2]/10 px-3 text-base font-black text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/40 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+        />
+      </label>
       {canUndo && (
         <ToolbarButton label="Undo" title="Restore previous deck state" onClick={onUndo} className="w-full">
           <Undo2 size={16} />
@@ -3548,6 +3682,9 @@ function MobileActionSheet({
       </ToolbarButton>
       <ToolbarButton label="Import" title="Import JSON" onClick={onImport} className="w-full">
         <Upload size={16} />
+      </ToolbarButton>
+      <ToolbarButton label="Close" title="Close more deck actions" onClick={onClose} className="col-span-2 w-full">
+        <X size={16} />
       </ToolbarButton>
     </div>
   );
@@ -3804,6 +3941,7 @@ function CardLightbox({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const lightboxCardNumber = item?.card.number;
 
   useEffect(() => {
@@ -3847,7 +3985,7 @@ function CardLightbox({
       >
         <X size={19} />
       </button>
-      <div className="card-lightbox h-full overflow-y-auto px-3 py-4 sm:px-5 sm:py-6">
+      <div ref={scrollRef} className="card-lightbox h-full overflow-y-auto px-3 py-4 sm:px-5 sm:py-6">
       <div
         className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center"
         onClick={(event) => event.stopPropagation()}
@@ -3892,7 +4030,12 @@ function CardLightbox({
                           ? "border-[#f6c542]/70 shadow-lg shadow-[#f6c542]/12"
                           : "border-[#a7b5c9]/18"
                       }`}
-                      onClick={() => onVariantChange(variant)}
+                      onClick={() => {
+                        onVariantChange(variant);
+                        window.requestAnimationFrame(() => {
+                          scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+                        });
+                      }}
                       aria-label={`View ${artDisplayLabel(variant)} of ${card.name}`}
                       aria-pressed={variant.id === artVariant.id}
                       title={`${artDisplayLabel(variant)} · ${formatPrintMoney(card, variant)}`}
@@ -4306,6 +4449,7 @@ function SelectFilter<T extends string>({
         {label}
       </span>
       <select
+        aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
         className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
@@ -4457,6 +4601,11 @@ function MiniQuantityControl({
         ? "cursor-not-allowed bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
         : "bg-black/22 text-current hover:bg-current/10"
     }`;
+  const disabledIncrementLabel = incrementReason?.toLowerCase().includes("rules")
+    ? "Rules"
+    : incrementReason?.toLowerCase().includes("max")
+      ? "Max"
+      : "Locked";
 
   return (
     <div
@@ -4500,7 +4649,13 @@ function MiniQuantityControl({
           onIncrement();
         }}
       >
-        <Plus size={dense ? 13 : 14} />
+        {incrementDisabled ? (
+          <span className="font-display text-[10px] font-black uppercase leading-none">
+            {disabledIncrementLabel}
+          </span>
+        ) : (
+          <Plus size={dense ? 13 : 14} />
+        )}
       </button>
     </div>
   );
@@ -4687,6 +4842,7 @@ function LibraryCard({
     : "No builder slot for this card type";
   const rulesPending =
     primaryZone === "main" && MAIN_TYPES.includes(card.type) && !hasDeckRulesData(card);
+  const deckReady = isDeckReadyCard(card);
   const onAdjustPrimary =
     primaryZone === "main"
       ? onAdjustMain
@@ -4792,6 +4948,14 @@ function LibraryCard({
                 Rules pending
               </span>
             )}
+            {!deckReady && (
+              <span
+                className="rounded-sm border border-[#8bdcff]/24 bg-[#1167d8]/10 px-1.5 py-0.5 text-[#d9ecff]"
+                title="Market catalog card. Add official rules data before deck building."
+              >
+                Catalog only
+              </span>
+            )}
           </div>
         </div>
 
@@ -4812,7 +4976,7 @@ function LibraryCard({
         ) : (
           <div className="grid h-11 place-items-center rounded-sm border border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] px-2">
             <div className="truncate font-display text-sm font-black uppercase text-[#f7f7f2]/58">
-              Locked
+              {rulesPending ? "Rules" : "Locked"}
             </div>
           </div>
         )}

@@ -83,9 +83,28 @@ function validArtId(card: GundamCard, artId: string) {
   return cardArtVariants(card).some((variant) => variant.id === artId);
 }
 
+function parseCost(card: GundamCard) {
+  const cost = Number(card.cost);
+  return Number.isFinite(cost) ? cost : null;
+}
+
+function hasRulesValue(value: string) {
+  return Boolean(value && value.trim() !== "-");
+}
+
+function hasDeckRulesData(card: GundamCard) {
+  if (card.type === "RESOURCE" || card.type === "EX RESOURCE") return true;
+  if (!MAIN_TYPES.includes(card.type)) return false;
+  return (
+    hasRulesValue(card.color) &&
+    hasRulesValue(card.level) &&
+    parseCost(card) !== null
+  );
+}
+
 function canCardEnterZone(zone: "main" | "resource", card: GundamCard) {
   return zone === "main"
-    ? MAIN_TYPES.includes(card.type)
+    ? MAIN_TYPES.includes(card.type) && hasDeckRulesData(card)
     : RESOURCE_TYPES.includes(card.type);
 }
 

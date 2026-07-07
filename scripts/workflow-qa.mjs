@@ -53,6 +53,44 @@ async function assertSharePreservesPrints() {
   }
 }
 
+async function assertShareDropsPendingRulesCards() {
+  const deck = {
+    name: "Workflow QA Pending Rules",
+    main: { "EB01-001": 4 },
+    resource: { "R-001": 10 },
+    art: { "EB01-001": "standard" },
+    prints: {
+      main: { "EB01-001": { standard: 4 } },
+      resource: { "R-001": { standard: 10 } },
+    },
+  };
+
+  const saveResponse = await fetch(absoluteUrl("/api/decks"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deck),
+  });
+
+  if (!saveResponse.ok) {
+    throw new Error(`POST /api/decks pending-rules probe failed with ${saveResponse.status}`);
+  }
+
+  const saved = await saveResponse.json();
+  const loadResponse = await fetch(absoluteUrl(`/api/decks/${saved.id}`));
+  if (!loadResponse.ok) {
+    throw new Error(`GET /api/decks/${saved.id} failed with ${loadResponse.status}`);
+  }
+
+  const loaded = await loadResponse.json();
+  if (loaded.deck?.main?.["EB01-001"]) {
+    throw new Error("Shared deck sanitizer kept pending-rules EB01-001 in the main deck");
+  }
+
+  if (loaded.deck?.resource?.["R-001"] !== 10) {
+    throw new Error("Shared deck sanitizer dropped valid resource cards");
+  }
+}
+
 async function assertInvalidShareBlocked(page) {
   const invalidDeck = {
     name: "Workflow QA Invalid Deck",
@@ -174,6 +212,22 @@ async function assertResourceSearchRanksResourceCards(page) {
   }
 }
 
+async function assertMarketCatalogOnlyCardsAreLabeled(page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByPlaceholder("Name, #, text").fill("EB01-001");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
+  await page.getByText("Rules pending").first().waitFor({ timeout: 15000 });
+
+  await page.getByRole("button", { name: /Filters/i }).click();
+  await page.getByLabel("Build").selectOption("Deck Ready");
+  await page.getByText("No cards found").waitFor({ timeout: 15000 });
+
+  await page.getByLabel("Build").selectOption("Catalog Only");
+  await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
+}
+
 async function assertMobileLibraryLayout(page) {
   await page.setViewportSize({ width: 320, height: 680 });
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
@@ -236,6 +290,25 @@ async function assertMobileLibraryLayout(page) {
   if (closeTop < 0) {
     throw new Error(`Lightbox close button scrolled out of reach: top=${closeTop}`);
   }
+  await page.locator('.card-lightbox button[aria-pressed="false"]').first().click();
+  await page.waitForFunction(
+    () => (document.querySelector(".card-lightbox")?.scrollTop ?? 999) <= 2,
+    null,
+    { timeout: 15000 },
+  );
+  const stageGeometry = await page.locator(".lightbox-card-stage").evaluate((stage) => {
+    const rect = stage.getBoundingClientRect();
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  if (stageGeometry.top < 0 || stageGeometry.bottom > stageGeometry.viewportHeight + 1) {
+    throw new Error(
+      `Lightbox alt switch left card cropped: top=${stageGeometry.top}, bottom=${stageGeometry.bottom}, viewport=${stageGeometry.viewportHeight}`,
+    );
+  }
   await page.locator(".lightbox-close").click();
 }
 
@@ -291,6 +364,7 @@ async function assertShortMobileControlsClearNav(page) {
 
 async function main() {
   await assertSharePreservesPrints();
+  await assertShareDropsPendingRulesCards();
 
   const browser = await launchBrowser();
   try {
@@ -335,6 +409,7 @@ async function main() {
     await assertInvalidShareBlocked(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
     await assertResourceSearchRanksResourceCards(desktop);
+    await assertMarketCatalogOnlyCardsAreLabeled(desktop);
 
     await desktop.goto(baseUrl, { waitUntil: "networkidle" });
     const downloadPromise = desktop.waitForEvent("download", { timeout: 20000 });
