@@ -439,6 +439,23 @@ async function assertEmptyDeckArtButtonsExplainNoOp(page) {
   await page.getByText("No prints to tune").waitFor({ timeout: 15000 });
 }
 
+async function assertSampleDeckClearsLibraryFilters(page) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByPlaceholder("Name, #, text").fill("<script>alert(1)</script> ST01-001");
+  await page.getByText("No cards found").waitFor({ timeout: 15000 });
+  await page.getByRole("button", { name: "Load sample deck" }).click();
+  await page.waitForFunction(
+    () => document.querySelector('input[aria-label="Search cards"]')?.value === "",
+    null,
+    { timeout: 15000 },
+  );
+  await page.getByText("Showing 1-6 of 808 cards").waitFor({ timeout: 15000 });
+  await page.getByRole("heading", { name: "Gundam", exact: true }).first().waitFor({
+    timeout: 15000,
+  });
+}
+
 async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
   const deck = legalDeck({ name: "Workflow QA Shared Preview" });
   const saveResponse = await fetch(absoluteUrl("/api/decks"), {
@@ -520,6 +537,9 @@ async function assertAccessibleControlNames(page) {
     throw new Error(`Closed mobile More button points at unmounted panel: ${closedMobileMoreControls}`);
   }
   await page.locator('button[title="More deck actions"]').click();
+  await page.getByRole("dialog", { name: "More deck actions" }).waitFor({
+    timeout: 15000,
+  });
   const mobileMoreControls = await page
     .locator('button[title="More deck actions"]')
     .getAttribute("aria-controls");
@@ -746,6 +766,94 @@ async function assertMobileLibraryLayout(page) {
   await page.locator(".lightbox-close").click();
 }
 
+async function assertMobileTouchTargets(page) {
+  const viewports = [
+    { width: 320, height: 568 },
+    { width: 360, height: 620 },
+    { width: 390, height: 844 },
+    { width: 667, height: 375 },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    const librarySmallTargets = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll(
+          ".library-card-actions .mini-stepper button, .library-card-actions > button, .library-card-actions > a",
+        ),
+      )
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            label: node.getAttribute("aria-label") ?? node.textContent?.trim() ?? "",
+            width: rect.width,
+            height: rect.height,
+          };
+        })
+        .filter((target) => target.width > 0 && target.height > 0)
+        .filter((target) => target.width < 44 || target.height < 44),
+    );
+    if (librarySmallTargets.length) {
+      throw new Error(
+        `${viewport.width}x${viewport.height} library targets below 44px: ${JSON.stringify(
+          librarySmallTargets,
+        )}`,
+      );
+    }
+
+    await page.getByRole("tab", { name: "Show Card" }).click();
+    const inspectorSmallTargets = await page.evaluate(() =>
+      Array.from(document.querySelectorAll(".quantity-stepper button"))
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            label: node.getAttribute("aria-label") ?? "",
+            width: rect.width,
+            height: rect.height,
+          };
+        })
+        .filter((target) => target.width > 0 && target.height > 0)
+        .filter((target) => target.width < 44 || target.height < 44),
+    );
+    if (inspectorSmallTargets.length) {
+      throw new Error(
+        `${viewport.width}x${viewport.height} inspector targets below 44px: ${JSON.stringify(
+          inspectorSmallTargets,
+        )}`,
+      );
+    }
+
+    await page.getByRole("tab", { name: "Show Deck" }).click();
+    const deckSmallTargets = await page.evaluate(() =>
+      Array.from(
+        document.querySelectorAll(
+          ".deck-card-actions .mini-stepper button, .deck-card-actions > a, .deck-card-actions > button",
+        ),
+      )
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            label: node.getAttribute("aria-label") ?? node.textContent?.trim() ?? "",
+            width: rect.width,
+            height: rect.height,
+          };
+        })
+        .filter((target) => target.width > 0 && target.height > 0)
+        .filter((target) => target.width < 44 || target.height < 44),
+    );
+    if (deckSmallTargets.length) {
+      throw new Error(
+        `${viewport.width}x${viewport.height} deck targets below 44px: ${JSON.stringify(
+          deckSmallTargets,
+        )}`,
+      );
+    }
+  }
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+}
+
 async function assertShortMobileControlsClearNav(page) {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
@@ -885,11 +993,13 @@ async function main() {
     await assertLibraryRowAddsFromBlankDeck(desktop);
     await assertImportRejectsEmptyObject(desktop);
     await assertEmptyDeckArtButtonsExplainNoOp(desktop);
+    await assertSampleDeckClearsLibraryFilters(desktop);
     await assertSharedPreviewRequiresCloneBeforeEditing(desktop);
     await assertAccessibleControlNames(desktop);
     await assertArtUpgradeKeepsBuyList(desktop);
     await assertResourceSearchRanksResourceCards(desktop);
     await assertMarketCatalogOnlyCardsAreLabeled(desktop);
+    await assertMobileTouchTargets(desktop);
 
     await desktop.goto(baseUrl, { waitUntil: "networkidle" });
     const downloadPromise = desktop.waitForEvent("download", { timeout: 20000 });

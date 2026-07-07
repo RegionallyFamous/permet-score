@@ -13,7 +13,7 @@ const checkOnly = process.argv.includes("--check");
 const allowEmpty = process.argv.includes("--allow-empty");
 const syncConcurrency = clampNumber(
   process.env.TCGPLAYER_BRIDGE_SYNC_CONCURRENCY ?? process.env.JANIE_SYNC_CONCURRENCY,
-  4,
+  checkOnly ? 1 : 4,
   1,
   8,
 );
@@ -89,6 +89,14 @@ function readExistingSyncReport() {
 
 function stableCheckTimestamp(current, existing) {
   return checkOnly && typeof existing === "string" ? existing : current;
+}
+
+function stableCheckSummary(current, existing) {
+  if (!checkOnly || !existing || typeof existing !== "object") return current;
+  return {
+    ...current,
+    queueLength: existing.queueLength ?? current?.queueLength,
+  };
 }
 
 function normalize(value) {
@@ -534,7 +542,10 @@ export const DECK_VALIDATION_CARDS: Record<string, DeckValidationCard> = ${JSON.
             existingReport?.catalogDiscovery?.generatedAt,
           ),
           status: catalogDiscovery.status,
-          summary: catalogDiscovery.summary,
+          summary: stableCheckSummary(
+            catalogDiscovery.summary,
+            existingReport?.catalogDiscovery?.summary,
+          ),
         },
         productCount: products.length,
         generatedCardCount: generatedCards.length,

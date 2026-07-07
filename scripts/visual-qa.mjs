@@ -41,11 +41,17 @@ async function waitForVisibleCardImages(page) {
 
       return (
         images.length > 0 &&
-        images.slice(0, 4).every((image) => image.complete && image.naturalWidth > 0)
+        images.every((image) => image.complete && image.naturalWidth > 0)
       );
     },
     null,
     { timeout: 15000 },
+  );
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }),
   );
 }
 

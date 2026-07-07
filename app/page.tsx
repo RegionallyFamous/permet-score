@@ -2072,6 +2072,11 @@ export function DeckBuilder({
   }
 
   function loadSampleDeck() {
+    if (sharedPreviewLocked) {
+      blockSharedPreviewEdit();
+      return;
+    }
+    clearLibraryFilters();
     replaceDeckWithUndo(
       () => starterDeck,
       "Sample loaded",
@@ -2792,16 +2797,16 @@ export function DeckBuilder({
             Skip to stats
           </a>
         </nav>
-        <header className="border-b border-[#a7b5c9]/25 bg-[#05060a]/82 shadow-xl shadow-black/40 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-[#a7b5c9]/25 bg-[#05060a]/88 shadow-xl shadow-black/40 backdrop-blur-xl">
         <div className="mx-auto max-w-[1800px] px-3 py-1.5 sm:px-5 sm:py-2">
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
               <div className="flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
                 <img
-                  src="/permet-link-logo.png"
+                  src="/permet-link-logo-header.webp"
                   alt="Permet Link"
-                  width={1983}
-                  height={793}
+                  width={640}
+                  height={256}
                   decoding="async"
                   className="h-auto w-full object-contain object-left"
                 />
@@ -3441,6 +3446,7 @@ export function DeckBuilder({
       </div>
       <ToastViewport
         toast={toast}
+        modalOpen={isDialogOpen}
         onAction={restoreUndoDeck}
         onDismiss={dismissToast}
       />
@@ -3624,7 +3630,7 @@ function SharedDeckBanner({
                 srcSet={cardImageSrcSet(card, undefined, [320, 480, 640])}
                 sizes="3.5rem"
                 alt=""
-                className="preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 bg-black object-contain object-top shadow-xl shadow-black/40"
+                className="card-image-surface preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-contain object-top shadow-xl shadow-black/40"
                 decoding="async"
                 referrerPolicy="no-referrer"
                 onError={handleCardImageError}
@@ -3924,12 +3930,12 @@ function MobileActionSheet({
         aria-labelledby="mobile-action-sheet-title"
         onKeyDown={(event) => trapDialogFocus(event, sheetRef.current, onClose)}
       >
+        <h2 id="mobile-action-sheet-title" className="sr-only">
+          More deck actions
+        </h2>
         <div className="col-span-2 grid grid-cols-[1fr_auto] items-start gap-2 rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/[0.055] p-2">
           <label className="grid min-w-0 gap-1">
-            <span
-              id="mobile-action-sheet-title"
-              className="font-display text-xs font-black uppercase text-[#8bdcff]"
-            >
+            <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
               Deck name
             </span>
             <input
@@ -4001,10 +4007,12 @@ function MobileActionSheet({
 
 function ToastViewport({
   toast,
+  modalOpen,
   onAction,
   onDismiss,
 }: {
   toast: ActionToast | null;
+  modalOpen: boolean;
   onAction: () => void;
   onDismiss: () => void;
 }) {
@@ -4024,7 +4032,9 @@ function ToastViewport({
         key={toast.id}
         role={toast.tone === "bad" ? "alert" : "status"}
         aria-live={toast.tone === "bad" ? "assertive" : "polite"}
-        className={`toast-shell pointer-events-auto flex w-full max-w-lg items-start gap-3 rounded-sm border p-3 shadow-2xl backdrop-blur ${toneClass}`}
+        className={`toast-shell flex w-full max-w-lg items-start gap-3 rounded-sm border p-3 shadow-2xl backdrop-blur ${
+          modalOpen ? "pointer-events-none" : "pointer-events-auto"
+        } ${toneClass}`}
       >
         <Icon className="mt-0.5 shrink-0" size={18} />
         <div className="min-w-0 flex-1">
@@ -4035,7 +4045,7 @@ function ToastViewport({
             {toast.detail}
           </div>
         </div>
-        {toast.actionLabel && (
+        {toast.actionLabel && !modalOpen && (
           <button
             type="button"
             className="interactive-control inline-flex min-h-11 shrink-0 items-center rounded-sm border border-current/35 bg-current/10 px-3 font-display text-base font-black uppercase"
@@ -4044,15 +4054,17 @@ function ToastViewport({
             {toast.actionLabel}
           </button>
         )}
-        <button
-          type="button"
-          className="interactive-control inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-current/25 bg-black/16"
-          onClick={onDismiss}
-          aria-label="Dismiss status"
-          title="Dismiss status"
-        >
-          <X size={15} />
-        </button>
+        {!modalOpen && (
+          <button
+            type="button"
+            className="interactive-control inline-flex size-11 shrink-0 items-center justify-center rounded-sm border border-current/25 bg-black/16"
+            onClick={onDismiss}
+            aria-label="Dismiss status"
+            title="Dismiss status"
+          >
+            <X size={15} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -4338,7 +4350,7 @@ function CardLightbox({
                 srcSet={cardImageSrcSet(card, artVariant, [640, 1000, 1500])}
                 sizes="(min-width: 1024px) 58vw, 94vw"
                 alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
-                className="mx-auto max-h-[58vh] max-w-full object-contain object-top lg:max-h-[66vh]"
+                className="card-image-surface mx-auto max-h-[58vh] max-w-full object-contain object-top lg:max-h-[66vh]"
                 decoding="async"
                 referrerPolicy="no-referrer"
                 onError={handleCardImageError}
@@ -4376,7 +4388,7 @@ function CardLightbox({
                         srcSet={cardImageSrcSet(card, variant, [320, 480, 640])}
                         sizes="4.5rem"
                         alt=""
-                        className="aspect-[5/7] w-full bg-black object-contain object-top"
+                        className="card-image-surface aspect-[5/7] w-full object-contain object-top"
                         decoding="async"
                         loading="lazy"
                         referrerPolicy="no-referrer"
@@ -4792,9 +4804,7 @@ function QuantityStepper({
       ? "border-[#e31b23]/32 bg-[#e31b23]/10 text-[#ffe3e3]"
       : "border-[#2e8cff]/32 bg-[#1167d8]/12 text-[#d9ecff]";
   const buttonClass = (disabled: boolean) =>
-    `interactive-control inline-flex items-center justify-center rounded-sm border ${
-      compact ? "size-8" : "size-9"
-    } ${
+    `interactive-control inline-flex size-11 items-center justify-center rounded-sm border ${
       disabled
         ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/25"
         : "border-current/30 bg-black/22 text-current hover:bg-current/10"
@@ -4818,8 +4828,8 @@ function QuantityStepper({
       <div
         className={`grid items-center gap-1.5 ${
           compact
-            ? "grid-cols-[minmax(1.8rem,1fr)_2rem_2rem_2rem]"
-            : "grid-cols-[minmax(4.5rem,1fr)_2.25rem_3rem_2.25rem]"
+            ? "grid-cols-[minmax(1.8rem,1fr)_2.75rem_2.75rem_2.75rem]"
+            : "grid-cols-[minmax(4.5rem,1fr)_2.75rem_3rem_2.75rem]"
         }`}
       >
         <span
@@ -4844,7 +4854,7 @@ function QuantityStepper({
         </button>
         <output
           className={`grid place-items-center rounded-sm border border-current/22 bg-black/28 font-display font-black ${
-            compact ? "h-8 text-base" : "h-9 text-xl"
+            compact ? "h-11 text-base" : "h-11 text-xl"
           }`}
           aria-label={`${label} quantity`}
         >
@@ -5188,7 +5198,7 @@ function LibraryCard({
             srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
             sizes="(min-width: 1536px) 8.75rem, (min-width: 1280px) 8rem, (min-width: 640px) 8.75rem, (min-width: 380px) 8rem, 7.25rem"
             alt={`${card.name} card`}
-            className="h-full w-full bg-black object-contain object-top transition duration-200 group-hover:scale-[1.035]"
+            className="card-image-surface h-full w-full object-contain object-top transition duration-200 group-hover:scale-[1.035]"
             decoding="async"
             loading={eagerImage ? "eager" : "lazy"}
             referrerPolicy="no-referrer"
@@ -5414,7 +5424,7 @@ function InspectorPanel({
               srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
               sizes="7rem"
               alt={`${card.name} card`}
-              className="h-full w-full bg-black object-contain object-top"
+              className="card-image-surface h-full w-full object-contain object-top"
               decoding="async"
               loading="lazy"
               referrerPolicy="no-referrer"
@@ -5476,6 +5486,14 @@ function InspectorPanel({
           onIncrement={() => onAdjustResource(1)}
           onDecrement={() => onAdjustResource(-1)}
         />
+      </div>
+      <div className="border-t border-[#a7b5c9]/20 p-3 xl:hidden">
+        <p className="text-base font-semibold leading-6 text-[#f7f7f2]/86">{card.text}</p>
+        <div className="mt-3 grid gap-1 text-sm font-bold text-[#f7f7f2]/55">
+          <span className="truncate">{card.trait}</span>
+          <span className="truncate">{card.link}</span>
+          <span className="truncate">{card.source}</span>
+        </div>
       </div>
       <div className="border-t border-[#a7b5c9]/20 p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -5557,7 +5575,11 @@ function InspectorPanel({
               Missing {missingSelectedPrint} · {artDisplayLabel(artVariant)} ownership
             </div>
           </div>
-          <IconButton label="Remove owned selected print" onClick={() => onAdjustCollection(-1)}>
+          <IconButton
+            label="Remove owned selected print"
+            disabled={ownedQuantity <= 0}
+            onClick={() => onAdjustCollection(-1)}
+          >
             <Minus size={14} />
           </IconButton>
           <IconButton label="Add owned selected print" onClick={() => onAdjustCollection(1)}>
@@ -5565,7 +5587,7 @@ function InspectorPanel({
           </IconButton>
         </div>
       </div>
-      <div className="border-t border-[#a7b5c9]/20 p-3">
+      <div className="hidden border-t border-[#a7b5c9]/20 p-3 xl:block">
         <p className="text-base font-medium leading-6 text-[#f7f7f2]/84">{card.text}</p>
         <div className="mt-3 grid gap-1 text-sm font-bold text-[#f7f7f2]/55">
           <span className="truncate">{card.trait}</span>
@@ -5618,7 +5640,7 @@ function CardThumb({
       srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
       sizes={size === "deck" ? "5rem" : "3rem"}
       alt={`${card.name} card`}
-      className="h-full w-full bg-black object-contain object-top"
+      className="card-image-surface h-full w-full object-contain object-top"
       decoding="async"
       loading={eager ? "eager" : "lazy"}
       referrerPolicy="no-referrer"

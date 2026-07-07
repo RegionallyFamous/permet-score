@@ -146,6 +146,13 @@ textarea {
   display: none;
 }
 
+.card-image-surface {
+  background:
+    linear-gradient(145deg, rgba(139, 220, 255, 0.1), rgba(5, 6, 10, 0.62) 42%, rgba(246, 197, 66, 0.08)),
+    url("/permet-link-logo-fallback.webp") center / 68% auto no-repeat,
+    #05070c;
+}
+
 .gcg-panel {
   position: relative;
   border: 1px solid rgba(167, 181, 201, 0.22);
@@ -1118,7 +1125,7 @@ textarea {
   }
 
   .deck-card-actions .mini-stepper {
-    grid-template-columns: 2.5rem minmax(1.8rem, 1fr) 2.5rem;
+    grid-template-columns: 2.75rem minmax(1.8rem, 1fr) 2.75rem;
   }
 
   .deck-card-actions .mini-stepper,
@@ -1307,7 +1314,7 @@ textarea {
   }
 
   .deck-card-actions .mini-stepper {
-    grid-template-columns: 2.5rem minmax(1.8rem, 1fr) 2.5rem;
+    grid-template-columns: 2.75rem minmax(1.8rem, 1fr) 2.75rem;
   }
 
   .deck-card-actions .mini-stepper,
@@ -1330,7 +1337,7 @@ textarea {
   }
 
   .library-card-actions .mini-stepper {
-    grid-template-columns: 2.5rem minmax(1.8rem, 1fr) 2.5rem;
+    grid-template-columns: 2.75rem minmax(1.8rem, 1fr) 2.75rem;
     height: 2.75rem;
   }
 
