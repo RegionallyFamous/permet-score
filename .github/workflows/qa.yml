@@ -52,3 +52,22 @@ jobs:
             sleep 1
           done
           npm run qa:routes
+
+      - name: Browser QA
+        run: |
+          npx playwright install --with-deps chromium
+          if ! curl -fsS http://localhost:3000 >/dev/null; then
+            npm run start > /tmp/permet-next-browser.log 2>&1 &
+            for attempt in {1..60}; do
+              if curl -fsS http://localhost:3000 >/dev/null; then
+                break
+              fi
+              if [ "$attempt" = "60" ]; then
+                cat /tmp/permet-next-browser.log
+                exit 1
+              fi
+              sleep 1
+            done
+          fi
+          npm run qa:visual
+          npm run qa:workflow

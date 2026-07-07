@@ -193,17 +193,18 @@ const typeFilters = [
 ] as const;
 const artFilters = [
   "All Art",
-  "Has Alt Art",
-  "Standard Only",
-  "Alt Print 1",
-  "Alt Print 2",
-  "Premium Alt",
+  "Has Parallel Art",
+  "Standard Art Only",
+  "Parallel Art P1",
+  "Parallel Art P2",
+  "Premium Parallel",
 ] as const;
 const collectionFilters = ["All", "Owned", "Budget"] as const;
 const buildStatusFilters = ["All", "Deck Ready", "Catalog Only"] as const;
 const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
 const LIBRARY_PAGE_SIZE = 6;
+const MAX_IMPORT_BYTES = 64 * 1024;
 const libraryPageSizeOptions = [6, 12, 24] as const;
 
 const HUD_TEXTURE_IMAGE = "/assets/permet-armor-ui-v2.webp";
@@ -279,6 +280,41 @@ function clampQuantity(value: unknown) {
   return Math.max(0, Math.floor(value));
 }
 
+function safeLocalStorageGet(key: string) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeLocalStorageSet(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeLocalStorageRemove(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Storage may be unavailable in private or locked-down browser modes.
+  }
+}
+
+function textByteLength(text: string) {
+  return new Blob([text]).size;
+}
+
+function assertImportSize(text: string) {
+  if (textByteLength(text) > MAX_IMPORT_BYTES) {
+    throw new Error("Deck import is too large. Use a Permet Link export under 64 KB.");
+  }
+}
+
 function sanitizeQuantities(value: unknown, zone: Zone): QuantityMap {
   if (!value || typeof value !== "object") return {};
   const maxCopies = zone === "main" ? MAX_MAIN_COPIES : RESOURCE_TARGET;
@@ -308,14 +344,36 @@ function hasDirectTcgplayerProduct(print: TcgplayerPrint) {
   return /tcgplayer\.com\/product\/\d+/i.test(print.url);
 }
 
+function isAllowedTcgplayerImageUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "product-images.tcgplayer.com" ||
+        url.hostname === "tcgplayer-cdn.tcgplayer.com" ||
+        url.hostname.endsWith(".tcgplayer.com"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function tcgplayerPrintImageUrl(print: TcgplayerPrint, size = 1500) {
-  if (print.imageUrl) return print.imageUrl;
+  if (print.imageUrl && isAllowedTcgplayerImageUrl(print.imageUrl)) {
+    return print.imageUrl;
+  }
   return print.productId && hasDirectTcgplayerProduct(print)
     ? tcgplayerProductImageUrl(print.productId, size)
     : null;
 }
 
+const cardArtVariantCache = new Map<string, readonly CardArtVariant[]>();
+const cardSearchHaystackCache = new Map<string, string>();
+
 function cardArtVariants(card: GundamCard) {
+  const cached = cardArtVariantCache.get(card.number);
+  if (cached) return cached;
+
   const localVariants = CARD_ARTS_BY_NUMBER[card.number];
   const tcgPrints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
   const hasLocalArt = CURATED_CARD_NUMBERS.has(card.number) || Boolean(localVariants);
@@ -339,20 +397,22 @@ function cardArtVariants(card: GundamCard) {
     };
   });
 
+  let variants: readonly CardArtVariant[];
   if (localVariants) {
-    return localVariants.some((variant) => variant.id === "standard")
+    variants = localVariants.some((variant) => variant.id === "standard")
       ? localVariants
       : [standardVariant, ...localVariants];
-  }
-
-  if (hasLocalArt) {
-    return [
+  } else if (hasLocalArt) {
+    variants = [
       standardVariant,
       ...tcgVariants.filter((variant) => variant.id !== "standard"),
     ];
+  } else {
+    variants = tcgVariants.length ? tcgVariants : [standardVariant];
   }
 
-  return tcgVariants.length ? tcgVariants : [standardVariant];
+  cardArtVariantCache.set(card.number, variants);
+  return variants;
 }
 
 function sanitizeArtChoices(
@@ -594,7 +654,7 @@ function parsePlainTextDeck(text: string): DeckImportResult | null {
     }
 
     const quantityFirst = line.match(/^\s*(\d{1,2})\s*x?\s+([A-Z]{1,4}\d{0,3}-\d{3})\b/i);
-    const numberFirst = line.match(/^\s*([A-Z]{1,4}\d{0,3}-\d{3})\b.*?\b(?:x\s*)?(\d{1,2})\b/i);
+    const numberFirst = line.match(/^\s*([A-Z]{1,4}\d{0,3}-\d{3})\b(?:\s+x\s*|\s+)(\d{1,2})\b/i);
     const explicitPrintId =
       line.match(/\[(?:print|art)\s*:\s*([A-Za-z0-9_-]+)\]/i)?.[1] ?? undefined;
     const quantity = clampQuantity(
@@ -896,6 +956,7 @@ function CardImage({
         decoding="async"
         loading={eager ? "eager" : "lazy"}
         fetchPriority={eager ? "high" : undefined}
+        preload={eager}
         onError={handleCardImageError}
       />
     );
@@ -1080,10 +1141,19 @@ function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
 }
 
 function artDisplayLabel(variant: CardArtVariant) {
-  if (variant.id === "standard" || variant.tier <= 0) return "Standard";
-  if (variant.tier === 1) return "Alt Print 1";
-  if (variant.tier === 2) return "Alt Print 2";
-  return `Premium Alt ${variant.tier}`;
+  if (variant.id === "standard" || variant.tier <= 0) return "Standard Art";
+
+  const suffix = variant.officialId.split("_")[1] ?? variant.id;
+  const parallelCode = /^p\d+$/i.test(suffix) ? suffix.toUpperCase() : "";
+  if (parallelCode) {
+    return variant.tier >= 3
+      ? `Premium Parallel ${parallelCode}`
+      : `Parallel Art ${parallelCode}`;
+  }
+
+  return variant.tier >= 3
+    ? `Premium Market Variant ${variant.tier}`
+    : `Market Variant ${variant.tier}`;
 }
 
 function printDisplayId(variant: CardArtVariant) {
@@ -1609,17 +1679,18 @@ function variantMatchesArtFilter(
   card: GundamCard,
   filter: (typeof artFilters)[number],
 ) {
+  if (filter === "All Art") return true;
   const variants = cardArtVariants(card);
   switch (filter) {
-    case "Has Alt Art":
+    case "Has Parallel Art":
       return variants.length > 1;
-    case "Standard Only":
+    case "Standard Art Only":
       return variants.length === 1 && variants[0]?.id === "standard";
-    case "Alt Print 1":
+    case "Parallel Art P1":
       return variants.some((variant) => variant.tier === 1);
-    case "Alt Print 2":
+    case "Parallel Art P2":
       return variants.some((variant) => variant.tier === 2);
-    case "Premium Alt":
+    case "Premium Parallel":
       return variants.some((variant) => variant.tier >= 3);
     default:
       return true;
@@ -1627,19 +1698,17 @@ function variantMatchesArtFilter(
 }
 
 function cardMatchesCollectionFilter(
-  deck: DeckState,
+  collection: CollectionMap,
+  art: ArtChoiceMap,
   card: GundamCard,
   filter: (typeof collectionFilters)[number],
   budgetLimit: number,
 ) {
-  const owned = getTotalOwnedForCard(deck.collection, card);
-  const selectedCost = printCost(card, getArtVariant(card, deck.art));
-
   switch (filter) {
     case "Owned":
-      return owned > 0;
+      return getTotalOwnedForCard(collection, card) > 0;
     case "Budget":
-      return selectedCost <= budgetLimit;
+      return printCost(card, getArtVariant(card, art)) <= budgetLimit;
     default:
       return true;
   }
@@ -1670,7 +1739,10 @@ function queryTokens(query: string) {
 }
 
 function cardSearchHaystack(card: GundamCard) {
-  return [
+  const cached = cardSearchHaystackCache.get(card.number);
+  if (cached) return cached;
+
+  const haystack = [
     card.name,
     card.number,
     card.type,
@@ -1683,6 +1755,8 @@ function cardSearchHaystack(card: GundamCard) {
   ]
     .join(" ")
     .toLowerCase();
+  cardSearchHaystackCache.set(card.number, haystack);
+  return haystack;
 }
 
 function cardMatchesQueryTokens(card: GundamCard, tokens: string[]) {
@@ -1694,6 +1768,21 @@ function cardMatchesQueryTokens(card: GundamCard, tokens: string[]) {
 function tokenizedQueryRank(card: GundamCard, tokens: string[]) {
   if (!tokens.length) return 6;
   return Math.min(...tokens.map((token) => queryMatchRank(card, token)));
+}
+
+function artChoiceSignature(art: ArtChoiceMap) {
+  return JSON.stringify(Object.entries(art).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function collectionSignature(collection: CollectionMap) {
+  return JSON.stringify(
+    Object.entries(collection)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([number, quantities]) => [
+        number,
+        Object.entries(quantities).sort(([a], [b]) => a.localeCompare(b)),
+      ]),
+  );
 }
 
 function normalizeLinkName(value: string) {
@@ -2072,6 +2161,13 @@ export function DeckBuilder({
   const feedbackPulseIdRef = useRef(0);
   const shareCacheRef = useRef<ShareCache | null>(null);
   const undoDeckRef = useRef<DeckState | null>(null);
+  const deckFilterRef = useRef<{
+    art: ArtChoiceMap;
+    collection: CollectionMap;
+  }>({ art: {}, collection: {} });
+  const deckRef = useRef(deck);
+  const mainTotalRef = useRef(0);
+  const resourceTotalRef = useRef(0);
   const storageTimerRef = useRef<number | null>(null);
   const pendingStorageDeckRef = useRef<string | null>(null);
   const lastSavedDeckRef = useRef("");
@@ -2109,7 +2205,7 @@ export function DeckBuilder({
   const flushPendingDeckStorage = useCallback(() => {
     const pendingDeck = pendingStorageDeckRef.current;
     if (!pendingDeck) return;
-    window.localStorage.setItem(STORAGE_KEY, pendingDeck);
+    safeLocalStorageSet(STORAGE_KEY, pendingDeck);
     lastSavedDeckRef.current = pendingDeck;
     pendingStorageDeckRef.current = null;
     clearStorageTimer();
@@ -2203,13 +2299,13 @@ export function DeckBuilder({
 
       setSharedStatus("local");
 
-      const stored = window.localStorage.getItem(STORAGE_KEY);
+      const stored = safeLocalStorageGet(STORAGE_KEY);
       if (stored) {
         try {
           const parsed = sanitizeDeck(JSON.parse(stored));
           if (parsed) setDeck(parsed);
         } catch {
-          window.localStorage.removeItem(STORAGE_KEY);
+          safeLocalStorageRemove(STORAGE_KEY);
         }
       }
       setLoaded(true);
@@ -2306,6 +2402,9 @@ export function DeckBuilder({
     () => totalCards(deck.resource),
     [deck.resource],
   );
+  deckRef.current = deck;
+  mainTotalRef.current = mainTotal;
+  resourceTotalRef.current = resourceTotal;
   const deckList = useMemo(() => buildDeckList(deck), [deck]);
   const costSummary = useMemo(() => summarizeDeckCosts(deck), [deck]);
   const tcgListEntries = useMemo(() => getTcgListEntries(deck), [deck]);
@@ -2346,10 +2445,20 @@ export function DeckBuilder({
         .filter((card): card is GundamCard => Boolean(card)),
     [openingHand],
   );
+  const deckArtSignature = useMemo(() => artChoiceSignature(deck.art), [deck.art]);
+  const deckCollectionSignature = useMemo(
+    () => collectionSignature(deck.collection),
+    [deck.collection],
+  );
+  deckFilterRef.current = {
+    art: deck.art,
+    collection: deck.collection,
+  };
 
   const filteredCards = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
     const tokens = queryTokens(normalizedQuery);
+    const filterDeck = deckFilterRef.current;
 
     const nextCards = CARD_POOL.filter((card) => {
       const matchesQuery = cardMatchesQueryTokens(card, tokens);
@@ -2362,7 +2471,8 @@ export function DeckBuilder({
         buildStatusFilter,
       );
       const matchesCollection = cardMatchesCollectionFilter(
-        deck,
+        filterDeck.collection,
+        filterDeck.art,
         card,
         collectionFilter,
         budgetLimit,
@@ -2388,13 +2498,15 @@ export function DeckBuilder({
       if (readyDelta !== 0) return readyDelta;
       return a.name.localeCompare(b.name);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- deck signatures intentionally invalidate this memo; deckFilterRef holds the latest art/collection objects.
   }, [
     artFilter,
     buildStatusFilter,
     budgetLimit,
     collectionFilter,
+    deckArtSignature,
+    deckCollectionSignature,
     colorFilter,
-    deck,
     deferredQuery,
     setFilter,
     typeFilter,
@@ -2550,7 +2662,16 @@ export function DeckBuilder({
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredCards, isDialogOpen, libraryPageSize, selectedCard, selectedNumber]);
+  }, [
+    deck,
+    filteredCards,
+    isDialogOpen,
+    libraryPageSize,
+    mainTotal,
+    resourceTotal,
+    selectedCard,
+    selectedNumber,
+  ]);
 
   const deckColors = useMemo(() => mainColorsForQuantities(deck.main), [deck.main]);
 
@@ -2863,7 +2984,19 @@ export function DeckBuilder({
   function openTcgList() {
     rememberFallbackReturnFocus();
     if (!tcgListText) {
-      showToast("good", "TCG list empty", "Add deck cards or adjust owned counts before reviewing open prints.");
+      if (mainTotal + resourceTotal > 0 && costSummary.unownedCopies === 0) {
+        showToast(
+          "good",
+          "All prints owned",
+          "Every selected deck print is already marked owned.",
+        );
+      } else {
+        showToast(
+          "good",
+          "TCG list empty",
+          "Add deck cards before reviewing open prints.",
+        );
+      }
       return;
     }
 
@@ -2889,7 +3022,13 @@ export function DeckBuilder({
 
   function stepCardArt(number: string, delta: number) {
     if (blockSharedPreviewEdit()) return;
+    const feedbackCard = CARD_BY_NUMBER.get(number);
+    if (!feedbackCard) return;
     clearUndoCheckpoint();
+    triggerFeedback(
+      [`art:${number}`, `main:${number}`, `resource:${number}`],
+      `${feedbackCard.name} print ${delta > 0 ? "upgraded" : "downgraded"}.`,
+    );
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card) return current;
@@ -2961,6 +3100,12 @@ export function DeckBuilder({
       return;
     }
 
+    undoDeckRef.current = cloneDeckState(deck);
+    setCanUndo(true);
+    triggerFeedback(
+      ["progress:main", "progress:resource", selectedCard ? `art:${selectedCard.number}` : "share"],
+      `Deck prints ${delta > 0 ? "upgraded" : "downgraded"}.`,
+    );
     setDeck((current) => {
       const cardNumbers = new Set([
         ...Object.keys(current.main),
@@ -2986,11 +3131,25 @@ export function DeckBuilder({
 
       return { ...current, art: nextArt, prints: nextPrints };
     });
+    showToast(
+      "warn",
+      delta > 0 ? "Prints upgraded" : "Prints downgraded",
+      delta > 0
+        ? "Deck copies moved toward higher art tiers."
+        : "Deck copies moved toward lower-cost print tiers.",
+      "Undo",
+    );
   }
 
   function setCardPrintQuantity(zone: Zone, number: string, variantId: string, delta: number) {
     if (blockSharedPreviewEdit()) return;
+    const feedbackCard = CARD_BY_NUMBER.get(number);
+    if (!feedbackCard) return;
     clearUndoCheckpoint();
+    triggerFeedback(
+      [`art:${number}`, `print:${zone}:${number}:${variantId}`, `${zone}:${number}`],
+      `${feedbackCard.name} print quantity updated.`,
+    );
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       const targetQuantity = current[zone][number] ?? 0;
@@ -3040,7 +3199,19 @@ export function DeckBuilder({
 
   function setAllCardPrints(number: string, variantId: string) {
     if (blockSharedPreviewEdit()) return;
+    const feedbackCard = CARD_BY_NUMBER.get(number);
+    if (!feedbackCard) return;
     clearUndoCheckpoint();
+    triggerFeedback(
+      [
+        `art:${number}`,
+        `print:main:${number}:${variantId}`,
+        `print:resource:${number}:${variantId}`,
+        `main:${number}`,
+        `resource:${number}`,
+      ],
+      `${feedbackCard.name} print locked in.`,
+    );
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card || !validArtId(card, variantId)) return current;
@@ -3132,27 +3303,45 @@ export function DeckBuilder({
 
   function adjustCard(zone: Zone, number: string, delta: number) {
     if (blockSharedPreviewEdit()) return;
+    const currentDeck = deckRef.current;
     const cardForFeedback = CARD_BY_NUMBER.get(number);
-    const currentQuantityForFeedback = deck[zone][number] ?? 0;
-    if (
-      cardForFeedback &&
-      !(
-        delta > 0 &&
-        zoneAddConstraint(zone, cardForFeedback, currentQuantityForFeedback, deck)
-      ) &&
-      !(delta < 0 && currentQuantityForFeedback <= 0)
-    ) {
-      const nextQuantityForFeedback =
-        zone === "main"
-          ? Math.max(0, Math.min(MAX_MAIN_COPIES, currentQuantityForFeedback + delta))
-          : Math.max(0, currentQuantityForFeedback + delta);
-      triggerFeedback(
-        [`${zone}:${number}`, `progress:${zone}`],
-        `${zoneLabel(zone)} deck ${
-          zone === "main" ? mainTotal + delta : resourceTotal + delta
-        }. ${cardForFeedback.name} quantity ${nextQuantityForFeedback}.`,
+    const currentQuantityForFeedback = currentDeck[zone][number] ?? 0;
+    if (!cardForFeedback) return;
+
+    if (delta > 0) {
+      const constraint = zoneAddConstraint(
+        zone,
+        cardForFeedback,
+        currentQuantityForFeedback,
+        currentDeck,
       );
+      if (constraint) {
+        showToast("warn", "Add blocked", constraint);
+        triggerFeedback(`${zone}:${number}`, constraint);
+        return;
+      }
     }
+
+    if (delta < 0 && currentQuantityForFeedback <= 0) {
+      showToast(
+        "warn",
+        "Remove blocked",
+        `No ${zoneLabel(zone).toLowerCase()} copies to remove.`,
+      );
+      triggerFeedback(`${zone}:${number}`, `No ${zoneLabel(zone).toLowerCase()} copies to remove.`);
+      return;
+    }
+
+    const nextQuantityForFeedback =
+      zone === "main"
+        ? Math.max(0, Math.min(MAX_MAIN_COPIES, currentQuantityForFeedback + delta))
+        : Math.max(0, currentQuantityForFeedback + delta);
+    triggerFeedback(
+      [`${zone}:${number}`, `progress:${zone}`],
+      `${zoneLabel(zone)} deck ${
+        zone === "main" ? mainTotalRef.current + delta : resourceTotalRef.current + delta
+      }. ${cardForFeedback.name} quantity ${nextQuantityForFeedback}.`,
+    );
     clearUndoCheckpoint();
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
@@ -3345,7 +3534,7 @@ export function DeckBuilder({
   function cloneSharedDeck() {
     let existing: DeckState | null = null;
     try {
-      existing = sanitizeDeck(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null"));
+      existing = sanitizeDeck(JSON.parse(safeLocalStorageGet(STORAGE_KEY) ?? "null"));
     } catch {
       existing = null;
     }
@@ -3369,17 +3558,17 @@ export function DeckBuilder({
       return;
     }
 
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clonedDeck));
+    if (safeLocalStorageSet(STORAGE_KEY, JSON.stringify(clonedDeck))) {
       setSharedStatus("cloned");
       window.location.assign("/");
-    } catch {
-      showToast(
-        "bad",
-        "Clone blocked",
-        "Browser storage is unavailable. Export this shared deck and import it locally instead.",
-      );
+      return;
     }
+
+    showToast(
+      "bad",
+      "Clone blocked",
+      "Browser storage is unavailable. Export this shared deck and import it locally instead.",
+    );
   }
 
   async function exportDeckImage() {
@@ -3703,7 +3892,11 @@ export function DeckBuilder({
   async function importJson(file: File | undefined) {
     if (!file) return;
     try {
+      if (file.size > MAX_IMPORT_BYTES) {
+        throw new Error("Deck import is too large. Use a Permet Link export under 64 KB.");
+      }
       const text = await file.text();
+      assertImportSize(text);
       const parsed = parseDeckImportText(text);
       if (!parsed) {
         throw new Error("Invalid deck");
@@ -3717,11 +3910,13 @@ export function DeckBuilder({
         `${parsed.source} imported`,
         `${parsed.deck.name} loaded. Previous deck is saved for undo.`,
       );
-    } catch {
+    } catch (error) {
       showToast(
         "bad",
         "Import failed",
-        "Choose a valid Permet Link JSON backup or plain-text decklist.",
+        error instanceof Error && error.message !== "Invalid deck"
+          ? error.message
+          : "Choose a valid Permet Link JSON backup or plain-text decklist.",
       );
     }
   }
@@ -3731,6 +3926,7 @@ export function DeckBuilder({
     try {
       const text = await navigator.clipboard?.readText?.();
       if (!text) throw new Error("Clipboard empty");
+      assertImportSize(text);
       const parsed = parseDeckImportText(text);
       if (!parsed) throw new Error("Invalid deck");
       if (!confirmParsedDeckImport(parsed)) {
@@ -3742,11 +3938,13 @@ export function DeckBuilder({
         "Deck pasted",
         `${parsed.deck.name} loaded from clipboard. Previous deck is saved for undo.`,
       );
-    } catch {
+    } catch (error) {
       showToast(
         "bad",
         "Paste failed",
-        "Copy a plain-text decklist or Permet Link JSON backup, then try Paste.",
+        error instanceof Error && !["Clipboard empty", "Invalid deck"].includes(error.message)
+          ? error.message
+          : "Copy a plain-text decklist or Permet Link JSON backup, then try Paste.",
       );
     }
   }
@@ -4127,8 +4325,8 @@ export function DeckBuilder({
           >
             {renderLibraryPanel && (
               <>
-            <div className="sticky top-0 z-10 border-b border-[#a7b5c9]/20 bg-[#080a0f]/94 p-2 backdrop-blur sm:p-3">
-              <div className="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
+            <div className="sticky top-0 z-10 border-b border-[#a7b5c9]/20 bg-[#080a0f]/94 p-2 backdrop-blur">
+              <div className="flex flex-col gap-2">
                 <div className="flex shrink-0 items-center gap-2">
                   <Search size={18} className="text-[#f6c542]" />
                   <h2 className="whitespace-nowrap font-display text-xl font-black uppercase text-[#f7f7f2] sm:text-2xl">
@@ -4141,10 +4339,10 @@ export function DeckBuilder({
                 <div className="grid gap-2">
                   <div className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,auto)] gap-2 md:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto] xl:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_minmax(8.5rem,0.5fr)_minmax(8.5rem,0.5fr)_auto]">
                     <label className="filter-cell relative block">
-                      <span className="hidden font-display text-xs font-black uppercase text-[#8bdcff] sm:block">
+                      <span className="sr-only">
                         Search
                       </span>
-                      <div className="relative sm:mt-1">
+                      <div className="relative">
                         <Search
                           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#f7f7f2]/58"
                           size={16}
@@ -4163,7 +4361,7 @@ export function DeckBuilder({
                         {query && (
                           <button
                             type="button"
-                            className="interactive-control absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-sm border border-[#a7b5c9]/18 bg-[#05070c]/80 text-[#f7f7f2]/72 hover:border-[#f6c542]/35 hover:text-[#fff2bd]"
+                            className="interactive-control absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-sm border border-[#a7b5c9]/18 bg-[#05070c]/80 text-[#f7f7f2]/72 hover:border-[#f6c542]/35 hover:text-[#fff2bd]"
                             onClick={() => {
                               setQuery("");
                               setLibraryPage(0);
@@ -4182,6 +4380,7 @@ export function DeckBuilder({
                         label="Color"
                         value={colorFilter}
                         values={colorFilters}
+                        hideLabel
                         onChange={(value) => {
                           setColorFilter(value);
                           setLibraryPage(0);
@@ -4193,6 +4392,7 @@ export function DeckBuilder({
                         label="Type"
                         value={typeFilter}
                         values={typeFilters}
+                        hideLabel
                         onChange={(value) => {
                           setTypeFilter(value);
                           setLibraryPage(0);
@@ -4202,7 +4402,7 @@ export function DeckBuilder({
                     <button
                       ref={advancedFiltersTriggerRef}
                       type="button"
-                      className="interactive-control inline-flex min-h-11 items-center justify-center gap-1.5 self-end rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-2.5 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:min-h-16 md:px-3"
+                      className="interactive-control inline-flex min-h-11 items-center justify-center gap-1.5 rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-2.5 font-display text-base font-black uppercase text-[#d9ecff] hover:bg-[#1167d8]/18 md:px-3"
                       onClick={() => setAdvancedFiltersOpen((open) => !open)}
                       aria-expanded={advancedFiltersOpen}
                       aria-controls={advancedFiltersOpen ? "library-advanced-filters" : undefined}
@@ -4378,21 +4578,15 @@ export function DeckBuilder({
               </div>
             </div>
 
-            <div className="library-pager border-b border-[#a7b5c9]/14 bg-[#0d1118]/86 px-2.5 py-1.5 sm:px-3 sm:py-2">
+            <div className="library-pager border-b border-[#a7b5c9]/14 bg-[#0d1118]/86 px-2 py-1.5">
               <div className="flex items-center justify-between gap-2">
-                <div aria-live="polite">
-                  <p className="hidden font-display text-xs font-black uppercase text-[#8bdcff] sm:block">
-                    Library Page
-                  </p>
-                  <p className="text-sm font-semibold text-[#f7f7f2]/72 sm:mt-0.5">
-                    <span className="hidden min-[390px]:inline">
-                      Showing {libraryRangeStart}-{libraryRangeEnd} of{" "}
-                      {filteredCards.length} cards
-                    </span>
-                    <span className="min-[390px]:hidden">
-                      {libraryRangeStart}-{libraryRangeEnd}/{filteredCards.length}
-                    </span>
-                  </p>
+                <div className="flex min-w-0 items-baseline gap-1.5" aria-live="polite">
+                  <span className="font-display text-sm font-black uppercase text-[#8bdcff]">
+                    {libraryRangeStart}-{libraryRangeEnd}
+                  </span>
+                  <span className="truncate text-sm font-semibold text-[#f7f7f2]/64">
+                    of {filteredCards.length}
+                  </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                   <label className="inline-flex items-center gap-1.5">
@@ -5478,9 +5672,9 @@ function ToastViewport({
         key={toast.id}
         role={toast.tone === "bad" ? "alert" : "status"}
         aria-live={toast.tone === "bad" ? "assertive" : "polite"}
-        className={`toast-shell flex w-full max-w-lg items-start gap-3 rounded-sm border p-3 shadow-2xl backdrop-blur ${
+        className={`toast-shell flex w-full max-w-lg items-start gap-3 overflow-hidden rounded-sm border p-3 shadow-2xl backdrop-blur ${
           modalOpen ? "pointer-events-none" : "pointer-events-auto"
-        } ${toneClass}`}
+        } ${toast.actionLabel ? "" : "toast-shell-timed"} ${toneClass}`}
       >
         <Icon className="mt-0.5 shrink-0" size={18} />
         <div className="min-w-0 flex-1">
@@ -5895,7 +6089,7 @@ function CardLightbox({
               <div className="grid gap-2 rounded-sm border border-[#a7b5c9]/16 bg-black/28 p-2">
                 <div className="flex items-center gap-2 font-display text-base font-black uppercase text-[#f7f7f2]/74">
                   <Sparkles size={15} className="text-[#f6c542]" />
-                  Alt Prints
+                  Parallel Prints
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-2">
                   {variants.map((variant) => (
@@ -6311,23 +6505,27 @@ function SelectFilter<T extends string>({
   value,
   values,
   onChange,
+  hideLabel = false,
 }: {
   label: string;
   ariaLabel?: string;
   value: T;
   values: readonly T[];
   onChange: (value: T) => void;
+  hideLabel?: boolean;
 }) {
   return (
     <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
-      <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+      <span className={hideLabel ? "sr-only" : "font-display text-xs font-black uppercase text-[#8bdcff]"}>
         {label}
       </span>
       <select
         aria-label={ariaLabel ?? label}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+        className={`control-field h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15 ${
+          hideLabel ? "" : "mt-1"
+        }`}
       >
         {values.map((option) => (
           <option key={option} value={option}>
@@ -6646,6 +6844,7 @@ function DeckPanel({
                 className={`deck-entry mecha-row interactive-row rounded-sm border bg-[#f7f7f2]/[0.045] p-2 shadow-lg shadow-black/10 ${colorAccentClass(
                   card.color,
                 )}`}
+                data-pulse={rowPulseId}
               >
                 <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2.5">
                   <CardThumb
@@ -6802,6 +7001,7 @@ function LibraryCard({
       className={`library-result mecha-row interactive-row group overflow-hidden rounded-sm border bg-[#080b11]/96 p-2.5 shadow-sm shadow-black/12 transition duration-150 hover:border-[#8bdcff]/45 hover:bg-[#0d131d] ${colorAccentClass(
         card.color,
       )} ${selected ? "active-scan-card ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
+      data-pulse={pulseId}
       tabIndex={0}
       onClick={(event) => {
         if (isInteractiveTarget(event.target)) return;
@@ -7067,6 +7267,7 @@ function InspectorPanel({
   const canDowngradeArt = canShiftCardArt(deck, card, -1);
   const canUpgradeArt = canShiftCardArt(deck, card, 1);
   const tcgplayerLabel = tcgplayerActionLabel(card, artVariant);
+  const artPulseId = pulseIdFor?.(`art:${card.number}`);
   const printControlRows = (["main", "resource"] as const).flatMap((zone) => {
     const targetQuantity = zone === "main" ? mainQuantity : resourceQuantity;
     if (targetQuantity <= 0) return [];
@@ -7088,6 +7289,7 @@ function InspectorPanel({
             <button
               type="button"
               className="selected-card-scan scan-frame interactive-control relative shrink-0 overflow-hidden rounded-sm border border-[#8bdcff]/35 bg-black text-left shadow-2xl shadow-black/40"
+              data-pulse={artPulseId}
               onClick={onOpenCard}
               aria-label={`Open large view of selected card ${card.name} ${card.number}`}
               title={`Open large view of selected card ${card.name} ${card.number}`}
@@ -7227,11 +7429,17 @@ function InspectorPanel({
         </div>
         <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] gap-1.5">
           {artVariants.map((variant) => (
-            <div
+            <button
+              type="button"
               key={variant.id}
-              className={`h-1.5 rounded-full ${
+              className={`art-print-dot interactive-control h-3 rounded-sm border ${
                 variant.id === artVariant.id ? "bg-[#f6c542]" : "bg-[#f7f7f2]/16"
               }`}
+              data-pulse={variant.id === artVariant.id ? artPulseId : undefined}
+              onClick={() => onSetAllPrints(variant.id)}
+              disabled={readOnly}
+              aria-pressed={variant.id === artVariant.id}
+              aria-label={`Set selected card to ${artDisplayLabel(variant)} ${formatPrintMoney(card, variant)}`}
               title={`${artDisplayLabel(variant)} ${formatPrintMoney(card, variant)}`}
             />
           ))}
@@ -7241,7 +7449,11 @@ function InspectorPanel({
             <div className="font-display text-sm font-black uppercase text-[#f7f7f2]/62">
               Print Quantities
             </div>
-            {printControlRows.map(({ zone, variant, quantity, targetQuantity }) => (
+            {printControlRows.map(({ zone, variant, quantity, targetQuantity }) => {
+              const printPulseId =
+                pulseIdFor?.(`print:${zone}:${card.number}:${variant.id}`) ??
+                (variant.id === artVariant.id ? artPulseId : undefined);
+              return (
               <div
                 key={`${zone}-${variant.id}`}
                 className="grid grid-cols-[minmax(0,1fr)_2.75rem_2.75rem_2.75rem_3.15rem] items-center gap-1.5"
@@ -7263,7 +7475,10 @@ function InspectorPanel({
                 >
                   <Minus size={14} />
                 </button>
-                <output className="grid h-11 place-items-center rounded-sm border border-[#f6c542]/24 bg-[#f6c542]/10 font-display text-base font-black text-[#fff2bd]">
+                <output
+                  className="quantity-readout print-quantity-output grid h-11 place-items-center rounded-sm border border-[#f6c542]/24 bg-[#f6c542]/10 font-display text-base font-black text-[#fff2bd]"
+                  data-pulse={printPulseId}
+                >
                   {quantity}
                 </output>
                 <button
@@ -7284,7 +7499,8 @@ function InspectorPanel({
                   All
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <div className="mt-3 grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-sm border border-[#a7b5c9]/16 bg-black/28 p-2">
@@ -7472,8 +7688,8 @@ function TypeMeter({
         aria-valuetext={`${count} cards, target ${target}`}
       >
         <div
-          className="type-meter-fill h-full rounded-full bg-gradient-to-r from-[#e31b23] via-[#f6c542] to-[#f7f7f2]"
-          style={{ width: `${width}%` }}
+          className="type-meter-fill h-full w-full rounded-full bg-gradient-to-r from-[#e31b23] via-[#f6c542] to-[#f7f7f2]"
+          style={{ transform: `scaleX(${width / 100})` }}
         />
       </div>
     </div>

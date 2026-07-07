@@ -14,6 +14,9 @@ const isProduction = process.env.NODE_ENV === "production";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   devIndicators: false,
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   outputFileTracingExcludes: {
     "/*": [".local/**/*", "design-assets/**/*", "qa-screenshots/**/*"],
   },

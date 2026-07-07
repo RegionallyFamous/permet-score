@@ -85,7 +85,7 @@ function legalMainReplacing(replacements) {
 
 async function assertSharePreservesPrints() {
   const deck = legalDeck({
-    name: "Workflow QA Alt Print",
+    name: "Workflow QA Parallel Print",
     art: { "ST01-001": "p1" },
     prints: {
       main: { "ST01-001": { p1: 4 } },
@@ -321,7 +321,9 @@ async function assertInvalidShareBlocked(page) {
   await page.locator(".library-result").first().waitFor({ timeout: 15000 });
   await page.locator(".library-result").first().getByLabel(/Add one/i).click();
   await page.getByRole("button", { name: "Share" }).click();
-  await page.locator(".toast-shell").getByText(/Share link|Shared link|Deck link/i).waitFor({ timeout: 15000 });
+  await page
+    .locator(".toast-shell", { hasText: /Share link|Shared link|Deck link/i })
+    .waitFor({ timeout: 15000 });
 }
 
 async function assertLocalStorageDropsNonDeckCards(page) {
@@ -477,7 +479,7 @@ async function assertPlainTextImportPreservesPrintIds(page) {
   await page.getByRole("button", { name: "Start a new deck" }).click();
   await writeClipboard(
     page,
-    "Name: Alt Text Import\nMain\n1 ST01-001 Gundam [Alt Print 1] [print:p1]\nResource\n1 R-001 Resource [print:standard]",
+    "Name: Parallel Text Import\nMain\n1 ST01-001 Gundam [Parallel Art P1] [print:p1]\nResource\n1 R-001 Resource [print:standard]",
   );
   await page.getByRole("button", { name: "Paste decklist" }).click();
   await page.waitForFunction(
@@ -490,6 +492,72 @@ async function assertPlainTextImportPreservesPrintIds(page) {
     null,
     { timeout: 15000 },
   );
+}
+
+async function assertPlainTextImportIgnoresRulesDigits(page) {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await writeClipboard(
+    page,
+    [
+      "Name: Rules Digits Import",
+      "Main",
+      "ST01-001 Gundam Lv 2",
+      "ST01-002 x2 Gundam MA Form",
+      "Resource",
+      "R-001 Resource Lv 3",
+    ].join("\n"),
+  );
+  await page.getByRole("button", { name: "Paste decklist" }).click();
+  await page.waitForFunction(
+    () => {
+      const stored = window.localStorage.getItem("gundam-deck-builder-v1");
+      if (!stored) return false;
+      const deck = JSON.parse(stored);
+      return (
+        deck.name === "Rules Digits Import" &&
+        deck.main?.["ST01-001"] === 1 &&
+        deck.main?.["ST01-002"] === 2 &&
+        deck.resource?.["R-001"] === 1
+      );
+    },
+    null,
+    { timeout: 15000 },
+  );
+}
+
+async function assertBlockedKeyboardAddReportsConstraint(page) {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Start a new deck" }).click();
+  await page.getByPlaceholder("Name, #, text").fill("ST01-001");
+  await page.locator(".library-result").first().waitFor({ timeout: 15000 });
+  for (let index = 0; index < 4; index += 1) {
+    await page.locator(".library-result").first().getByLabel(/^Add one/i).click();
+  }
+  await page
+    .getByLabel("Card inspector")
+    .getByRole("heading", { name: /^Gundam$/i })
+    .waitFor({ timeout: 15000 });
+  await page.waitForFunction(
+    () => {
+      const deck = JSON.parse(window.localStorage.getItem("gundam-deck-builder-v1") ?? "{}");
+      return deck.main?.["ST01-001"] === 4;
+    },
+    null,
+    { timeout: 15000 },
+  );
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+  await page.keyboard.press("=");
+  await page.getByText("Add blocked").waitFor({ timeout: 15000 });
+  const quantity = await page.evaluate(() => {
+    const deck = JSON.parse(window.localStorage.getItem("gundam-deck-builder-v1") ?? "{}");
+    return deck.main?.["ST01-001"];
+  });
+  if (quantity !== 4) {
+    throw new Error(`Blocked keyboard add changed quantity to ${quantity}`);
+  }
 }
 
 async function assertStartPanelVisibleOnMobile(page) {
@@ -582,9 +650,11 @@ async function assertSampleDeckClearsLibraryFilters(page) {
     null,
     { timeout: 15000 },
   );
-  await page.getByText(`Showing 1-6 of ${libraryCount} cards`).waitFor({
-    timeout: 15000,
-  });
+  await page.waitForFunction(
+    (expected) => document.querySelector(".library-pager")?.textContent?.includes(expected),
+    `1-6of ${libraryCount}`,
+    { timeout: 15000 },
+  );
   await page.getByRole("heading", { name: "Gundam", exact: true }).first().waitFor({
     timeout: 15000,
   });
@@ -602,9 +672,11 @@ async function assertNoResultSearchShowsRecovery(page) {
     timeout: 15000,
   });
   await page.locator("#card-panel").getByRole("button", { name: "Clear All" }).click();
-  await page.getByText(`Showing 1-6 of ${libraryCount} cards`).waitFor({
-    timeout: 15000,
-  });
+  await page.waitForFunction(
+    (expected) => document.querySelector(".library-pager")?.textContent?.includes(expected),
+    `1-6of ${libraryCount}`,
+    { timeout: 15000 },
+  );
   if (!(await page.locator("#card-panel h2", { hasText: "Gundam" }).first().isVisible())) {
     throw new Error("Clear All from empty inspector did not restore the selected card");
   }
@@ -1439,6 +1511,8 @@ async function main() {
     await assertJsonImportDoesNotFallThroughToText(desktop);
     await assertPasteConfirmsBeforeReplacingDeck(desktop);
     await assertPlainTextImportPreservesPrintIds(desktop);
+    await assertPlainTextImportIgnoresRulesDigits(desktop);
+    await assertBlockedKeyboardAddReportsConstraint(desktop);
     await assertEmptyDeckArtButtonsExplainNoOp(desktop);
     await assertSelectedCardArtButtonsTrackMixedPrints(desktop);
     await assertSampleDeckClearsLibraryFilters(desktop);
