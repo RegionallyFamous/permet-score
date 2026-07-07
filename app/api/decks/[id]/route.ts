@@ -18,7 +18,7 @@ const sharedDeckCacheHeaders = {
   "Vercel-CDN-Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
 };
 
-const missingDeckCacheHeaders = {
+const notFoundDeckCacheHeaders = {
   "Cache-Control": "public, max-age=30, stale-while-revalidate=120",
   "Vercel-CDN-Cache-Control": "public, max-age=300, stale-while-revalidate=1800",
 };
@@ -33,7 +33,7 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!deck) {
     return NextResponse.json(
       { error: "Deck not found." },
-      { status: 404, headers: missingDeckCacheHeaders },
+      { status: 404, headers: notFoundDeckCacheHeaders },
     );
   }
 

@@ -694,11 +694,11 @@ async function assertArtUpgradeKeepsBuyList(page) {
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.locator('button[title="Upgrade deck art budget"]').click();
-  await page.locator('button[title="Open missing prints buy list"]').click();
-  await page.getByRole("heading", { name: "Buy List" }).waitFor({ timeout: 15000 });
+  await page.locator('button[title="Open TCG print list"]').click();
+  await page.getByRole("heading", { name: "TCG List" }).waitFor({ timeout: 15000 });
   const buyList = await page.locator("textarea").inputValue();
   if (!/ST01-\d{3}/.test(buyList) || buyList.length < 100) {
-    throw new Error(`Art upgrade cleared the buy list: ${buyList.slice(0, 80)}`);
+    throw new Error(`Art upgrade cleared the TCG list: ${buyList.slice(0, 80)}`);
   }
   await page.locator('button[aria-label="Close fallback panel"]').click();
 }
@@ -1177,11 +1177,11 @@ async function main() {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    const missingPageResponse = await page.goto(absoluteUrl("/decks/not-a-real-deck-id").toString(), {
+    const notFoundPageResponse = await page.goto(absoluteUrl("/decks/not-a-real-deck-id").toString(), {
       waitUntil: "networkidle",
     });
-    if (missingPageResponse?.status() !== 404) {
-      throw new Error(`Missing shared deck page returned ${missingPageResponse?.status()}`);
+    if (notFoundPageResponse?.status() !== 404) {
+      throw new Error(`Shared deck 404 page returned ${notFoundPageResponse?.status()}`);
     }
     await page.getByText("Shared Deck Not Found").waitFor({ timeout: 15000 });
     await page.getByRole("link", { name: /Open Builder/i }).waitFor({

@@ -33,7 +33,7 @@ export default function SharedDeckNotFound() {
               Link Offline
             </h1>
             <p className="max-w-xl text-lg font-bold leading-7 text-[#f7f7f2]/72">
-              This shared deck link is missing, expired, or no longer available.
+              This shared deck link is expired or no longer available.
             </p>
             <div className="flex flex-wrap gap-2">
               <Link

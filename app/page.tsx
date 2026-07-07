@@ -101,7 +101,7 @@ type FallbackPanel = {
   href?: string;
   downloadName?: string;
   copyLabel?: string;
-  buyEntries?: MissingPrintEntry[];
+  buyEntries?: TcgListEntry[];
   autoSelectContent?: boolean;
 };
 
@@ -114,18 +114,17 @@ type CostSummary = {
   artTotal: number;
   altPremium: number;
   ownedValue: number;
-  missingCost: number;
-  neededCopies: number;
+  unownedCost: number;
+  deckCopies: number;
   ownedCopies: number;
-  missingCopies: number;
+  unownedCopies: number;
 };
 
-type MissingPrintEntry = {
+type TcgListEntry = {
   card: GundamCard;
   variant: CardArtVariant;
-  needed: number;
+  quantity: number;
   owned: number;
-  missing: number;
   unitCost: number;
   totalCost: number;
 };
@@ -197,7 +196,7 @@ const artFilters = [
   "Alt Print 2",
   "Premium Alt",
 ] as const;
-const collectionFilters = ["All", "Owned", "Missing", "Budget"] as const;
+const collectionFilters = ["All", "Owned", "Budget"] as const;
 const buildStatusFilters = ["All", "Deck Ready", "Catalog Only"] as const;
 const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
@@ -968,7 +967,7 @@ function printEntriesForCard(deck: DeckState, zone: Zone, card: GundamCard) {
     .filter((entry) => entry.quantity > 0);
 }
 
-function getNeededPrintCount(deck: DeckState, card: GundamCard, variantId: string) {
+function getDeckPrintCount(deck: DeckState, card: GundamCard, variantId: string) {
   return (["main", "resource"] as const).reduce((sum, zone) => {
     const explicit = deck.prints[zone][card.number]?.[variantId];
     if (explicit !== undefined) return sum + explicit;
@@ -989,18 +988,6 @@ function getTotalOwnedForCard(collection: CollectionMap, card: GundamCard) {
   return totalCards(collection[card.number] ?? {});
 }
 
-function getTotalNeededForCard(deck: DeckState, card: GundamCard) {
-  return (deck.main[card.number] ?? 0) + (deck.resource[card.number] ?? 0);
-}
-
-function getMissingCopiesForCard(deck: DeckState, card: GundamCard) {
-  return cardArtVariants(card).reduce((sum, variant) => {
-    const needed = getNeededPrintCount(deck, card, variant.id);
-    const owned = getOwnedPrintCount(deck.collection, card, variant.id);
-    return sum + Math.max(0, needed - owned);
-  }, 0);
-}
-
 function summarizeDeckCosts(deck: DeckState): CostSummary {
   const consumedOwned: QuantityMap = {};
   const summary: CostSummary = {
@@ -1008,10 +995,10 @@ function summarizeDeckCosts(deck: DeckState): CostSummary {
     artTotal: 0,
     altPremium: 0,
     ownedValue: 0,
-    missingCost: 0,
-    neededCopies: 0,
+    unownedCost: 0,
+    deckCopies: 0,
     ownedCopies: 0,
-    missingCopies: 0,
+    unownedCopies: 0,
   };
 
   (["main", "resource"] as const).forEach((zone) => {
@@ -1026,16 +1013,16 @@ function summarizeDeckCosts(deck: DeckState): CostSummary {
         const alreadyConsumed = consumedOwned[key] ?? 0;
         const availableOwned = Math.max(0, owned - alreadyConsumed);
         const covered = Math.min(quantity, availableOwned);
-        const missing = quantity - covered;
+        const unowned = quantity - covered;
 
         consumedOwned[key] = alreadyConsumed + covered;
         summary.baseTotal += standardCost * quantity;
         summary.artTotal += cost * quantity;
         summary.ownedValue += cost * covered;
-        summary.missingCost += cost * missing;
-        summary.neededCopies += quantity;
+        summary.unownedCost += cost * unowned;
+        summary.deckCopies += quantity;
         summary.ownedCopies += covered;
-        summary.missingCopies += missing;
+        summary.unownedCopies += unowned;
       });
     });
   });
@@ -1044,38 +1031,41 @@ function summarizeDeckCosts(deck: DeckState): CostSummary {
   return summary;
 }
 
-function getMissingPrintEntries(deck: DeckState): MissingPrintEntry[] {
-  const cards = new Map<string, GundamCard>();
+function getTcgListEntries(deck: DeckState): TcgListEntry[] {
+  const entries = new Map<string, TcgListEntry>();
 
   (["main", "resource"] as const).forEach((zone) => {
-    deckEntries(deck[zone]).forEach(({ card }) => cards.set(card.number, card));
-  });
-
-  return Array.from(cards.values())
-    .flatMap((card) =>
-      cardArtVariants(card).map((variant) => {
-        const needed = getNeededPrintCount(deck, card, variant.id);
-        const owned = getOwnedPrintCount(deck.collection, card, variant.id);
-        const missing = Math.max(0, needed - owned);
+    deckEntries(deck[zone]).forEach(({ card }) => {
+      printEntriesForCard(deck, zone, card).forEach(({ variant, quantity }) => {
+        const key = `${card.number}:${variant.id}`;
         const unitCost = printCost(card, variant);
+        const existing = entries.get(key);
 
-        return {
+        if (existing) {
+          existing.quantity += quantity;
+          existing.totalCost = existing.quantity * existing.unitCost;
+          return;
+        }
+
+        entries.set(key, {
           card,
           variant,
-          needed,
-          owned,
-          missing,
+          quantity,
+          owned: getOwnedPrintCount(deck.collection, card, variant.id),
           unitCost,
-          totalCost: unitCost * missing,
-        };
-      }),
-    )
-    .filter((entry) => entry.missing > 0)
+          totalCost: unitCost * quantity,
+        });
+      });
+    });
+  });
+
+  return Array.from(entries.values())
+    .filter((entry) => entry.quantity > 0)
     .sort((a, b) => {
       const totalDelta = b.totalCost - a.totalCost;
       if (totalDelta !== 0) return totalDelta;
-      const missingDelta = b.missing - a.missing;
-      if (missingDelta !== 0) return missingDelta;
+      const quantityDelta = b.quantity - a.quantity;
+      if (quantityDelta !== 0) return quantityDelta;
       return a.card.name.localeCompare(b.card.name);
     });
 }
@@ -1322,16 +1312,12 @@ function cardMatchesCollectionFilter(
   filter: (typeof collectionFilters)[number],
   budgetLimit: number,
 ) {
-  const needed = getTotalNeededForCard(deck, card);
   const owned = getTotalOwnedForCard(deck.collection, card);
-  const missing = getMissingCopiesForCard(deck, card);
   const selectedCost = printCost(card, getArtVariant(card, deck.art));
 
   switch (filter) {
     case "Owned":
       return owned > 0;
-    case "Missing":
-      return needed > 0 && missing > 0;
     case "Budget":
       return selectedCost <= budgetLimit;
     default:
@@ -1401,7 +1387,7 @@ function analyzeSynergy(entries: DeckEntry[]): SynergyNotice[] {
       notices.push({
         tone: "warn",
         label: unit.card.name,
-        detail: "Linked pilot missing",
+        detail: "No linked Pilot",
       });
     }
   });
@@ -1652,7 +1638,7 @@ type MobileViewChangeOptions = {
   focusPanel?: boolean;
 };
 
-type SharedStatus = "local" | "loading" | "ready" | "missing" | "cloned";
+type SharedStatus = "local" | "loading" | "ready" | "unavailable" | "cloned";
 
 const mobileViews: Array<{
   id: MobileView;
@@ -1685,7 +1671,7 @@ export function DeckBuilder({
       ? hasInitialSharedDeck && initialSharedDeck
         ? "ready"
         : hasInitialSharedDeck
-          ? "missing"
+          ? "unavailable"
           : "loading"
       : "local",
   );
@@ -1816,7 +1802,7 @@ export function DeckBuilder({
 
       if (sharedDeckId && hasInitialSharedDeck) {
         if (!initialSharedDeck) setDeck(emptyDeck());
-        setSharedStatus(initialSharedDeck ? "ready" : "missing");
+        setSharedStatus(initialSharedDeck ? "ready" : "unavailable");
         setLoaded(true);
         return;
       }
@@ -1833,15 +1819,15 @@ export function DeckBuilder({
               setSharedStatus("ready");
             } else {
               setDeck(emptyDeck());
-              setSharedStatus("missing");
+              setSharedStatus("unavailable");
             }
           } else {
             setDeck(emptyDeck());
-            setSharedStatus("missing");
+            setSharedStatus("unavailable");
           }
         } catch {
           setDeck(emptyDeck());
-          setSharedStatus("missing");
+          setSharedStatus("unavailable");
         }
         if (!cancelled) setLoaded(true);
         return;
@@ -1954,29 +1940,29 @@ export function DeckBuilder({
   );
   const deckList = useMemo(() => buildDeckList(deck), [deck]);
   const costSummary = useMemo(() => summarizeDeckCosts(deck), [deck]);
-  const missingPrints = useMemo(() => getMissingPrintEntries(deck), [deck]);
+  const tcgListEntries = useMemo(() => getTcgListEntries(deck), [deck]);
   const dataStatus = useMemo(
     () => databaseStatus(statusTimestamp ?? undefined),
     [statusTimestamp],
   );
-  const missingPrintCost = useMemo(
-    () => missingPrints.reduce((sum, entry) => sum + entry.totalCost, 0),
-    [missingPrints],
+  const tcgListTotal = useMemo(
+    () => tcgListEntries.reduce((sum, entry) => sum + entry.totalCost, 0),
+    [tcgListEntries],
   );
-  const buyListText = useMemo(
+  const tcgListText = useMemo(
     () =>
-      missingPrints
+      tcgListEntries
         .map((entry) => {
           const priceSummary = printPriceSummary(entry.card, entry.variant);
           const url = tcgplayerUrl(entry.card, entry.variant);
-          return `${entry.missing}x ${printDisplayId(entry.variant)} ${entry.card.name} (${artDisplayLabel(
+          return `${entry.quantity}x ${printDisplayId(entry.variant)} ${entry.card.name} (${artDisplayLabel(
             entry.variant,
           )}) - ${priceSummary.full} each / ${formatMoney(
             entry.totalCost,
           )} total - ${url}`;
         })
         .join("\n"),
-    [missingPrints],
+    [tcgListEntries],
   );
   const selectedAltTotal = useMemo(() => selectedAltPrintCopies(deck), [deck]);
   const synergyNotices = useMemo(() => analyzeSynergy(mainEntries), [mainEntries]);
@@ -2105,10 +2091,10 @@ export function DeckBuilder({
     () => (selectedCard ? getArtVariant(selectedCard, deck.art) : null),
     [deck.art, selectedCard],
   );
-  const selectedNeededCount = useMemo(
+  const selectedDeckPrintCount = useMemo(
     () =>
       selectedCard && selectedArtVariant
-        ? getNeededPrintCount(deck, selectedCard, selectedArtVariant.id)
+        ? getDeckPrintCount(deck, selectedCard, selectedArtVariant.id)
         : 0,
     [deck, selectedArtVariant, selectedCard],
   );
@@ -2404,22 +2390,22 @@ export function DeckBuilder({
     setLibraryPage(0);
   }
 
-  function openBuyList() {
+  function openTcgList() {
     rememberFallbackReturnFocus();
-    if (!buyListText) {
-      showToast("good", "Buy list clear", "No missing selected prints to review.");
+    if (!tcgListText) {
+      showToast("good", "TCG list empty", "Add deck cards before reviewing selected prints.");
       return;
     }
 
     setFallbackPanel({
-      title: "Buy List",
-      detail: "Review missing selected prints, then copy or download the list when ready.",
-      content: buyListText,
-      copyLabel: "Copy Buy List",
-      buyEntries: missingPrints,
-      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-buy-list.txt`,
+      title: "TCG List",
+      detail: "Review selected deck printings, then copy or download the list when ready.",
+      content: tcgListText,
+      copyLabel: "Copy TCG List",
+      buyEntries: tcgListEntries,
+      downloadName: `${deck.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "permet-link"}-tcg-list.txt`,
     });
-    showToast("good", "Buy list ready", "Review panel opened without changing your clipboard.");
+    showToast("good", "TCG list ready", "Review panel opened without changing your clipboard.");
   }
 
   function openCardLightbox(card: GundamCard, artVariant?: CardArtVariant) {
@@ -2631,7 +2617,7 @@ export function DeckBuilder({
 
   function markDeckOwned() {
     if (blockSharedPreviewEdit()) return;
-    if (costSummary.neededCopies <= 0) {
+    if (costSummary.deckCopies <= 0) {
       showToast("warn", "No prints to mark", "Add cards before marking deck prints owned.");
       return;
     }
@@ -2775,8 +2761,8 @@ export function DeckBuilder({
     const columns = 6;
     const headerHeight = 170;
     const width = 1080;
-    const rowsNeeded = Math.ceil(rows.length / columns);
-    const height = headerHeight + rowsNeeded * (cardHeight + 72 + gap) + 64;
+    const requiredRows = Math.ceil(rows.length / columns);
+    const height = headerHeight + requiredRows * (cardHeight + 72 + gap) + 64;
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
@@ -3168,6 +3154,7 @@ export function DeckBuilder({
                   width={960}
                   height={384}
                   decoding="async"
+                  fetchPriority="high"
                   className="h-auto w-full object-contain object-left"
                 />
               </div>
@@ -3218,10 +3205,10 @@ export function DeckBuilder({
                     <Shuffle size={16} />
                   </ToolbarButton>
                   <ToolbarButton
-                    label="Buy List"
-                    mobileLabel="Buy"
-                    title="Open missing prints buy list"
-                    onClick={openBuyList}
+                    label="TCG List"
+                    mobileLabel="TCG"
+                    title="Open TCG print list"
+                    onClick={openTcgList}
                     showDesktopLabel
                     className="w-full xl:w-auto"
                   >
@@ -3360,7 +3347,7 @@ export function DeckBuilder({
             <Metric label="Cards" value={`${CARD_POOL.length} loaded`} />
             <Metric label="Alt Selected" value={`${selectedAltTotal}`} />
             <Metric label="Market / Est." value={formatMoney(costSummary.artTotal)} />
-            <Metric label="Missing Est." value={formatMoney(missingPrintCost)} />
+            <Metric label="TCG List" value={formatMoney(tcgListTotal)} />
             <Metric label="Showing" value={`${filteredCards.length}`} />
           </div>
           <HudStrip
@@ -3370,7 +3357,7 @@ export function DeckBuilder({
             isStarterTemplate={isStarterTemplate}
             selectedCard={selectedCard}
             openingHandCards={openingHandEntries}
-            missingCost={costSummary.missingCost}
+            marketTotal={costSummary.artTotal}
           />
         </div>
       </header>
@@ -3389,7 +3376,7 @@ export function DeckBuilder({
           />
         )}
 
-        <div className="workbench-grid grid gap-4 xl:grid-cols-[minmax(430px,1.05fr)_minmax(360px,0.82fr)_minmax(360px,0.9fr)] xl:items-start 2xl:grid-cols-[minmax(540px,1.25fr)_minmax(390px,0.82fr)_minmax(390px,0.9fr)]">
+            <div className="workbench-grid grid gap-4 xl:grid-cols-[minmax(430px,1.05fr)_minmax(360px,0.82fr)_minmax(360px,0.9fr)] xl:items-start 2xl:grid-cols-[minmax(540px,1.25fr)_minmax(390px,0.82fr)_minmax(390px,0.9fr)]">
           <section
             id="library-panel"
             role={mobileTabsEnabled ? "tabpanel" : "region"}
@@ -3541,7 +3528,7 @@ export function DeckBuilder({
                         <button
                           ref={advancedFiltersDoneRef}
                           type="button"
-                          className="interactive-control inline-flex h-10 items-center justify-center rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
+                          className="interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
                           onClick={() => setAdvancedFiltersOpen(false)}
                         >
                           Done
@@ -3710,7 +3697,6 @@ export function DeckBuilder({
                     mainQuantity={deck.main[card.number] ?? 0}
                     resourceQuantity={deck.resource[card.number] ?? 0}
                     ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
-                    missingQuantity={getMissingCopiesForCard(deck, card)}
                     readOnly={sharedPreviewLocked}
                     eagerImage={index < 3}
                     onSelect={() => setSelectedNumber(card.number)}
@@ -3747,7 +3733,7 @@ export function DeckBuilder({
             )}
           </section>
 
-          <div className="contents xl:grid xl:gap-4">
+              <div className="inspector-stack contents xl:grid xl:gap-4">
             <div
               id="card-panel"
               role={mobileTabsEnabled ? "tabpanel" : "region"}
@@ -3764,7 +3750,7 @@ export function DeckBuilder({
                   deck={deck}
                   artVariant={selectedArtVariant}
                   artVariants={selectedArtVariants}
-                  neededQuantity={selectedNeededCount}
+                  deckQuantity={selectedDeckPrintCount}
                   ownedQuantity={selectedOwnedCount}
                   mainQuantity={deck.main[selectedCard.number] ?? 0}
                   resourceQuantity={deck.resource[selectedCard.number] ?? 0}
@@ -3965,7 +3951,7 @@ function HudStrip({
   isStarterTemplate,
   selectedCard,
   openingHandCards,
-  missingCost,
+  marketTotal,
 }: {
   isLegal: boolean;
   sharedStatus: SharedStatus;
@@ -3973,14 +3959,14 @@ function HudStrip({
   isStarterTemplate: boolean;
   selectedCard: GundamCard | null;
   openingHandCards: readonly GundamCard[];
-  missingCost: number;
+  marketTotal: number;
 }) {
   const statusLabel =
     sharedStatus === "ready"
       ? "Shared"
       : sharedStatus === "loading"
         ? "Syncing"
-        : sharedStatus === "missing"
+        : sharedStatus === "unavailable"
           ? "Offline"
           : "Local";
   const handTitle = openingHandCards
@@ -4041,7 +4027,7 @@ function HudStrip({
             {selectedCard ? `Card ${selectedCard.number}` : "No card"}
           </span>
           <span className="rounded-sm border border-[#f6c542]/30 bg-black/24 px-2 py-1 text-[#fff2bd]">
-            Missing Est. {formatMoney(missingCost)}
+            TCG Est. {formatMoney(marketTotal)}
           </span>
         </div>
       </div>
@@ -4069,7 +4055,7 @@ function SharedDeckBanner({
   onClone: () => void;
 }) {
   const title =
-    sharedStatus === "missing"
+    sharedStatus === "unavailable"
       ? "Shared Deck Not Found"
       : sharedStatus === "loading"
         ? "Loading Shared Deck"
@@ -4128,7 +4114,7 @@ function SharedDeckBanner({
             type="button"
             className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/40 bg-[#f6c542]/14 px-4 font-display text-lg font-black uppercase text-[#fff2bd] shadow-lg shadow-[#f6c542]/10 hover:bg-[#f6c542]/20"
             onClick={onClone}
-            disabled={sharedStatus === "loading" || sharedStatus === "missing"}
+            disabled={sharedStatus === "loading" || sharedStatus === "unavailable"}
           >
             <Download size={17} />
             Clone
@@ -4631,7 +4617,7 @@ function FallbackPanelView({
   const downloadHref = panel.downloadName
     ? `data:text/plain;charset=utf-8,${encodeURIComponent(panel.content)}`
     : "";
-  const hasBuyEntries = Boolean(panel.buyEntries?.length);
+  const hasTcgEntries = Boolean(panel.buyEntries?.length);
 
   return (
     <div
@@ -4645,7 +4631,7 @@ function FallbackPanelView({
         ref={dialogRef}
         className={panelClass(
           `fallback-panel-shell flex w-full flex-col overflow-hidden ${
-            hasBuyEntries ? "max-w-4xl" : "max-w-2xl"
+            hasTcgEntries ? "max-w-4xl" : "max-w-2xl"
           }`,
         )}
       >
@@ -4673,10 +4659,11 @@ function FallbackPanelView({
           </button>
         </div>
         <div className="fallback-panel-body grid min-h-0 gap-3 overflow-auto p-3">
-          {hasBuyEntries && (
-            <ul className="grid gap-2" aria-label="Missing selected prints">
+          {hasTcgEntries && (
+            <ul className="grid gap-2" aria-label="Selected TCG print rows">
               {panel.buyEntries?.map((entry) => {
                 const priceSummary = printPriceSummary(entry.card, entry.variant);
+                const actionLabel = tcgplayerActionLabel(entry.card, entry.variant);
                 return (
                   <li
                     key={`${entry.card.number}-${entry.variant.id}`}
@@ -4688,9 +4675,9 @@ function FallbackPanelView({
                       card={entry.card}
                       artVariant={entry.variant}
                       size="sm"
-                      badge={`${entry.missing}`}
+                      badge={`${entry.quantity}`}
                       eager
-                      openLabel={`Missing ${entry.card.name} ${artDisplayLabel(entry.variant)}`}
+                      openLabel={`Open ${entry.card.name} ${artDisplayLabel(entry.variant)}`}
                     />
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -4708,7 +4695,7 @@ function FallbackPanelView({
                         {entry.card.name}
                       </h3>
                       <p className="text-sm font-bold leading-5 text-[#f7f7f2]/66">
-                        Need {entry.missing} · owned {entry.owned} / {entry.needed} · {priceSummary.full} each · {formatMoney(entry.totalCost)} total
+                        Qty {entry.quantity} · owned {entry.owned} · {priceSummary.full} each · {formatMoney(entry.totalCost)} total
                       </p>
                     </div>
                     <a
@@ -4716,9 +4703,9 @@ function FallbackPanelView({
                       target="_blank"
                       rel="noopener noreferrer nofollow"
                       className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-base font-black uppercase text-[#fff2bd] sm:self-center"
-                      aria-label={`View on TCGplayer for ${entry.card.name}, ${artDisplayLabel(
+                      aria-label={`${actionLabel} for ${entry.card.name}, ${artDisplayLabel(
                         entry.variant,
-                      )}, ${entry.missing} missing`}
+                      )}, ${entry.quantity} copies`}
                     >
                       <ShoppingCart size={15} />
                       TCG
@@ -5080,11 +5067,11 @@ function CostPanel({
         <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
         <CostRow label="Alt-art premium" value={formatMoney(summary.altPremium)} />
         <CostRow label="Owned prints" value={formatMoney(summary.ownedValue)} />
-        <CostRow label="Missing prints" value={formatMoney(summary.missingCost)} hot />
+        <CostRow label="TCG print total" value={formatMoney(summary.artTotal)} hot />
         <div className="mt-1 grid grid-cols-3 gap-2 text-center">
-          <Spec label="Needed" value={`${summary.neededCopies}`} />
+          <Spec label="Deck" value={`${summary.deckCopies}`} />
           <Spec label="Owned" value={`${summary.ownedCopies}`} />
-          <Spec label="Missing" value={`${summary.missingCopies}`} />
+          <Spec label="Open" value={`${summary.unownedCopies}`} />
         </div>
         <button
           type="button"
@@ -5757,7 +5744,6 @@ function LibraryCard({
   mainQuantity,
   resourceQuantity,
   ownedQuantity,
-  missingQuantity,
   readOnly = false,
   eagerImage = false,
   onSelect,
@@ -5773,7 +5759,6 @@ function LibraryCard({
   mainQuantity: number;
   resourceQuantity: number;
   ownedQuantity: number;
-  missingQuantity: number;
   readOnly?: boolean;
   eagerImage?: boolean;
   onSelect: () => void;
@@ -5832,7 +5817,7 @@ function LibraryCard({
             srcSet={cardImageSrcSet(card, artVariant, [320, 480, 640])}
             sizes="(min-width: 1536px) 8.75rem, (min-width: 1280px) 8rem, (min-width: 640px) 8.75rem, (min-width: 380px) 8rem, 7.25rem"
             alt={`${card.name} card`}
-            className="card-image-surface h-full w-full object-contain object-top transition duration-200 group-hover:scale-[1.035]"
+            className="card-image-surface h-full w-full object-contain object-top transition duration-200 group-hover:scale-[1.06]"
             decoding="async"
             loading={eagerImage ? "eager" : "lazy"}
             referrerPolicy="no-referrer"
@@ -5902,14 +5887,6 @@ function LibraryCard({
                 title={`${ownedQuantity} owned across any print`}
               >
                 Any Owned {ownedQuantity}
-              </span>
-            )}
-            {missingQuantity > 0 && (
-              <span
-                className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 text-[#fff2bd]"
-                title={`${missingQuantity} missing across selected deck printings`}
-              >
-                Missing {missingQuantity}
               </span>
             )}
             {rulesPending && (
@@ -6027,7 +6004,7 @@ function InspectorPanel({
   deck,
   artVariant,
   artVariants,
-  neededQuantity,
+  deckQuantity,
   ownedQuantity,
   mainQuantity,
   resourceQuantity,
@@ -6042,7 +6019,7 @@ function InspectorPanel({
   deck: DeckState;
   artVariant: CardArtVariant;
   artVariants: readonly CardArtVariant[];
-  neededQuantity: number;
+  deckQuantity: number;
   ownedQuantity: number;
   mainQuantity: number;
   resourceQuantity: number;
@@ -6057,7 +6034,6 @@ function InspectorPanel({
   const resourceConstraint = zoneAddConstraint("resource", card, resourceQuantity, deck);
   const canDowngradeArt = canShiftCardArt(deck, card, -1);
   const canUpgradeArt = canShiftCardArt(deck, card, 1);
-  const missingSelectedPrint = Math.max(0, neededQuantity - ownedQuantity);
   const tcgplayerLabel = tcgplayerActionLabel(card, artVariant);
 
   return (
@@ -6221,10 +6197,10 @@ function InspectorPanel({
               Selected Print
             </div>
             <div className="text-base font-black text-[#f7f7f2]">
-              Owned {ownedQuantity} / Needed {neededQuantity}
+              Owned {ownedQuantity} / Deck {deckQuantity}
             </div>
             <div className="truncate text-sm font-bold text-[#f7f7f2]/55">
-              Missing {missingSelectedPrint} · {artDisplayLabel(artVariant)} ownership
+              {artDisplayLabel(artVariant)} collection
             </div>
           </div>
           <IconButton
