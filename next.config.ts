@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
           "object-src 'none'",
           `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"} blob:`,
           "style-src 'self' 'unsafe-inline'",
-          "img-src 'self' data: blob: https://product-images.tcgplayer.com https://tcgplayer-cdn.tcgplayer.com https://*.tcgplayer.com",
+          "img-src 'self' data: blob: https://www.gundam-gcg.com https://product-images.tcgplayer.com https://tcgplayer-cdn.tcgplayer.com https://*.tcgplayer.com",
           "font-src 'self' data:",
           "connect-src 'self'",
           "worker-src 'self' blob:",

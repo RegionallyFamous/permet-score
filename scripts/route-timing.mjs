@@ -26,7 +26,7 @@ const sampleDeck = {
   },
   resource: { "R-001": 10 },
   art: {},
-  prints: { main: {}, resource: { "R-001": { standard: 10 } } },
+  prints: { main: {}, resource: { "R-001": { p4: 10 } } },
 };
 
 async function time(label, run, expectedStatuses = [200]) {

@@ -44,6 +44,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { type CardArtVariant } from "./card-art-data";
 import {
   type CardColor,
@@ -59,6 +60,7 @@ import {
   CARD_BY_NUMBER,
   CARD_POOL,
   CURATED_CARD_NUMBERS,
+  OFFICIAL_CARD_ARTS_BY_NUMBER,
 } from "./card-pool";
 import {
   TCGPLAYER_CARD_PRINTS,
@@ -208,6 +210,12 @@ const CARD_IMAGE_FALLBACK = "/permet-link-logo-fallback.webp";
 const TCGPLAYER_SEARCH_URL = "https://www.tcgplayer.com/search/all/product";
 const CANONICAL_ORIGIN = "https://permetlink.com";
 
+function buildStatusFilterLabel(filter: (typeof buildStatusFilters)[number]) {
+  if (filter === "Deck Ready") return "Addable cards";
+  if (filter === "Catalog Only") return "Reference cards";
+  return filter;
+}
+
 const starterDeck: DeckState = {
   name: "Heroic Beginnings Shell",
   main: {
@@ -354,6 +362,15 @@ function isAllowedTcgplayerImageUrl(value: string) {
   }
 }
 
+function isAllowedOfficialCardImageUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "www.gundam-gcg.com";
+  } catch {
+    return false;
+  }
+}
+
 function tcgplayerPrintImageUrl(print: TcgplayerPrint, size = 1500) {
   if (print.imageUrl && isAllowedTcgplayerImageUrl(print.imageUrl)) {
     return print.imageUrl;
@@ -371,8 +388,12 @@ function cardArtVariants(card: GundamCard) {
   if (cached) return cached;
 
   const localVariants = CARD_ARTS_BY_NUMBER[card.number];
+  const officialVariants = OFFICIAL_CARD_ARTS_BY_NUMBER[card.number];
   const tcgPrints = TCGPLAYER_CARD_PRINTS[card.number] ?? [];
-  const hasLocalArt = CURATED_CARD_NUMBERS.has(card.number) || Boolean(localVariants);
+  const hasLocalArt =
+    CURATED_CARD_NUMBERS.has(card.number) ||
+    Boolean(localVariants) ||
+    Boolean(officialVariants);
   const standardVariant = {
     id: "standard",
     label: "Standard",
@@ -395,9 +416,41 @@ function cardArtVariants(card: GundamCard) {
 
   let variants: readonly CardArtVariant[];
   if (localVariants) {
-    variants = localVariants.some((variant) => variant.id === "standard")
-      ? localVariants
-      : [standardVariant, ...localVariants];
+    const hasStandardVariant = localVariants.some((variant) => variant.id === "standard");
+    const officialHasStandard =
+      !officialVariants?.length ||
+      officialVariants.some((variant) => variant.id === "standard");
+    variants =
+      hasStandardVariant || !officialHasStandard
+        ? localVariants
+        : [standardVariant, ...localVariants];
+  } else if (officialVariants?.length) {
+    variants = officialVariants.map((variant, index) => {
+      const print = tcgPrints.find(
+        (candidate) =>
+          candidate.variantId === variant.id ||
+          candidate.officialId === variant.officialId,
+      );
+      const printImage = print ? tcgplayerPrintImageUrl(print) : null;
+      const tierMatch = variant.id.match(/^p(\d+)$/i);
+      const tier = variant.id === "standard" ? 0 : tierMatch ? Number(tierMatch[1]) : index;
+      return {
+        id: variant.id,
+        label:
+          variant.id === "standard"
+            ? "Standard"
+            : tierMatch
+              ? `Alt P${tierMatch[1]}`
+              : variant.label,
+        image:
+          printImage ??
+          (isAllowedOfficialCardImageUrl(variant.image)
+            ? variant.image
+            : standardVariant.image),
+        tier,
+        officialId: variant.officialId,
+      };
+    });
   } else if (hasLocalArt) {
     variants = [
       standardVariant,
@@ -451,8 +504,9 @@ function normalizePrintQuantities(
   if (!card || targetQuantity <= 0) return {};
 
   const variants = cardArtVariants(card);
+  const fallbackArtId = variants[0]?.id ?? "standard";
   const preferred =
-    preferredArtId && validArtId(card, preferredArtId) ? preferredArtId : "standard";
+    preferredArtId && validArtId(card, preferredArtId) ? preferredArtId : fallbackArtId;
   const next: QuantityMap = {};
 
   if (rawValue && typeof rawValue === "object") {
@@ -1967,7 +2021,7 @@ function addPrintCopies(
   artId: string,
   quantity: number,
 ) {
-  const safeArtId = validArtId(card, artId) ? artId : "standard";
+  const safeArtId = validArtId(card, artId) ? artId : (cardArtVariants(card)[0]?.id ?? artId);
   const current = { ...(printMap[card.number] ?? {}) };
   current[safeArtId] = (current[safeArtId] ?? 0) + quantity;
   printMap[card.number] = cleanQuantityMap(current);
@@ -2110,11 +2164,11 @@ export function DeckBuilder({
   const deferredQuery = useDeferredValue(query);
 
   const advancedFiltersModalOpen = advancedFiltersOpen && compactFiltersEnabled;
-  const isDialogOpen = Boolean(fallbackPanel || lightbox || mobileActionsOpen);
+  const isDialogOpen = Boolean(
+    fallbackPanel || lightbox || mobileActionsOpen || advancedFiltersModalOpen,
+  );
   const sharedPreviewLocked = Boolean(sharedDeckId && sharedStatus === "ready");
   const sharedPreviewEditReason = "Clone this shared deck before editing";
-  const shareButtonLabel =
-    sharedPreviewLocked && shareState === "Share" ? "Copy Link" : shareState;
   const renderAllPanels = !mobileTabsEnabled;
   const renderLibraryPanel = renderAllPanels || mobileView === "library";
   const renderCardPanel = renderAllPanels || mobileView === "card";
@@ -2537,6 +2591,13 @@ export function DeckBuilder({
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (isDialogOpen || isTypingTarget(event.target)) return;
+
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void copyShareUrl();
+        return;
+      }
+
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       const selected = selectedCard;
@@ -2594,11 +2655,6 @@ export function DeckBuilder({
         stepCardArt(selected.number, 1);
         return;
       }
-
-      if (event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        void copyShareUrl();
-      }
     };
 
     window.addEventListener("keydown", handleShortcut);
@@ -2616,6 +2672,23 @@ export function DeckBuilder({
   ]);
 
   const deckColors = useMemo(() => mainColorsForQuantities(deck.main), [deck.main]);
+  const compositionNotices = useMemo<SynergyNotice[]>(() => {
+    if (mainTotal !== MAIN_TARGET) return [];
+    const checks = [
+      ["Units", typeCounts.UNIT, 25, 28],
+      ["Pilots", typeCounts.PILOT, 6, 8],
+      ["Commands", typeCounts.COMMAND, 8, 10],
+      ["Bases", typeCounts.BASE, 4, 6],
+    ] as const;
+
+    return checks
+      .filter(([, count, min, max]) => count < min || count > max)
+      .map(([label, count, min, max]) => ({
+        tone: "warn",
+        label: `${label} mix`,
+        detail: `${count}, suggested ${min}-${max}`,
+      }));
+  }, [mainTotal, typeCounts]);
 
   const costCurve = useMemo(() => {
     const buckets = Array.from({ length: 8 }, (_, index) => ({
@@ -2706,25 +2779,6 @@ export function DeckBuilder({
       });
     }
 
-    if (mainTotal === MAIN_TARGET) {
-      const checks = [
-        ["Units", typeCounts.UNIT, 25, 28],
-        ["Pilots", typeCounts.PILOT, 6, 8],
-        ["Commands", typeCounts.COMMAND, 8, 10],
-        ["Bases", typeCounts.BASE, 4, 6],
-      ] as const;
-
-      checks.forEach(([label, count, min, max]) => {
-        if (count < min || count > max) {
-          messages.push({
-            tone: "warn",
-            label,
-            detail: `${count}, target ${min}-${max}`,
-          });
-        }
-      });
-    }
-
     return messages;
   }, [
     deckColors,
@@ -2732,10 +2786,15 @@ export function DeckBuilder({
     mainTotal,
     resourceEntries,
     resourceTotal,
-    typeCounts,
   ]);
 
   const isLegal = notices.every((notice) => notice.tone !== "bad");
+  const steadyShareLabel = sharedPreviewLocked
+    ? "Copy Link"
+    : !isLegal && deckHasCards(deck)
+      ? "Share WIP"
+      : "Share";
+  const shareButtonLabel = shareState === "Share" ? steadyShareLabel : shareState;
   const primaryDeckIssue = notices.find((notice) => notice.tone === "bad") ?? null;
   const activeAdvancedFilterCount = [
     colorFilter !== "All",
@@ -2792,10 +2851,10 @@ export function DeckBuilder({
     setToast(null);
   }
 
-  function clearUndoCheckpoint() {
-    undoDeckRef.current = null;
-    setCanUndo(false);
-    setToast((current) => (current?.actionLabel === "Undo" ? null : current));
+  function captureUndoCheckpoint(sourceDeck: DeckState = deckRef.current) {
+    if (undoDeckRef.current) return;
+    undoDeckRef.current = cloneDeckState(sourceDeck);
+    setCanUndo(true);
   }
 
   function restoreUndoDeck() {
@@ -2943,7 +3002,7 @@ export function DeckBuilder({
     if (blockSharedPreviewEdit()) return;
     const feedbackCard = CARD_BY_NUMBER.get(number);
     if (!feedbackCard) return;
-    clearUndoCheckpoint();
+    captureUndoCheckpoint();
     triggerFeedback(
       [`art:${number}`, `main:${number}`, `resource:${number}`],
       `${feedbackCard.name} print ${delta > 0 ? "upgraded" : "downgraded"}.`,
@@ -3019,8 +3078,7 @@ export function DeckBuilder({
       return;
     }
 
-    undoDeckRef.current = cloneDeckState(deck);
-    setCanUndo(true);
+    captureUndoCheckpoint(deck);
     triggerFeedback(
       ["progress:main", "progress:resource", selectedCard ? `art:${selectedCard.number}` : "share"],
       `Deck prints ${delta > 0 ? "upgraded" : "downgraded"}.`,
@@ -3064,7 +3122,7 @@ export function DeckBuilder({
     if (blockSharedPreviewEdit()) return;
     const feedbackCard = CARD_BY_NUMBER.get(number);
     if (!feedbackCard) return;
-    clearUndoCheckpoint();
+    captureUndoCheckpoint();
     triggerFeedback(
       [`art:${number}`, `print:${zone}:${number}:${variantId}`, `${zone}:${number}`],
       `${feedbackCard.name} print quantity updated.`,
@@ -3120,7 +3178,7 @@ export function DeckBuilder({
     if (blockSharedPreviewEdit()) return;
     const feedbackCard = CARD_BY_NUMBER.get(number);
     if (!feedbackCard) return;
-    clearUndoCheckpoint();
+    captureUndoCheckpoint();
     triggerFeedback(
       [
         `art:${number}`,
@@ -3188,7 +3246,7 @@ export function DeckBuilder({
         zone === "main" ? mainTotalRef.current + delta : resourceTotalRef.current + delta
       }. ${cardForFeedback.name} quantity ${nextQuantityForFeedback}.`,
     );
-    clearUndoCheckpoint();
+    captureUndoCheckpoint();
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card) return current;
@@ -3244,8 +3302,7 @@ export function DeckBuilder({
     const quantity = deck[zone][number] ?? 0;
     if (!card || quantity <= 0) return;
 
-    undoDeckRef.current = cloneDeckState(deck);
-    setCanUndo(true);
+    captureUndoCheckpoint(deck);
     setDeck((current) => {
       const nextTarget = { ...current[zone] };
       const nextPrints = clonePrints(current.prints);
@@ -3268,7 +3325,7 @@ export function DeckBuilder({
       return;
     }
 
-    clearUndoCheckpoint();
+    captureUndoCheckpoint();
     setDeck((current) => {
       const card = CARD_BY_NUMBER.get(number);
       if (!card || !validArtId(card, artId)) return current;
@@ -3292,8 +3349,7 @@ export function DeckBuilder({
       return;
     }
 
-    undoDeckRef.current = cloneDeckState(deck);
-    setCanUndo(true);
+    captureUndoCheckpoint(deck);
     setDeck((current) => {
       const nextCollection: CollectionMap = { ...current.collection };
       (["main", "resource"] as const).forEach((zone) => {
@@ -3840,6 +3896,149 @@ export function DeckBuilder({
     });
   }
 
+  function renderLibraryFiltersPanel(modal: boolean) {
+    return (
+      <>
+        {modal && (
+          <button
+            type="button"
+            className="fixed inset-0 z-[64] cursor-default bg-black/55 md:hidden"
+            onClick={() => setAdvancedFiltersOpen(false)}
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+        )}
+        <div
+          ref={advancedFiltersRef}
+          id="library-advanced-filters"
+          className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4"
+          role={modal ? "dialog" : undefined}
+          aria-modal={modal || undefined}
+          aria-labelledby={modal ? "library-advanced-filters-title" : undefined}
+          onKeyDown={
+            modal
+              ? (event) =>
+                  trapDialogFocus(event, advancedFiltersRef.current, () =>
+                    setAdvancedFiltersOpen(false),
+                  )
+              : undefined
+          }
+        >
+          <div className="filter-sheet-header col-span-full flex items-center justify-between gap-2 border-b border-[#a7b5c9]/16 pb-2 md:hidden">
+            <h2
+              id="library-advanced-filters-title"
+              className="font-display text-base font-black uppercase text-[#d9ecff]"
+            >
+              Filter Library
+            </h2>
+            <button
+              ref={advancedFiltersDoneRef}
+              type="button"
+              className="interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
+              onClick={() => setAdvancedFiltersOpen(false)}
+            >
+              Done
+            </button>
+          </div>
+          <div className="md:hidden">
+            <SelectFilter
+              label="Color"
+              ariaLabel="Advanced color"
+              value={colorFilter}
+              values={colorFilters}
+              onChange={(value) => {
+                setColorFilter(value);
+                setLibraryPage(0);
+              }}
+            />
+          </div>
+          <div className="md:hidden">
+            <SelectFilter
+              label="Type"
+              ariaLabel="Advanced type"
+              value={typeFilter}
+              values={typeFilters}
+              onChange={(value) => {
+                setTypeFilter(value);
+                setLibraryPage(0);
+              }}
+            />
+          </div>
+          <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
+            <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+              Set
+            </span>
+            <select
+              value={setFilter}
+              onChange={(event) => {
+                setSetFilter(event.target.value);
+                setLibraryPage(0);
+              }}
+              className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+            >
+              {setOptions.map((set) => (
+                <option key={set} value={set}>
+                  {set}
+                </option>
+              ))}
+            </select>
+          </label>
+          <SelectFilter
+            label="Art"
+            value={artFilter}
+            values={artFilters}
+            onChange={(value) => {
+              setArtFilter(value);
+              setLibraryPage(0);
+            }}
+          />
+          <SelectFilter
+            label="Owned/Budget"
+            value={collectionFilter}
+            values={collectionFilters}
+            onChange={(value) => {
+              setCollectionFilter(value);
+              setLibraryPage(0);
+            }}
+          />
+          <SelectFilter
+            label="Card Data"
+            value={buildStatusFilter}
+            values={buildStatusFilters}
+            getOptionLabel={buildStatusFilterLabel}
+            onChange={(value) => {
+              setBuildStatusFilter(value);
+              setLibraryPage(0);
+            }}
+          />
+          <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
+            <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
+              Under Price
+            </span>
+            <input
+              type="number"
+              min="0"
+              step="0.25"
+              value={budgetLimit}
+              onChange={(event) => {
+                setBudgetLimit(Math.max(0, Number(event.target.value) || 0));
+                setLibraryPage(0);
+              }}
+              className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+            />
+          </label>
+        </div>
+      </>
+    );
+  }
+
+  function browseLibraryFromStart() {
+    changeMobileView("library");
+    window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+  }
+
   return (
     <main className="app-shell min-h-screen bg-[#05060a] text-[#f7f7f2]">
       <div
@@ -3939,7 +4138,7 @@ export function DeckBuilder({
                 />
               </label>
               <div className="relative short-cockpit-actions min-w-0">
-                <div className="toolbar-action-rail grid grid-cols-3 gap-2 xl:flex xl:flex-nowrap xl:justify-end xl:overflow-x-auto xl:pb-1">
+                <div className="toolbar-action-rail grid grid-cols-3 gap-2 xl:flex xl:flex-nowrap xl:justify-start xl:overflow-x-auto xl:pb-1 min-[1500px]:justify-end">
                   <ToolbarButton
                     label="TCG List"
                     mobileLabel="TCG"
@@ -3974,13 +4173,13 @@ export function DeckBuilder({
                     label={mobileActionsOpen ? "Close" : "More"}
                     mobileLabel={mobileActionsOpen ? "Close" : "More"}
                     title="More deck actions"
-                    onClick={() => setMobileActionsOpen((open) => !open)}
-                    ariaExpanded={mobileActionsOpen}
-                    ariaControls={mobileActionsOpen ? "mobile-action-sheet" : undefined}
-                    className="w-full xl:hidden"
-                  >
-                    {mobileActionsOpen ? <X size={16} /> : <MoreHorizontal size={16} />}
-                  </ToolbarButton>
+	                    onClick={() => setMobileActionsOpen((open) => !open)}
+	                    ariaExpanded={mobileActionsOpen}
+	                    ariaControls={mobileActionsOpen ? "mobile-action-sheet" : undefined}
+	                    className="w-full xl:w-auto min-[1700px]:hidden"
+	                  >
+	                    {mobileActionsOpen ? <X size={16} /> : <MoreHorizontal size={16} />}
+	                  </ToolbarButton>
                   <div className="hidden xl:contents">
                       {canUndo && (
                       <ToolbarButton
@@ -3997,6 +4196,7 @@ export function DeckBuilder({
                         ariaLabel="Load sample deck"
                         onClick={loadSampleDeck}
                         disabled={sharedPreviewLocked}
+                        showDesktopLabel
                       >
                         <ShieldCheck size={16} />
                       </ToolbarButton>
@@ -4006,6 +4206,7 @@ export function DeckBuilder({
                         ariaLabel="Start a new deck"
                         onClick={startNewDeck}
                         disabled={sharedPreviewLocked}
+                        showDesktopLabel
                       >
                         <RotateCcw size={16} />
                       </ToolbarButton>
@@ -4027,48 +4228,53 @@ export function DeckBuilder({
                     >
                       <ChevronUp size={16} />
                     </ToolbarButton>
-                    <ToolbarButton
-                      label={copyState}
-                      title="Copy deck list"
-                      onClick={copyDeckList}
-                    >
-                      <Clipboard size={16} />
-                    </ToolbarButton>
-                      <ToolbarButton
-                      label="Backup"
-                      title="Export backup JSON"
-                      onClick={exportJson}
-                    >
-                      <Download size={16} />
-                    </ToolbarButton>
-                    <ToolbarButton
-                      label="Sheet"
-                      title="Export deck image"
-                      onClick={() => void exportDeckImage()}
-                    >
-                      <Layers size={16} />
-                    </ToolbarButton>
-                    <ToolbarButton
-                      label="Import"
-                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Import JSON or text decklist"}
-                        ariaLabel="Import deck"
-                        onClick={() => importInputRef.current?.click()}
-                        disabled={sharedPreviewLocked}
-                        showDesktopLabel
-                      >
-                        <Upload size={16} />
-                      </ToolbarButton>
-                    <ToolbarButton
-                      label="Paste"
-                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Paste decklist from clipboard"}
-                      ariaLabel="Paste decklist"
-                      onClick={() => void pasteDeckList()}
-                      disabled={sharedPreviewLocked}
-                      showDesktopLabel
-                    >
-                      <Clipboard size={16} />
-                    </ToolbarButton>
-                  </div>
+	                    <div className="hidden min-[1700px]:contents">
+	                      <ToolbarButton
+	                        label={copyState}
+	                        title="Copy deck list"
+	                        onClick={copyDeckList}
+	                        showDesktopLabel
+	                      >
+	                        <Clipboard size={16} />
+	                      </ToolbarButton>
+	                      <ToolbarButton
+	                        label="Backup"
+	                        title="Export backup JSON"
+	                        onClick={exportJson}
+	                        showDesktopLabel
+	                      >
+	                        <Download size={16} />
+	                      </ToolbarButton>
+	                      <ToolbarButton
+	                        label="Sheet"
+	                        title="Export deck image"
+	                        onClick={() => void exportDeckImage()}
+	                        showDesktopLabel
+	                      >
+	                        <Layers size={16} />
+	                      </ToolbarButton>
+	                      <ToolbarButton
+	                        label="Import"
+	                        title={sharedPreviewLocked ? sharedPreviewEditReason : "Import JSON or text decklist"}
+	                        ariaLabel="Import deck"
+	                        onClick={() => importInputRef.current?.click()}
+	                        disabled={sharedPreviewLocked}
+	                        showDesktopLabel
+	                      >
+	                        <Upload size={16} />
+	                      </ToolbarButton>
+	                      <ToolbarButton
+	                        label="Paste"
+	                        title={sharedPreviewLocked ? sharedPreviewEditReason : "Paste decklist from clipboard"}
+	                        ariaLabel="Paste decklist"
+	                        onClick={() => void pasteDeckList()}
+	                        disabled={sharedPreviewLocked}
+	                        showDesktopLabel
+	                      >
+	                        <Clipboard size={16} />
+	                      </ToolbarButton>
+	                    </div>
+	                  </div>
                 </div>
               </div>
               <input
@@ -4117,12 +4323,16 @@ export function DeckBuilder({
             onClone={cloneSharedDeck}
           />
         )}
-        {!sharedDeckId && loaded && !deckHasCards(deck) && (
-          <StartBuildPanel
-            onSample={loadSampleDeck}
-            onImport={() => importInputRef.current?.click()}
-            onBrowse={() => changeMobileView("library")}
-          />
+        {!sharedDeckId &&
+          loaded &&
+          !deckHasCards(deck) &&
+          activeAdvancedFilterCount === 0 &&
+          !deferredQuery.trim() && (
+	          <StartBuildPanel
+	            onSample={loadSampleDeck}
+	            onImport={() => importInputRef.current?.click()}
+	            onBrowse={browseLibraryFromStart}
+	          />
         )}
 
             <div className="workbench-grid grid gap-4 xl:grid-cols-[minmax(430px,1.05fr)_minmax(360px,0.82fr)_minmax(360px,0.9fr)] xl:items-start 2xl:grid-cols-[minmax(540px,1.25fr)_minmax(390px,0.82fr)_minmax(390px,0.9fr)]">
@@ -4237,7 +4447,7 @@ export function DeckBuilder({
                       {setFilter !== "All" && <FilterChip label={`Set: ${setFilter}`} />}
                       {artFilter !== "All Prints" && <FilterChip label={`Print: ${artFilter}`} />}
                       {buildStatusFilter !== "All" && (
-                        <FilterChip label={`Card Data: ${buildStatusFilter}`} />
+                        <FilterChip label={`Cards: ${buildStatusFilterLabel(buildStatusFilter)}`} />
                       )}
                       {collectionFilter !== "All" && (
                         <FilterChip label={`Owned/Budget: ${collectionFilter}`} />
@@ -4255,138 +4465,9 @@ export function DeckBuilder({
                     </div>
                   )}
 
-                  {advancedFiltersModalOpen && (
-                    <button
-                      type="button"
-                      className="fixed inset-0 z-[54] cursor-default bg-black/45 md:hidden"
-                      onClick={() => setAdvancedFiltersOpen(false)}
-                      aria-label="Close library filters"
-                      tabIndex={-1}
-                    />
-                  )}
-                  {advancedFiltersOpen && (
-                    <div
-                      ref={advancedFiltersRef}
-                      id="library-advanced-filters"
-                      className="library-filters-popover workbench-scroll grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4"
-                      role={advancedFiltersModalOpen ? "dialog" : undefined}
-                      aria-modal={advancedFiltersModalOpen || undefined}
-                      aria-labelledby={
-                        advancedFiltersModalOpen ? "library-advanced-filters-title" : undefined
-                      }
-                      onKeyDown={
-                        advancedFiltersModalOpen
-                          ? (event) =>
-                              trapDialogFocus(event, advancedFiltersRef.current, () =>
-                                setAdvancedFiltersOpen(false),
-                              )
-                          : undefined
-                      }
-                    >
-                      <div className="filter-sheet-header col-span-full flex items-center justify-between gap-2 border-b border-[#a7b5c9]/16 pb-2 md:hidden">
-                        <h2
-                          id="library-advanced-filters-title"
-                          className="font-display text-base font-black uppercase text-[#d9ecff]"
-                        >
-                          Filter Library
-                        </h2>
-                        <button
-                          ref={advancedFiltersDoneRef}
-                          type="button"
-                          className="interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
-                          onClick={() => setAdvancedFiltersOpen(false)}
-                        >
-                          Done
-                        </button>
-                      </div>
-                      <div className="md:hidden">
-                        <SelectFilter
-                          label="Color"
-                          ariaLabel="Advanced color"
-                          value={colorFilter}
-                          values={colorFilters}
-                          onChange={(value) => {
-                            setColorFilter(value);
-                            setLibraryPage(0);
-                          }}
-                        />
-                      </div>
-                      <div className="md:hidden">
-                        <SelectFilter
-                          label="Type"
-                          ariaLabel="Advanced type"
-                          value={typeFilter}
-                          values={typeFilters}
-                          onChange={(value) => {
-                            setTypeFilter(value);
-                            setLibraryPage(0);
-                          }}
-                        />
-                      </div>
-                      <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
-                        <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
-                          Set
-                        </span>
-                        <select
-                          value={setFilter}
-                          onChange={(event) => {
-                            setSetFilter(event.target.value);
-                            setLibraryPage(0);
-                          }}
-                          className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
-                        >
-                          {setOptions.map((set) => (
-                            <option key={set} value={set}>
-                              {set}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <SelectFilter
-                        label="Art"
-                        value={artFilter}
-                        values={artFilters}
-                        onChange={(value) => {
-                          setArtFilter(value);
-                          setLibraryPage(0);
-                        }}
-                      />
-                      <SelectFilter
-                        label="Owned/Budget"
-                        value={collectionFilter}
-                        values={collectionFilters}
-                        onChange={(value) => {
-                          setCollectionFilter(value);
-                          setLibraryPage(0);
-                        }}
-                      />
-                      <SelectFilter
-                        label="Card Data"
-                        value={buildStatusFilter}
-                        values={buildStatusFilters}
-                        onChange={(value) => {
-                          setBuildStatusFilter(value);
-                          setLibraryPage(0);
-                        }}
-                      />
-                      <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
-                        <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
-                          Under Price
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          value={budgetLimit}
-                          onChange={(event) => {
-                            setBudgetLimit(Math.max(0, Number(event.target.value) || 0));
-                            setLibraryPage(0);
-                          }}
-                          className="control-field mt-1 h-11 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
-                        />
-                      </label>
-                    </div>
-                  )}
+                  {advancedFiltersOpen &&
+                    !advancedFiltersModalOpen &&
+                    renderLibraryFiltersPanel(false)}
                 </div>
               </div>
             </div>
@@ -4488,7 +4569,7 @@ export function DeckBuilder({
                           : `card:${card.number}`,
                     )}
                     readOnly={sharedPreviewLocked}
-                    eagerImage={index === 0}
+                    eagerImage={index === 0 && getArtVariant(card, deck.art).image.startsWith("/")}
                     onSelect={() => setSelectedNumber(card.number)}
                     onOpenCard={() => {
                       setSelectedNumber(card.number);
@@ -4593,7 +4674,7 @@ export function DeckBuilder({
 
               <LegalityPanel notices={notices} onFixNotice={focusLegalityFix} />
 
-              <SynergyPanel notices={synergyNotices} />
+              <SynergyPanel notices={[...synergyNotices, ...compositionNotices]} />
 
               <div className="xl:hidden">
                 <CompositionPanel
@@ -4612,7 +4693,7 @@ export function DeckBuilder({
             role={mobileTabsEnabled ? "tabpanel" : "region"}
             aria-labelledby={mobileTabsEnabled ? "deck-tab" : undefined}
             aria-label={mobileTabsEnabled ? undefined : "Deck list"}
-            tabIndex={-1}
+            tabIndex={0}
             className={`min-w-0 max-w-full gap-4 xl:grid ${
               mobileView === "deck" ? "grid" : "hidden"
             }`}
@@ -4674,6 +4755,9 @@ export function DeckBuilder({
         onChange={changeMobileView}
       />
       </div>
+      {advancedFiltersOpen && advancedFiltersModalOpen && typeof document !== "undefined"
+        ? createPortal(renderLibraryFiltersPanel(true), document.body)
+        : null}
       <ToastViewport
         toast={toast}
         modalOpen={isDialogOpen}
@@ -5065,8 +5149,8 @@ function StartBuildPanel({
           onClick={onBrowse}
         >
           <LayoutGrid size={15} />
-          Browse
-        </button>
+	          Open Library
+	        </button>
         <button
           type="button"
           className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/38 bg-[#f6c542]/12 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
@@ -5099,6 +5183,9 @@ function CatalogOnlyBanner({
   onDeckReady: () => void;
   onCatalogOnly: () => void;
 }) {
+  const cardNoun = catalogCards === 1 ? "card" : "cards";
+  const verb = catalogCards === 1 ? "is" : "are";
+
   return (
     <div className="border-b border-[#f6c542]/18 bg-[#221807]/86 px-2.5 py-2 sm:px-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -5108,7 +5195,7 @@ function CatalogOnlyBanner({
             Market Catalog
           </div>
           <p className="mt-0.5 text-sm font-bold leading-5 text-[#f7f7f2]/72">
-            {catalogCards} cards have TCGplayer market data but need official rules before deck building.
+            {catalogCards} reference {cardNoun} {verb} available for lookup but cannot be added to the main or resource deck.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
@@ -5118,14 +5205,14 @@ function CatalogOnlyBanner({
             onClick={onDeckReady}
             disabled={deckReadyCards === 0}
           >
-            Deck Ready {deckReadyCards}
+            Addable {deckReadyCards}
           </button>
           <button
             type="button"
             className="interactive-control inline-flex h-11 min-h-11 items-center justify-center rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
             onClick={onCatalogOnly}
           >
-            Catalog {catalogCards}
+            Reference {catalogCards}
           </button>
         </div>
       </div>
@@ -5140,6 +5227,15 @@ function LegalityPanel({
   notices: Notice[];
   onFixNotice: (notice: Notice) => void;
 }) {
+  const fixLabel = (notice: Notice) => {
+    if (notice.label === "Main deck") return "Find main cards";
+    if (notice.label === "Resource") return "Find resources";
+    if (notice.label === "Colors") return "Review colors";
+    if (notice.label === "Copies") return "Review copies";
+    if (notice.label === "Zones") return "Review zones";
+    return "Review deck";
+  };
+
   return (
     <section className={panelClass()}>
       <PanelTitle icon={<ShieldCheck size={18} />} title="Legality" />
@@ -5161,8 +5257,9 @@ function LegalityPanel({
                   type="button"
                   className="interactive-control inline-flex h-11 shrink-0 items-center justify-center rounded-sm border border-current/30 bg-black/18 px-3 font-display text-sm font-black uppercase"
                   onClick={() => onFixNotice(notice)}
+                  aria-label={`${fixLabel(notice)} for ${notice.label}: ${notice.detail}`}
                 >
-                  Fix
+                  {fixLabel(notice)}
                 </button>
               )}
             </div>
@@ -5284,20 +5381,20 @@ function MobileCockpitNav({
     >
       <div className="mobile-progress-strip mx-auto mb-1.5 grid max-w-lg grid-cols-4 gap-1">
         <span
-          className="mobile-progress-chip quantity-readout rounded-sm border border-[#e31b23]/30 bg-[#e31b23]/10 px-1.5 py-0.5 text-center font-display text-[11px] font-black uppercase text-[#ffe3e3]"
+          className="mobile-progress-chip quantity-readout rounded-sm border border-[#e31b23]/30 bg-[#e31b23]/10 px-1.5 py-0.5 text-center font-display text-xs font-black uppercase text-[#ffe3e3]"
           data-pulse={pulseIdFor?.("progress:main")}
         >
           Main {mainTotal}/{MAIN_TARGET}
           <i style={{ transform: `scaleX(${Math.min(1, mainTotal / MAIN_TARGET)})` }} />
         </span>
         <span
-          className="mobile-progress-chip quantity-readout rounded-sm border border-[#2e8cff]/30 bg-[#1167d8]/12 px-1.5 py-0.5 text-center font-display text-[11px] font-black uppercase text-[#d9ecff]"
+          className="mobile-progress-chip quantity-readout rounded-sm border border-[#2e8cff]/30 bg-[#1167d8]/12 px-1.5 py-0.5 text-center font-display text-xs font-black uppercase text-[#d9ecff]"
           data-pulse={pulseIdFor?.("progress:resource")}
         >
           Res {resourceTotal}/{RESOURCE_TARGET}
           <i style={{ transform: `scaleX(${Math.min(1, resourceTotal / RESOURCE_TARGET)})` }} />
         </span>
-        <span className="rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/8 px-1.5 py-0.5 text-center font-display text-[11px] font-black uppercase text-[#f7f7f2]/72">
+        <span className="rounded-sm border border-[#a7b5c9]/20 bg-[#f7f7f2]/8 px-1.5 py-0.5 text-center font-display text-xs font-black uppercase text-[#f7f7f2]/72">
           <span className="inline-flex h-full items-center justify-center gap-1" aria-label={`Deck colors ${deckColors.length ? deckColors.map(colorName).join(", ") : "none"}`}>
             {deckColors.length ? (
               deckColors.map((color) => (
@@ -5318,7 +5415,7 @@ function MobileCockpitNav({
           </span>
         </span>
         <span
-          className={`rounded-sm border px-1.5 py-0.5 text-center font-display text-[11px] font-black uppercase ${
+          className={`rounded-sm border px-1.5 py-0.5 text-center font-display text-xs font-black uppercase ${
             isLegal
               ? "border-[#28d17c]/35 bg-[#28d17c]/12 text-[#d9ffe9]"
               : "border-[#f6c542]/35 bg-[#f6c542]/12 text-[#fff2bd]"
@@ -5437,17 +5534,17 @@ function MobileActionSheet({
 
   return (
     <>
-      <button
-        type="button"
-          className="mobile-action-backdrop fixed inset-0 z-[64] cursor-default bg-black/55 xl:hidden"
-        onClick={onClose}
-        aria-label="Close more deck actions"
-        tabIndex={-1}
+	      <button
+	        type="button"
+	        className="mobile-action-backdrop fixed inset-0 z-[64] cursor-default bg-black/55"
+	        onClick={onClose}
+	        aria-hidden="true"
+	        tabIndex={-1}
       />
       <div
-        ref={sheetRef}
-        id="mobile-action-sheet"
-        className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl xl:hidden"
+	        ref={sheetRef}
+	        id="mobile-action-sheet"
+	        className="mobile-action-sheet mx-auto grid max-w-lg grid-cols-2 gap-2 rounded-sm border border-[#8bdcff]/28 bg-[#07090d]/98 p-2 shadow-2xl shadow-black/70 backdrop-blur-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="mobile-action-sheet-title"
@@ -6006,6 +6103,17 @@ function CardLightbox({
               />
             </div>
 
+            <a
+              href={tcgplayerUrl(card, artVariant)}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/42 bg-[#f6c542]/13 font-display text-base font-black uppercase text-[#fff2bd] hover:bg-[#f6c542]/18 lg:hidden"
+              title={`${tcgplayerLabel} for ${card.name} ${artDisplayLabel(artVariant)}`}
+            >
+              <ShoppingCart size={16} />
+              {tcgplayerLabel}
+            </a>
+
             {hasAltPrints && (
               <div className="grid gap-2 rounded-sm border border-[#a7b5c9]/16 bg-black/28 p-2">
                 <div className="flex items-center gap-2 font-display text-base font-black uppercase text-[#f7f7f2]/74">
@@ -6282,6 +6390,7 @@ function SelectFilter<T extends string>({
   value,
   values,
   onChange,
+  getOptionLabel,
   hideLabel = false,
 }: {
   label: string;
@@ -6289,6 +6398,7 @@ function SelectFilter<T extends string>({
   value: T;
   values: readonly T[];
   onChange: (value: T) => void;
+  getOptionLabel?: (value: T) => string;
   hideLabel?: boolean;
 }) {
   return (
@@ -6306,7 +6416,7 @@ function SelectFilter<T extends string>({
       >
         {values.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {getOptionLabel ? getOptionLabel(option) : option}
           </option>
         ))}
       </select>
@@ -6785,7 +6895,6 @@ function LibraryCard({
         card.color,
       )} ${selected ? "active-scan-card ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
       data-pulse={pulseId}
-      tabIndex={0}
       onClick={(event) => {
         if (isInteractiveTarget(event.target)) return;
         onSelect();
@@ -6793,16 +6902,6 @@ function LibraryCard({
       onDoubleClick={(event) => {
         if (isInteractiveTarget(event.target)) return;
         onOpenCard();
-      }}
-      onKeyDown={(event) => {
-        if (event.currentTarget !== event.target) return;
-        if (event.key === "Enter") {
-          event.preventDefault();
-          onOpenCard();
-        } else if (event.key === " ") {
-          event.preventDefault();
-          onSelect();
-        }
       }}
       aria-label={`${card.name} ${card.number} library row`}
     >
@@ -6906,9 +7005,9 @@ function LibraryCard({
             {!deckReady && (
               <span
                 className="rounded-sm border border-[#8bdcff]/24 bg-[#1167d8]/10 px-1.5 py-0.5 text-[#d9ecff]"
-                title="Market catalog card. Add official rules data before deck building."
+                title="Reference card for lookup. This card cannot be added to the main or resource deck."
               >
-                Catalog only
+                Reference
               </span>
             )}
           </div>
@@ -7281,6 +7380,8 @@ function InspectorPanel({
                   className="interactive-control inline-flex h-11 items-center justify-center rounded-sm border border-[#8bdcff]/28 bg-[#1167d8]/10 px-2 font-display text-xs font-black uppercase text-[#d9ecff] disabled:cursor-not-allowed disabled:opacity-35"
                   onClick={() => onSetAllPrints(variant.id)}
                   disabled={readOnly || quantity === targetQuantity}
+                  aria-label={`Set all ${zoneLabel(zone)} ${card.name} copies to ${printDisplayId(variant)}`}
+                  title={`Set all ${zoneLabel(zone)} copies to ${printDisplayId(variant)}`}
                 >
                   All
                 </button>

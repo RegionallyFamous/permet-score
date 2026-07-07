@@ -78,7 +78,7 @@ function legalDeck(overrides = {}) {
     main: legalMain,
     resource: { "R-001": 10 },
     art: {},
-    prints: { main: {}, resource: { "R-001": { standard: 10 } } },
+    prints: { main: {}, resource: { "R-001": { p4: 10 } } },
     ...overrides,
   };
 }
@@ -98,7 +98,7 @@ async function assertSharePreservesPrints() {
     art: { "ST01-001": "p1" },
     prints: {
       main: { "ST01-001": { p1: 4 } },
-      resource: { "R-001": { standard: 10 } },
+      resource: { "R-001": { p4: 10 } },
     },
   });
 
@@ -133,7 +133,7 @@ async function assertShareAcceptsOfficialRulesCards() {
     art: { "EB01-001": "standard" },
     prints: {
       main: { "EB01-001": { standard: 4 } },
-      resource: { "R-001": { standard: 10 } },
+      resource: { "R-001": { p4: 10 } },
     },
   });
 
@@ -178,7 +178,7 @@ async function assertShareRejectsOrphanArt() {
         "EB01-001": { standard: 4 },
         "ST01-001": { p1: 4 },
       },
-      resource: { "R-001": { standard: 10 } },
+      resource: { "R-001": { p4: 10 } },
     },
   });
 
@@ -299,7 +299,7 @@ async function assertShareRejectsOverflowingPrintQuantities() {
     art: { "ST01-001": "p7" },
     prints: {
       main: { "ST01-001": { p7: 4, p5: 999 } },
-      resource: { "R-001": { standard: 10 } },
+      resource: { "R-001": { p4: 10 } },
     },
   });
 
@@ -343,7 +343,7 @@ async function assertLocalStorageDropsNonDeckCards(page) {
     art: { "T-025": "standard" },
     prints: {
       main: { "T-025": { standard: 4 } },
-      resource: { "R-001": { standard: 10 } },
+      resource: { "R-001": { p4: 10 } },
     },
   };
 
@@ -441,6 +441,19 @@ async function writeClipboard(page, text) {
   await page.evaluate(async (value) => navigator.clipboard.writeText(value), text);
 }
 
+async function clickDeckAction(page, accessibleName) {
+  const directAction = page.getByRole("button", { name: accessibleName });
+  if (await directAction.isVisible().catch(() => false)) {
+    await directAction.click();
+    return;
+  }
+
+  await page.getByRole("button", { name: "More deck actions" }).click();
+  const sheet = page.getByRole("dialog", { name: "More deck actions" });
+  await sheet.waitFor({ timeout: 15000 });
+  await sheet.getByRole("button", { name: accessibleName }).click();
+}
+
 async function assertJsonImportDoesNotFallThroughToText(page) {
   await gotoApp(page);
   await page.getByRole("button", { name: "Load sample deck" }).click();
@@ -468,10 +481,10 @@ async function assertPasteConfirmsBeforeReplacingDeck(page) {
     await dialog.dismiss();
     return message;
   });
-  const [message] = await Promise.all([
-    dialogPromise,
-    page.getByRole("button", { name: "Paste decklist" }).click(),
-  ]);
+	  const [message] = await Promise.all([
+	    dialogPromise,
+	    clickDeckAction(page, "Paste decklist"),
+	  ]);
 
   if (!/replace the current deck/i.test(String(message))) {
     throw new Error(`Paste replacement dialog was not explicit: ${message}`);
@@ -488,9 +501,9 @@ async function assertPlainTextImportPreservesPrintIds(page) {
   await page.getByRole("button", { name: "Start a new deck" }).click();
   await writeClipboard(
     page,
-    "Name: Parallel Text Import\nMain\n1 ST01-001 Gundam [ST01-001 P1] [print:p1]\nResource\n1 R-001 Resource [print:standard]",
+    "Name: Parallel Text Import\nMain\n1 ST01-001 Gundam [ST01-001 P1] [print:p1]\nResource\n1 R-001 Resource [print:p4]",
   );
-  await page.getByRole("button", { name: "Paste decklist" }).click();
+	  await clickDeckAction(page, "Paste decklist");
   await page.waitForFunction(
     () => {
       const stored = window.localStorage.getItem("gundam-deck-builder-v1");
@@ -517,7 +530,7 @@ async function assertPlainTextImportIgnoresRulesDigits(page) {
       "R-001 Resource Lv 3",
     ].join("\n"),
   );
-  await page.getByRole("button", { name: "Paste decklist" }).click();
+	  await clickDeckAction(page, "Paste decklist");
   await page.waitForFunction(
     () => {
       const stored = window.localStorage.getItem("gundam-deck-builder-v1");
@@ -574,12 +587,12 @@ async function assertStartPanelVisibleOnMobile(page) {
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
   await gotoApp(page);
 
-  const audit = await page.evaluate(() => {
-    const panel = document.querySelector(".start-build-panel");
-    const browse = Array.from(document.querySelectorAll("button")).find((button) =>
-      /^Browse$/i.test(button.textContent?.trim() ?? ""),
-    );
-    if (!panel || !browse) return { height: 0, hitText: "", browseVisible: false };
+	  const audit = await page.evaluate(() => {
+	    const panel = document.querySelector(".start-build-panel");
+	    const browse = Array.from(document.querySelectorAll("button")).find((button) =>
+	      /^Open Library$/i.test(button.textContent?.trim() ?? ""),
+	    );
+	    if (!panel || !browse) return { height: 0, hitText: "", browseVisible: false };
     const panelRect = panel.getBoundingClientRect();
     const browseRect = browse.getBoundingClientRect();
     const hit = document.elementFromPoint(
@@ -591,12 +604,21 @@ async function assertStartPanelVisibleOnMobile(page) {
       hitText: hit?.closest("button")?.textContent?.trim() ?? "",
       browseVisible: browseRect.width > 0 && browseRect.height > 0,
     };
-  });
+	  });
 
-  if (audit.height < 120 || !audit.browseVisible || audit.hitText !== "Browse") {
-    throw new Error(`Start panel is collapsed or covered on mobile: ${JSON.stringify(audit)}`);
-  }
-}
+	  if (audit.height < 120 || !audit.browseVisible || audit.hitText !== "Open Library") {
+	    throw new Error(`Start panel is collapsed or covered on mobile: ${JSON.stringify(audit)}`);
+	  }
+
+	  await page.getByRole("button", { name: "Open Library" }).click();
+	  await page.waitForFunction(
+	    () =>
+	      document.activeElement instanceof HTMLInputElement &&
+	      document.activeElement.placeholder === "Name, #, text",
+	    null,
+	    { timeout: 15000 },
+	  );
+	}
 
 async function assertEmptyDeckArtButtonsExplainNoOp(page) {
   await gotoApp(page);
@@ -799,12 +821,10 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
     );
   }
 
-  const desktopLockedControls = [
-    [page.getByRole("button", { name: "Start a new deck" }), "new deck button"],
-    [page.getByRole("button", { name: "Load sample deck" }), "sample deck button"],
-    [page.getByRole("button", { name: "Import deck" }), "import button"],
-    [page.getByRole("button", { name: "Paste decklist" }), "paste button"],
-    [page.getByRole("button", { name: "Mark Deck Prints Owned" }), "mark-owned button"],
+	  const desktopLockedControls = [
+	    [page.getByRole("button", { name: "Start a new deck" }), "new deck button"],
+	    [page.getByRole("button", { name: "Load sample deck" }), "sample deck button"],
+	    [page.getByRole("button", { name: "Mark Deck Prints Owned" }), "mark-owned button"],
     [page.getByRole("button", { name: "Add owned selected print" }), "owned increment button"],
     [page.getByRole("button", { name: "Remove owned selected print" }), "owned decrement button"],
     [
@@ -846,11 +866,24 @@ async function assertSharedPreviewRequiresCloneBeforeEditing(page) {
     [page.locator('#card-panel button[title="Clone to edit"]').first(), "inspector art down button"],
     [page.locator('#card-panel button[title="Clone to edit"]').nth(1), "inspector art up button"],
   ];
-  for (const [control, label] of desktopLockedControls) {
-    await assertDisabled(control, `Shared preview exposes an enabled mutating desktop control: ${label}`);
-  }
+	  for (const [control, label] of desktopLockedControls) {
+	    await assertDisabled(control, `Shared preview exposes an enabled mutating desktop control: ${label}`);
+	  }
 
-  const name = await page.locator("input").first().inputValue();
+	  await page.getByRole("button", { name: "More deck actions" }).click();
+	  const desktopActionSheet = page.getByRole("dialog", { name: "More deck actions" });
+	  await desktopActionSheet.waitFor({ timeout: 15000 });
+	  const desktopOverflowLockedControls = [
+	    [desktopActionSheet.getByRole("button", { name: "Import deck" }), "import button"],
+	    [desktopActionSheet.getByRole("button", { name: "Paste decklist" }), "paste button"],
+	  ];
+	  for (const [control, label] of desktopOverflowLockedControls) {
+	    await assertDisabled(control, `Shared preview exposes an enabled desktop overflow control: ${label}`);
+	  }
+	  await desktopActionSheet.getByRole("button", { name: "Close more deck actions" }).click();
+	  await page.waitForFunction(() => !document.querySelector("#mobile-action-sheet"));
+
+	  const name = await page.locator("input").first().inputValue();
   if (name !== deck.name) {
     throw new Error(`Shared preview was mutated before clone: ${name}`);
   }
@@ -1032,7 +1065,7 @@ async function assertMarketCatalogOnlyCardsAreLabeled(page) {
   await gotoApp(page);
   await page.getByPlaceholder("Name, #, text").fill("T-025");
   await page.locator(".library-result").first().waitFor({ timeout: 15000 });
-  await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
+  await page.getByText("Reference").first().waitFor({ timeout: 15000 });
   const tokenChipVisible = await page.locator(".library-result").first().evaluate((card) =>
     Array.from(card.querySelectorAll("span")).some(
       (chip) => chip.textContent?.trim() === "UNIT TOKEN",
@@ -1047,7 +1080,7 @@ async function assertMarketCatalogOnlyCardsAreLabeled(page) {
   await page.getByText("No cards found").waitFor({ timeout: 15000 });
 
   await page.getByLabel("Card Data").selectOption("Catalog Only");
-  await page.getByText("Catalog only").first().waitFor({ timeout: 15000 });
+  await page.getByText("Reference").first().waitFor({ timeout: 15000 });
 }
 
 async function assertMobileLibraryLayout(page) {
@@ -1522,10 +1555,10 @@ async function main() {
     await assertMarketCatalogOnlyCardsAreLabeled(desktop);
     await assertMobileTouchTargets(desktop);
 
-    await gotoApp(desktop);
-    const downloadPromise = desktop.waitForEvent("download", { timeout: 20000 });
-    await desktop.getByRole("button", { name: "Export deck image" }).click();
-    await downloadPromise;
+	    await gotoApp(desktop);
+	    const downloadPromise = desktop.waitForEvent("download", { timeout: 20000 });
+	    await clickDeckAction(desktop, "Export deck image");
+	    await downloadPromise;
     await desktop.getByText(/Deck sheet exported/i).waitFor({ timeout: 20000 });
     const toast = await desktop.getByText(/print rows rendered/i).textContent();
     if (/placeholder/i.test(toast ?? "")) {

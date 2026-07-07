@@ -154,6 +154,24 @@ export async function incrementSharedDeckDailyCounter(
   };
 }
 
+export async function checkSharedDeckDailyCounter(
+  keyHash: string,
+  day: string,
+  limit: number,
+) {
+  assertShareStoreConfigured();
+
+  const current = shouldUseLocalShareStore()
+    ? await readLocalDailyCounter(keyHash, day)
+    : await readBlobDailyCounter(keyHash, day);
+  const count = current?.day === day && current.keyHash === keyHash ? current.count ?? 0 : 0;
+
+  return {
+    allowed: count < limit,
+    count,
+  };
+}
+
 export async function saveSharedDeck(id: string, deck: SharedDeckState) {
   assertShareStoreConfigured();
 

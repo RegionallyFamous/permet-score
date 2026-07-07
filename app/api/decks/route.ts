@@ -5,6 +5,7 @@ import {
   validateSharedDeckPayload,
 } from "../../deck-share-schema";
 import {
+  checkSharedDeckDailyCounter,
   incrementSharedDeckDailyCounter,
   saveSharedDeck,
 } from "../../share-store";
@@ -154,7 +155,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const dailyLimit = await incrementSharedDeckDailyCounter(
+    const dailyLimit = await checkSharedDeckDailyCounter(
       shareRateKeyHash(request),
       utcDayKey(),
       SHARE_DAILY_RATE_LIMIT_MAX,
@@ -184,6 +185,15 @@ export async function POST(request: Request) {
   try {
     const id = randomShareId();
     await saveSharedDeck(id, deck);
+    try {
+      await incrementSharedDeckDailyCounter(
+        shareRateKeyHash(request),
+        utcDayKey(),
+        SHARE_DAILY_RATE_LIMIT_MAX,
+      );
+    } catch (error) {
+      console.warn("Shared deck quota increment failed after save", error);
+    }
 
     return NextResponse.json(
       {

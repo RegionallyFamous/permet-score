@@ -343,7 +343,7 @@ async function generateFiles() {
       label:
         entry.officialId === number
           ? "Standard"
-          : `Alt Print ${variantIdForOfficialId(entry.officialId, number).replace(/^p/i, "")}`,
+          : `Alt P${variantIdForOfficialId(entry.officialId, number).replace(/^p/i, "")}`,
       image: entry.imageUrl,
     }));
     officialVariants[number] = variants.filter(

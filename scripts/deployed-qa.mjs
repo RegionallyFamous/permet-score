@@ -1,6 +1,7 @@
 const baseUrl = process.env.PERMET_DEPLOYED_BASE_URL ?? "https://permetlink.com";
 const expectedCanonical =
   process.env.PERMET_EXPECTED_CANONICAL_ORIGIN ?? "https://permetlink.com";
+const writeCanaryEnabled = process.env.PERMET_DEPLOYED_WRITE_QA === "1";
 const redirectOrigins = (
   process.env.PERMET_REDIRECT_ORIGINS ?? "https://www.permetlink.com"
 )
@@ -100,7 +101,7 @@ async function assertShareCanary() {
     art: {},
     prints: {
       main: { "ST01-001": { standard: 1 } },
-      resource: { "R-001": { standard: 1 } },
+      resource: { "R-001": { p4: 1 } },
     },
   };
   const saveResponse = await fetchWithTimeout(absolute("/api/decks"), {
@@ -168,7 +169,7 @@ await assertJsonAsset("/manifest.webmanifest", (manifest) => {
   }
 });
 await assertDeck404();
-const shareCanaryId = await assertShareCanary();
+const shareCanaryId = writeCanaryEnabled ? await assertShareCanary() : null;
 await assertRedirects();
 
 assertMatch(baseUrl, /^https?:\/\//, "base URL");
@@ -179,6 +180,7 @@ console.log(
       baseUrl,
       expectedCanonical,
       redirectOrigins,
+      writeCanaryEnabled,
       shareCanaryId,
     },
     null,
