@@ -8,6 +8,8 @@ import {
   BadgeDollarSign,
   BarChart3,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   CheckCircle2,
   Clipboard,
@@ -184,6 +186,7 @@ const artFilters = [
 const collectionFilters = ["All", "Owned", "Missing", "Budget"] as const;
 const OPENING_HAND_SIZE = 5;
 const DEFAULT_BUDGET_LIMIT = 5;
+const LIBRARY_PAGE_SIZE = 8;
 
 const CARD_POOL = [
   ...CURATED_CARD_POOL,
@@ -544,11 +547,11 @@ function formatPrintMoney(card: GundamCard, variant: CardArtVariant) {
   const price = tcgplayerMarketPrice(card, variant);
   return price === null
     ? formatEstimatedMoney(estimatePrintCost(card, variant))
-    : `Janie market ${formatMoney(price)}`;
+    : `Market est. ${formatMoney(price)}`;
 }
 
 function priceSourceLabel(card: GundamCard, variant: CardArtVariant) {
-  return tcgplayerMarketPrice(card, variant) === null ? "local estimate" : "Janie market";
+  return tcgplayerMarketPrice(card, variant) === null ? "local estimate" : "market estimate";
 }
 
 function formatCopyCount(quantity: number) {
@@ -562,11 +565,23 @@ function artDisplayLabel(variant: CardArtVariant) {
   return `Premium Alt ${variant.tier}`;
 }
 
+function printDisplayId(variant: CardArtVariant) {
+  const printSuffix = variant.officialId.split("_")[1] ?? "";
+  return printSuffix && !/^p\d+$/i.test(printSuffix)
+    ? `Market Print ${variant.tier + 1}`
+    : variant.officialId;
+}
+
 function tcgplayerSearchUrl(card: GundamCard, variant?: CardArtVariant) {
+  const printSuffix = variant?.officialId.split("_")[1] ?? "";
+  const queryId =
+    variant && printSuffix && !/^p\d+$/i.test(printSuffix)
+      ? card.number
+      : variant?.officialId ?? card.number;
   const params = new URLSearchParams({
     page: "1",
     productLineName: "gundam-card-game",
-    q: `${variant?.officialId ?? card.number} ${card.name} Gundam Card Game`,
+    q: `${queryId} ${card.name} Gundam Card Game`,
     view: "grid",
   });
 
@@ -1161,6 +1176,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
   const [toast, setToast] = useState<ActionToast | null>(null);
   const [fallbackPanel, setFallbackPanel] = useState<FallbackPanel | null>(null);
   const [lightbox, setLightbox] = useState<CardLightboxState | null>(null);
+  const [libraryPage, setLibraryPage] = useState(0);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -1281,7 +1297,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         .map((entry) => {
           const source = priceSourceLabel(entry.card, entry.variant);
           const url = tcgplayerUrl(entry.card, entry.variant);
-          return `${entry.missing}x ${entry.variant.officialId} ${entry.card.name} (${artDisplayLabel(
+          return `${entry.missing}x ${printDisplayId(entry.variant)} ${entry.card.name} (${artDisplayLabel(
             entry.variant,
           )}) - ${source} ${formatMoney(entry.unitCost)} each / ${formatMoney(
             entry.totalCost,
@@ -1344,6 +1360,27 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     setFilter,
     typeFilter,
   ]);
+
+  const libraryTotalPages = Math.max(
+    1,
+    Math.ceil(filteredCards.length / LIBRARY_PAGE_SIZE),
+  );
+  const safeLibraryPage = Math.min(libraryPage, libraryTotalPages - 1);
+  const libraryRangeStart = filteredCards.length
+    ? safeLibraryPage * LIBRARY_PAGE_SIZE + 1
+    : 0;
+  const libraryRangeEnd = Math.min(
+    filteredCards.length,
+    (safeLibraryPage + 1) * LIBRARY_PAGE_SIZE,
+  );
+  const visibleLibraryCards = useMemo(
+    () =>
+      filteredCards.slice(
+        safeLibraryPage * LIBRARY_PAGE_SIZE,
+        (safeLibraryPage + 1) * LIBRARY_PAGE_SIZE,
+      ),
+    [filteredCards, safeLibraryPage],
+  );
 
   const selectedCard =
     CARD_BY_NUMBER.get(selectedNumber) ?? filteredCards[0] ?? CARD_POOL[0];
@@ -1460,12 +1497,12 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
         ? {
             tone: dataStatus.isFresh ? "good" : "warn",
             label: "Card DB",
-            detail: dataStatus.isFresh ? "Fresh Janie" : "Janie stale",
+            detail: dataStatus.isFresh ? "Fresh market" : "Market stale",
           }
         : {
             tone: "warn",
             label: "Card DB",
-            detail: "Janie pending",
+            detail: "Market pending",
           },
     );
 
@@ -1591,6 +1628,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
     setArtFilter("All Art");
     setCollectionFilter("All");
     setBudgetLimit(DEFAULT_BUDGET_LIMIT);
+    setLibraryPage(0);
   }
 
   function openBuyList() {
@@ -2326,7 +2364,7 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                     Card Library
                   </h2>
                   <span className="rounded-sm border border-[#f6c542]/25 bg-[#f6c542]/12 px-2.5 py-1 text-sm font-black text-[#fff2bd]">
-                    {filteredCards.length}
+                    {libraryRangeStart}-{libraryRangeEnd}
                   </span>
                 </div>
                 <div className="grid gap-2">
@@ -2342,7 +2380,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                         />
                         <input
                           value={query}
-                          onChange={(event) => setQuery(event.target.value)}
+                          onChange={(event) => {
+                            setQuery(event.target.value);
+                            setLibraryPage(0);
+                          }}
                           placeholder="Name, #, text"
                           className="control-field h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-9 pr-3 text-base font-semibold text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/42 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         />
@@ -2352,13 +2393,19 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                       label="Color"
                       value={colorFilter}
                       values={colorFilters}
-                      onChange={setColorFilter}
+                      onChange={(value) => {
+                        setColorFilter(value);
+                        setLibraryPage(0);
+                      }}
                     />
                     <SelectFilter
                       label="Type"
                       value={typeFilter}
                       values={typeFilters}
-                      onChange={setTypeFilter}
+                      onChange={(value) => {
+                        setTypeFilter(value);
+                        setLibraryPage(0);
+                      }}
                     />
                     <button
                       type="button"
@@ -2404,7 +2451,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                         </span>
                         <select
                           value={setFilter}
-                          onChange={(event) => setSetFilter(event.target.value)}
+                          onChange={(event) => {
+                            setSetFilter(event.target.value);
+                            setLibraryPage(0);
+                          }}
                           className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         >
                           {setOptions.map((set) => (
@@ -2418,13 +2468,19 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                         label="Art"
                         value={artFilter}
                         values={artFilters}
-                        onChange={setArtFilter}
+                        onChange={(value) => {
+                          setArtFilter(value);
+                          setLibraryPage(0);
+                        }}
                       />
                       <SelectFilter
                         label="Collection"
                         value={collectionFilter}
                         values={collectionFilters}
-                        onChange={setCollectionFilter}
+                        onChange={(value) => {
+                          setCollectionFilter(value);
+                          setLibraryPage(0);
+                        }}
                       />
                       <label className="filter-cell block min-w-[8.5rem] shrink-0 md:min-w-0">
                         <span className="font-display text-xs font-black uppercase text-[#8bdcff]">
@@ -2435,9 +2491,10 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
                           min="0"
                           step="0.25"
                           value={budgetLimit}
-                          onChange={(event) =>
-                            setBudgetLimit(Math.max(0, Number(event.target.value) || 0))
-                          }
+                          onChange={(event) => {
+                            setBudgetLimit(Math.max(0, Number(event.target.value) || 0));
+                            setLibraryPage(0);
+                          }}
                           className="control-field mt-1 h-10 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#11141b] px-3 text-base font-bold text-[#f7f7f2] outline-none focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
                         />
                       </label>
@@ -2447,29 +2504,83 @@ export function DeckBuilder({ sharedDeckId }: DeckBuilderProps = {}) {
               </div>
             </div>
 
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2.5 p-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3 sm:p-3 2xl:grid-cols-[repeat(auto-fill,minmax(204px,1fr))]">
-              {filteredCards.map((card) => (
-                <LibraryCard
-                  key={card.number}
-                  card={card}
-                  artVariant={getArtVariant(card, deck.art)}
-                  artVariants={cardArtVariants(card)}
-                  selected={selectedCard.number === card.number}
-                  mainQuantity={deck.main[card.number] ?? 0}
-                  resourceQuantity={deck.resource[card.number] ?? 0}
-                  ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
-                  missingQuantity={getMissingCopiesForCard(deck, card)}
-                  onSelect={() => setSelectedNumber(card.number)}
-                  onOpenCard={() => {
-                    setSelectedNumber(card.number);
-                    openCardLightbox(card, getArtVariant(card, deck.art));
-                  }}
-                  onAdjustMain={(delta) => adjustCard("main", card.number, delta)}
-                  onAdjustResource={(delta) =>
-                    adjustCard("resource", card.number, delta)
-                  }
-                />
-              ))}
+            <div className="border-b border-[#a7b5c9]/14 bg-[#0d1118]/86 px-2.5 py-2.5 sm:px-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div aria-live="polite">
+                  <p className="font-display text-xs font-black uppercase text-[#8bdcff]">
+                    Library Page
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-[#f7f7f2]/72">
+                    Showing {libraryRangeStart}-{libraryRangeEnd} of{" "}
+                    {filteredCards.length} cards
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="interactive-control inline-flex size-10 items-center justify-center rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#8bdcff]/45 hover:bg-[#8bdcff]/12 disabled:cursor-not-allowed disabled:opacity-35"
+                    onClick={() =>
+                      setLibraryPage(Math.max(0, safeLibraryPage - 1))
+                    }
+                    disabled={safeLibraryPage === 0}
+                    aria-label="Previous library page"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="min-w-20 rounded-sm border border-[#f6c542]/22 bg-[#f6c542]/10 px-3 py-2 text-center font-display text-sm font-black uppercase text-[#fff2bd]">
+                    {safeLibraryPage + 1}/{libraryTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="interactive-control inline-flex size-10 items-center justify-center rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 text-[#f7f7f2] hover:border-[#8bdcff]/45 hover:bg-[#8bdcff]/12 disabled:cursor-not-allowed disabled:opacity-35"
+                    onClick={() =>
+                      setLibraryPage(
+                        Math.min(libraryTotalPages - 1, safeLibraryPage + 1),
+                      )
+                    }
+                    disabled={safeLibraryPage >= libraryTotalPages - 1}
+                    aria-label="Next library page"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2.5 p-2.5 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] sm:gap-3 sm:p-3 2xl:grid-cols-[repeat(auto-fill,minmax(248px,1fr))]">
+              {visibleLibraryCards.length ? (
+                visibleLibraryCards.map((card) => (
+                  <LibraryCard
+                    key={card.number}
+                    card={card}
+                    artVariant={getArtVariant(card, deck.art)}
+                    artVariants={cardArtVariants(card)}
+                    selected={selectedCard.number === card.number}
+                    mainQuantity={deck.main[card.number] ?? 0}
+                    resourceQuantity={deck.resource[card.number] ?? 0}
+                    ownedQuantity={getTotalOwnedForCard(deck.collection, card)}
+                    missingQuantity={getMissingCopiesForCard(deck, card)}
+                    onSelect={() => setSelectedNumber(card.number)}
+                    onOpenCard={() => {
+                      setSelectedNumber(card.number);
+                      openCardLightbox(card, getArtVariant(card, deck.art));
+                    }}
+                    onAdjustMain={(delta) => adjustCard("main", card.number, delta)}
+                    onAdjustResource={(delta) =>
+                      adjustCard("resource", card.number, delta)
+                    }
+                  />
+                ))
+              ) : (
+                <div className="col-span-full rounded-sm border border-[#a7b5c9]/18 bg-[#f7f7f2]/7 p-5 text-center">
+                  <p className="font-display text-lg font-black uppercase text-[#f7f7f2]">
+                    No cards found
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[#f7f7f2]/62">
+                    Clear a filter or broaden the search.
+                  </p>
+                </div>
+              )}
             </div>
           </section>
 
@@ -3011,18 +3122,18 @@ function DataIntegrityPanel({ status }: { status: DataStatus }) {
 
         <div className="grid grid-cols-2 gap-2">
           <Spec label="Curated" value={`${status.curatedCards}`} />
-          <Spec label="Janie Cards" value={`${status.tcgCards}`} />
+          <Spec label="Market Cards" value={`${status.tcgCards}`} />
           <Spec label="Prints" value={`${status.tcgPrints}`} />
           <Spec label="Priced IDs" value={`${status.tcgCardsWithPrints}`} />
         </div>
 
         <div className={`rounded-sm border p-3 ${noticeClass(status.syncTone)}`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-base font-black">Janie Snapshot</span>
+            <span className="text-base font-black">Market Snapshot</span>
             <span className="text-right text-base font-black">{syncLabel}</span>
           </div>
           <p className="mt-1 text-sm font-bold opacity-75">
-            Janie-backed pricing and discovered printings should sync every {MARKET_FRESH_HOURS}h.
+            Pricing and discovered printings should sync every {MARKET_FRESH_HOURS}h.
           </p>
         </div>
 
@@ -3102,7 +3213,7 @@ function CardLightbox({
               />
               <div className="pointer-events-none absolute left-2 top-2 flex flex-wrap gap-1.5">
                 <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
-                  {artVariant.officialId}
+                  {printDisplayId(artVariant)}
                 </span>
                 <span className="rounded-sm border border-[#f6c542]/35 bg-black/70 px-2 py-1 text-sm font-black text-[#fff2bd]">
                   {artDisplayLabel(artVariant)}
@@ -3229,8 +3340,8 @@ function CostPanel({
       <div className="grid gap-2 p-3">
         <div className="rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2 text-sm font-bold leading-6 text-[#d9ecff]/82">
           {TCGPLAYER_LAST_SYNC
-            ? `Janie market snapshot synced ${TCGPLAYER_LAST_SYNC}. Unmatched prints fall back to local estimates.`
-            : "Janie is connected, but no market snapshot has been generated yet. Showing local estimates."}
+            ? `Market snapshot synced ${TCGPLAYER_LAST_SYNC}. Unmatched prints fall back to local estimates.`
+            : "No market snapshot has been generated yet. Showing local estimates."}
         </div>
         <CostRow label="Base prints" value={formatMoney(summary.baseTotal)} />
         <CostRow label="Alt-art premium" value={formatMoney(summary.altPremium)} />
@@ -3308,7 +3419,7 @@ function MissingPrintsPanel({
       <PanelTitle icon={<ShoppingCart size={18} />} title="Missing Prints" />
       <div className="grid gap-2 p-3">
         <div className="rounded-sm border border-[#f6c542]/20 bg-[#f6c542]/10 p-2 text-sm font-bold leading-6 text-[#fff2bd]/86">
-          Prices use Janie&apos;s market snapshot when matched. Verify exact language and condition before buying.
+          Prices use matched market snapshots when available. Verify exact language and condition before buying.
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Spec label="Missing" value={`${entries.reduce((sum, entry) => sum + entry.missing, 0)}`} />
@@ -3348,7 +3459,7 @@ function MissingPrintsPanel({
                           {entry.card.name}
                         </div>
                         <div className="truncate text-sm font-bold text-[#f7f7f2]/58">
-                          {entry.variant.officialId} · {artDisplayLabel(entry.variant)}
+                          {printDisplayId(entry.variant)} · {artDisplayLabel(entry.variant)}
                         </div>
                       </div>
                       <span className="shrink-0 rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
@@ -3999,7 +4110,7 @@ function LibraryCard({
 
   return (
     <article
-      className={`virtual-card group relative cursor-pointer overflow-hidden rounded-sm border bg-[#07090d] shadow-xl transition duration-200 hover:-translate-y-0.5 hover:shadow-2xl ${colorAccentClass(
+      className={`library-result interactive-row group cursor-pointer overflow-hidden rounded-sm border bg-[#080b11]/96 p-2.5 shadow-lg shadow-black/18 transition duration-200 hover:-translate-y-0.5 hover:border-[#8bdcff]/45 hover:bg-[#0d131d] ${colorAccentClass(
         card.color,
       )} ${selected ? "ring-2 ring-[#f6c542] ring-offset-2 ring-offset-[#05060a]" : ""}`}
       onClick={onSelect}
@@ -4008,68 +4119,60 @@ function LibraryCard({
         onOpenCard();
       }}
     >
-      <button
-        type="button"
-        className="relative block aspect-[5/7] w-full overflow-hidden bg-[#11141b] text-left"
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpenCard();
-        }}
-        aria-label={`Open large view of ${card.name}`}
-        title={`Open large view of ${card.name}`}
-      >
-        <img
-          src={cardImagePath(card, artVariant)}
-          alt={`${card.name} card`}
-          className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.018]"
-          loading="lazy"
-          onError={handleCardImageError}
-        />
-        {selected && (
-          <div className="pointer-events-none absolute inset-0 border border-[#8bdcff]/65">
-            <div className="permet-scanline absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#8bdcff]/0 via-[#8bdcff]/28 to-[#8bdcff]/0" />
-            <div className="absolute left-2 top-2 h-5 w-5 border-l-2 border-t-2 border-[#f6c542]" />
-            <div className="absolute right-2 top-2 h-5 w-5 border-r-2 border-t-2 border-[#f6c542]" />
-            <div className="absolute bottom-2 left-2 h-5 w-5 border-b-2 border-l-2 border-[#f6c542]" />
-            <div className="absolute bottom-2 right-2 h-5 w-5 border-b-2 border-r-2 border-[#f6c542]" />
-          </div>
-        )}
-        {quantity > 0 && (
-          <div className="absolute right-2 top-2 grid gap-1">
-            <span className="grid size-8 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-lg font-black leading-none text-white shadow-lg shadow-black/30">
+      <div className="grid grid-cols-[4.4rem_minmax(0,1fr)] gap-2.5">
+        <button
+          type="button"
+          className="scan-frame relative h-[6.15rem] w-full overflow-hidden rounded-sm border border-[#8bdcff]/28 bg-[#11141b] text-left shadow-lg shadow-black/35"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenCard();
+          }}
+          aria-label={`Open large view of ${card.name}`}
+          title={`Open large view of ${card.name}`}
+        >
+          <img
+            src={cardImagePath(card, artVariant)}
+            alt={`${card.name} card`}
+            className="h-full w-full object-cover object-top transition duration-200 group-hover:scale-[1.035]"
+            loading="lazy"
+            onError={handleCardImageError}
+          />
+          {quantity > 0 && (
+            <span className="absolute right-1 top-1 grid size-6 place-items-center rounded-sm border border-[#f6c542]/55 bg-[#e31b23] font-display text-sm font-black leading-none text-white shadow-lg shadow-black/30">
               {quantity}
             </span>
-          </div>
-        )}
-        <span className="pointer-events-none absolute bottom-2 right-2 grid size-8 place-items-center rounded-sm border border-[#8bdcff]/42 bg-[#04101b]/78 text-[#d9ecff] opacity-100 shadow-lg shadow-black/30 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
-          <Maximize2 size={15} />
-        </span>
-      </button>
-      <div className="border-t border-[#a7b5c9]/18 bg-[#07090d] p-2">
-        <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-1">
-          <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-[11px] font-black leading-none text-black">
-            {card.number}
-          </span>
-          <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] font-black leading-none ${colorChipClass(card.color)}`}>
-            {card.color}
-          </span>
-          {artVariants.length > 1 && (
-            <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/10 px-1.5 py-0.5 text-[11px] font-black leading-none text-[#fff2bd]">
-              {artDisplayLabel(artVariant)}
-            </span>
           )}
-        </div>
-        <h3 className="line-clamp-2 font-display text-lg font-black uppercase leading-tight text-[#f7f7f2] sm:text-xl">
-          {card.name}
-        </h3>
-        <p className="mt-0.5 text-sm font-bold text-[#f7f7f2]/65">
-          {card.type} · {formatPrintMoney(card, artVariant)}
-        </p>
-        {quantity > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1 text-xs font-black uppercase">
-            <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
-              Deck {quantity}
+          <span className="absolute inset-x-0 bottom-0 z-10 inline-flex h-6 items-center justify-center bg-black/74 text-[#d9ecff] opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
+            <Maximize2 size={13} />
+          </span>
+        </button>
+
+        <div className="grid min-w-0 content-start gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
+            <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-[11px] font-black leading-none text-black">
+              {card.number}
             </span>
+            <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] font-black leading-none ${colorChipClass(card.color)}`}>
+              {card.color}
+            </span>
+            {artVariants.length > 1 && (
+              <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/10 px-1.5 py-0.5 text-[11px] font-black leading-none text-[#fff2bd]">
+                {artDisplayLabel(artVariant)}
+              </span>
+            )}
+          </div>
+          <h3 className="line-clamp-2 font-display text-base font-black uppercase leading-tight text-[#f7f7f2]">
+            {card.name}
+          </h3>
+          <p className="truncate text-sm font-bold text-[#f7f7f2]/62">
+            {card.type} · {formatPrintMoney(card, artVariant)}
+          </p>
+          <div className="flex min-w-0 flex-wrap gap-1 text-[11px] font-black uppercase">
+            {quantity > 0 && (
+              <span className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/7 px-1.5 py-0.5 text-[#f7f7f2]/62">
+                Deck {quantity}
+              </span>
+            )}
             {ownedQuantity > 0 && (
               <span
                 className="rounded-sm border border-[#28d17c]/24 bg-[#28d17c]/10 px-1.5 py-0.5 text-[#d9ffe9]"
@@ -4087,9 +4190,10 @@ function LibraryCard({
               </span>
             )}
           </div>
-        )}
+        </div>
       </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_3.35rem] gap-1.5 border-t border-[#a7b5c9]/18 bg-[#080a0f] p-2">
+
+      <div className="mt-2 grid grid-cols-[minmax(5.7rem,1fr)_2.35rem_3.1rem] gap-1.5">
         {primaryZone && onAdjustPrimary ? (
           <MiniQuantityControl
             label={`${card.name} ${zoneLabel(primaryZone).toLowerCase()} copy`}
@@ -4110,6 +4214,18 @@ function LibraryCard({
             </div>
           </div>
         )}
+        <button
+          type="button"
+          className="interactive-control inline-flex h-9 min-h-9 items-center justify-center rounded-sm border border-[#8bdcff]/30 bg-[#8bdcff]/10 text-[#d9ecff] hover:bg-[#8bdcff]/16"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenCard();
+          }}
+          title={`Open large view of ${card.name}`}
+          aria-label={`Open large view of ${card.name}`}
+        >
+          <Maximize2 size={15} />
+        </button>
         <a
           href={tcgplayerUrl(card, artVariant)}
           target="_blank"
@@ -4249,7 +4365,7 @@ function InspectorPanel({
               </span>
             </div>
             <p className="mt-1 truncate text-base font-bold text-[#f7f7f2]/68">
-              {artVariant.officialId} · {formatPrintMoney(card, artVariant)}
+              {printDisplayId(artVariant)} · {formatPrintMoney(card, artVariant)}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 2xl:grid-cols-3">
