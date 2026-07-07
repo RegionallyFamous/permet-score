@@ -53,6 +53,10 @@ async function waitForVisibleCardImages(page) {
   );
 }
 
+async function waitForBootOverlay(page) {
+  await page.locator(".boot-overlay").waitFor({ state: "hidden", timeout: 15000 });
+}
+
 async function assertLocalCardImagesStayLocal(page, viewportName) {
   const remoteLocalImages = await page.evaluate(() =>
     Array.from(document.querySelectorAll('img[src^="/card-images/"]'))
@@ -186,6 +190,7 @@ try {
       state: "visible",
       timeout: 15000,
     });
+    await waitForBootOverlay(page);
     await waitForVisibleCardImages(page);
     await assertLocalCardImagesStayLocal(page, viewport.name);
     await page.screenshot({

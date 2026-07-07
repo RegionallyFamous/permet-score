@@ -27,14 +27,23 @@ async function waitForAppShell(page) {
     null,
     { timeout: 15000 },
   );
+  await page.locator(".boot-overlay").waitFor({ state: "hidden", timeout: 15000 });
+}
+
+async function enableFastBoot(page) {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("permet-skip-boot", "1");
+  });
 }
 
 async function gotoApp(page, url = baseUrl) {
+  await enableFastBoot(page);
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await waitForAppShell(page);
 }
 
 async function reloadApp(page) {
+  await enableFastBoot(page);
   await page.reload({ waitUntil: "domcontentloaded" });
   await waitForAppShell(page);
 }
@@ -933,6 +942,8 @@ async function assertAccessibleControlNames(page) {
 async function assertArtUpgradeKeepsBuyList(page) {
   await page.evaluate(() => window.localStorage.removeItem("gundam-deck-builder-v1"));
   await gotoApp(page);
+  await page.locator('button[title="Load sample deck"]').click();
+  await page.getByText("Sample loaded").waitFor({ timeout: 15000 });
   await page.locator('button[title="Upgrade deck art budget"]').click();
   await page.locator('button[title="Open TCG print list"]').click();
   await page.getByRole("heading", { name: "TCG List" }).waitFor({ timeout: 15000 });

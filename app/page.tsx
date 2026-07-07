@@ -2181,6 +2181,7 @@ export function DeckBuilder({
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
   const [compactFiltersEnabled, setCompactFiltersEnabled] = useState(false);
+  const [bootState, setBootState] = useState<"active" | "exit" | "hidden">("active");
   const [statusTimestamp, setStatusTimestamp] = useState<number | null>(null);
   const [fallbackReturnFocusElement, setFallbackReturnFocusElement] =
     useState<HTMLElement | null>(null);
@@ -2195,6 +2196,9 @@ export function DeckBuilder({
   const feedbackPulseIdRef = useRef(0);
   const shareCacheRef = useRef<ShareCache | null>(null);
   const undoDeckRef = useRef<DeckState | null>(null);
+  const bootStartedAtRef = useRef(
+    typeof performance !== "undefined" ? performance.now() : 0,
+  );
   const deckFilterRef = useRef<{
     art: ArtChoiceMap;
     collection: CollectionMap;
@@ -2228,6 +2232,36 @@ export function DeckBuilder({
       delete document.documentElement.dataset.permetHydrated;
     };
   }, []);
+
+  useEffect(() => {
+    if (!loaded || bootState === "hidden") return undefined;
+
+    try {
+      if (window.sessionStorage.getItem("permet-skip-boot") === "1") {
+        const skipTimer = window.setTimeout(() => setBootState("hidden"), 0);
+        return () => window.clearTimeout(skipTimer);
+      }
+    } catch {
+      // Keep the normal boot animation when session storage is unavailable.
+    }
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const minimumBootMs = reducedMotion ? 180 : 1180;
+    const exitMs = reducedMotion ? 80 : 420;
+    const elapsed = performance.now() - bootStartedAtRef.current;
+    const exitDelay = Math.max(0, minimumBootMs - elapsed);
+
+    const exitTimer = window.setTimeout(() => setBootState("exit"), exitDelay);
+    const hideTimer = window.setTimeout(
+      () => setBootState("hidden"),
+      exitDelay + exitMs,
+    );
+
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [bootState, loaded]);
 
   const clearStorageTimer = useCallback(() => {
     if (storageTimerRef.current) {
@@ -4026,6 +4060,10 @@ export function DeckBuilder({
       />
       <div className="cockpit-grid fixed inset-0 -z-10" />
 
+      {bootState !== "hidden" && (
+        <BootOverlay state={bootState} sharedStatus={sharedStatus} />
+      )}
+
       <div
         className="app-content-shell"
         aria-hidden={isDialogOpen || undefined}
@@ -5077,7 +5115,7 @@ function ColorChip({
     <span
       className={`inline-flex items-center gap-1.5 rounded-sm border font-black uppercase ${colorChipClass(
         color,
-      )} ${compact ? "px-1.5 py-1 text-[0.65rem] leading-none" : "px-2 py-1 text-xs leading-none"}`}
+      )} ${compact ? "px-1.5 py-0.5 text-[0.7rem] leading-none" : "px-2 py-1 text-xs leading-none"}`}
       title={colorName(color)}
       aria-label={`Color ${colorName(color)}`}
     >
@@ -5086,7 +5124,7 @@ function ColorChip({
         className={`${compact ? "size-3" : "size-3.5"} shrink-0 rounded-full border`}
         style={colorSwatchStyle(color)}
       />
-      {!compact && <span>{colorName(color)}</span>}
+      <span>{colorName(color)}</span>
     </span>
   );
 }
@@ -5141,6 +5179,64 @@ function DeckColorRail({
       </span>
       {!compact && <span>{colors.map(colorName).join(" / ")}</span>}
     </span>
+  );
+}
+
+function BootOverlay({
+  state,
+  sharedStatus,
+}: {
+  state: "active" | "exit";
+  sharedStatus: SharedStatus;
+}) {
+  const statusText =
+    sharedStatus === "loading"
+      ? "Syncing shared deck"
+      : sharedStatus === "ready"
+        ? "Shared link acquired"
+        : "Builder systems online";
+
+  return (
+    <div
+      className="boot-overlay"
+      data-state={state}
+      role="status"
+      aria-live="polite"
+      aria-label={`${statusText}. Permet Link launch sequence.`}
+    >
+      <div className="boot-grid" aria-hidden="true" />
+      <div className="boot-shell">
+        <div className="boot-logo-frame">
+          <img
+            src="/permet-link-logo-header.webp"
+            alt=""
+            width={960}
+            height={384}
+            decoding="async"
+            fetchPriority="high"
+          />
+          <span className="boot-logo-scan" aria-hidden="true" />
+        </div>
+        <div className="boot-copy">
+          <div className="boot-kicker">
+            <Radar size={16} />
+            Permet Link
+          </div>
+          <h2>Launch Sequence</h2>
+          <div className="boot-status-row" aria-hidden="true">
+            <span>Card DB</span>
+            <span>TCG Link</span>
+            <span>Deck Bay</span>
+          </div>
+          <div className="boot-progress" aria-hidden="true">
+            <i />
+          </div>
+          <p>{statusText}</p>
+        </div>
+      </div>
+      <div className="boot-hatch boot-hatch-top" aria-hidden="true" />
+      <div className="boot-hatch boot-hatch-bottom" aria-hidden="true" />
+    </div>
   );
 }
 
@@ -5865,9 +5961,9 @@ function FallbackPanelView({
                         <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black leading-none text-black">
                           {printDisplayId(entry.variant)}
                         </span>
-                        <ColorChip color={entry.card.color} />
+                        <ColorChip color={entry.card.color} compact />
                       </div>
-                      <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
+                      <h3 className="mt-2 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {entry.card.name}
                       </h3>
                       <p className="text-sm font-bold leading-5 text-[#f7f7f2]/66">
@@ -6804,7 +6900,7 @@ function DeckPanel({
                   <div className="grid min-w-0 content-start gap-2">
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <ColorChip color={card.color} />
+                        <ColorChip color={card.color} compact />
                         <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/8 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]/78">
                           {card.type}
                         </span>
@@ -6814,7 +6910,7 @@ function DeckPanel({
                           </span>
                         )}
                       </div>
-                      <h3 className="mt-1 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
+                      <h3 className="mt-2 truncate font-display text-xl font-black uppercase leading-tight text-[#f7f7f2]">
                         {card.name}
                       </h3>
                       <p className="text-sm font-bold leading-5 text-[#f7f7f2]/66">
@@ -7007,7 +7103,7 @@ function LibraryCard({
             <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 leading-none text-black">
               {card.number}
             </span>
-            <ColorChip color={card.color} />
+            <ColorChip color={card.color} compact />
             <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/8 px-1.5 py-0.5 leading-none text-[#f7f7f2]/78">
               {card.type}
             </span>
@@ -7018,7 +7114,7 @@ function LibraryCard({
             )}
           </div>
           <div className="min-w-0">
-            <h3 className="line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2] sm:text-2xl">
+            <h3 className="mt-1.5 line-clamp-2 font-display text-xl font-black uppercase leading-tight text-[#f7f7f2] sm:text-2xl">
               {card.name}
             </h3>
             <p
@@ -7249,20 +7345,20 @@ function InspectorPanel({
             </button>
             <div className="w-full min-w-0 text-center sm:text-left">
               <div className="flex flex-wrap justify-center gap-1.5 sm:justify-start">
-                <span className="rounded-sm bg-[#f7f7f2] px-2 py-1 text-sm font-black text-black">
+                <span className="rounded-sm bg-[#f7f7f2] px-1.5 py-0.5 text-xs font-black text-black">
                   {card.number}
                 </span>
-              <ColorChip color={card.color} />
-              <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/10 px-2 py-1 text-sm font-black text-[#f7f7f2]">
+              <ColorChip color={card.color} compact />
+              <span className="rounded-sm border border-[#f7f7f2]/12 bg-[#f7f7f2]/10 px-1.5 py-0.5 text-xs font-black text-[#f7f7f2]">
                 {card.type}
               </span>
               {artVariant.id !== "standard" && (
-                <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-2 py-1 text-sm font-black text-[#fff2bd]">
+                <span className="rounded-sm border border-[#f6c542]/35 bg-[#f6c542]/12 px-1.5 py-0.5 text-xs font-black text-[#fff2bd]">
                   {artDisplayLabel(artVariant)}
                 </span>
               )}
             </div>
-            <h2 className="mt-3 font-display text-3xl font-black uppercase leading-none text-[#f7f7f2]">
+            <h2 className="mt-4 font-display text-3xl font-black uppercase leading-none text-[#f7f7f2]">
               {card.name}
             </h2>
             <p className="mt-1 text-base font-bold text-[#f7f7f2]/65">{card.set}</p>
