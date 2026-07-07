@@ -21,6 +21,19 @@ const printCount = Object.values(TCGPLAYER_CARD_PRINTS).reduce(
   (sum, prints) => sum + prints.length,
   0,
 );
+const sourceOnlyProductIds = Object.entries(TCGPLAYER_CARD_PRINTS).flatMap(
+  ([number, prints]) =>
+    prints
+      .filter((print) =>
+        Boolean(
+          print.productId &&
+            print.janieProductId &&
+            print.productId === print.janieProductId &&
+            !/tcgplayer\.com\/product\/\d+/i.test(print.url),
+        ),
+      )
+      .map((print) => `${number}:${print.variantId}`),
+);
 const cardsWithPrints = Object.keys(TCGPLAYER_CARD_PRINTS).length;
 const syncAgeHours = TCGPLAYER_LAST_SYNC
   ? Math.max(0, (Date.now() - new Date(TCGPLAYER_LAST_SYNC).getTime()) / 3_600_000)
@@ -58,12 +71,19 @@ report(
   `Janie market snapshot is stale or missing; expected <= ${maxSyncAgeHours}h.`,
 );
 
+if (sourceOnlyProductIds.length) {
+  warnings.push(
+    `${sourceOnlyProductIds.length} market print records have source-only IDs where TCGplayer product IDs are expected; runtime image guards will ignore those CDN paths until the next sync repairs them.`,
+  );
+}
+
 const summary = {
   strict,
   curatedCards: CURATED_CARD_POOL.length,
   marketCards: TCGPLAYER_CARD_POOL.length,
   totalCards: cards.length,
   marketPrints: printCount,
+  sourceOnlyProductIds: sourceOnlyProductIds.length,
   marketCardsWithPrints: cardsWithPrints,
   janieLastSync: TCGPLAYER_LAST_SYNC,
   syncAgeHours: syncAgeHours === null ? null : Math.round(syncAgeHours * 10) / 10,

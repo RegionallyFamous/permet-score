@@ -7,6 +7,7 @@ import {
   type GundamCard,
 } from "./card-data";
 import { TCGPLAYER_CARD_POOL } from "./tcgplayer-card-data";
+import { TCGPLAYER_CARD_PRINTS } from "./tcgplayer-data";
 
 export type QuantityMap = Record<string, number>;
 export type ArtChoiceMap = Record<string, string>;
@@ -57,11 +58,19 @@ function cardArtVariants(card: GundamCard) {
     tier: 0,
     officialId: card.number,
   };
-  const variants = CARD_ARTS_BY_NUMBER[card.number];
-  if (!variants) return [standardVariant];
-  return variants.some((variant) => variant.id === "standard")
-    ? variants
-    : [standardVariant, ...variants];
+  const localVariants = CARD_ARTS_BY_NUMBER[card.number] ?? [];
+  const marketVariants = (TCGPLAYER_CARD_PRINTS[card.number] ?? []).map((print, index) => ({
+    id: print.variantId,
+    label: print.variantId === "standard" ? "Standard" : `Market Print ${index + 1}`,
+    image: print.imageUrl ?? standardVariant.image,
+    tier: index,
+    officialId: print.officialId,
+  }));
+  const variants = [standardVariant, ...localVariants, ...marketVariants];
+  return variants.filter(
+    (variant, index) =>
+      variants.findIndex((candidate) => candidate.id === variant.id) === index,
+  );
 }
 
 function validArtId(card: GundamCard, artId: string) {

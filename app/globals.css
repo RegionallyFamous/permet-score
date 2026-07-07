@@ -12,6 +12,7 @@
   --cockpit-black: #07080b;
   --panel-black: #101116;
   --panel-line: rgba(247, 247, 242, 0.16);
+  --font-gundam-ui: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 @theme inline {
@@ -77,6 +78,10 @@ textarea {
     linear-gradient(rgba(247, 247, 242, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(167, 181, 201, 0.045) 1px, transparent 1px);
   background-size: 44px 44px;
+  opacity: 0.62;
+  mask-image: linear-gradient(180deg, black, rgba(0, 0, 0, 0.42) 72%, transparent);
+  animation: cockpit-grid-drift 28s linear infinite;
+  will-change: background-position;
 }
 
 .ambient-field {
@@ -460,6 +465,20 @@ textarea {
 .cockpit-tab-active::after {
   opacity: 1;
   transform: scaleX(1);
+  box-shadow:
+    0 0 12px rgba(139, 220, 255, 0.72),
+    0 -10px 22px rgba(17, 103, 216, 0.24);
+}
+
+.cockpit-tab-active::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(139, 220, 255, 0.14), transparent 52%),
+    radial-gradient(circle at 50% 100%, rgba(139, 220, 255, 0.26), transparent 48%);
+  opacity: 0.72;
 }
 
 .mobile-action-sheet {
@@ -528,11 +547,30 @@ textarea {
 }
 
 .quantity-stepper {
+  position: relative;
+  overflow: hidden;
   transition:
     border-color 170ms ease,
     background-color 170ms ease,
     box-shadow 170ms ease,
     transform 170ms ease;
+}
+
+.quantity-stepper::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(139, 220, 255, 0.12), transparent 34% 66%, rgba(246, 197, 66, 0.1)),
+    linear-gradient(180deg, rgba(247, 247, 242, 0.08), transparent 48%);
+  opacity: 0;
+  transition: opacity 170ms ease;
+}
+
+.quantity-stepper:hover::before,
+.quantity-stepper:focus-within::before {
+  opacity: 1;
 }
 
 .quantity-stepper:focus-within {
@@ -551,6 +589,47 @@ textarea {
 
 .quantity-stepper:focus-within output {
   transform: scale(1.03);
+}
+
+.library-result {
+  position: relative;
+  isolation: isolate;
+}
+
+.library-result::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, rgba(139, 220, 255, 0.84), rgba(246, 197, 66, 0.72), rgba(227, 27, 35, 0.78));
+  opacity: 0.5;
+  z-index: 1;
+}
+
+.library-result::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(139, 220, 255, 0.1), transparent 24%),
+    linear-gradient(315deg, rgba(246, 197, 66, 0.08), transparent 18%);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  opacity: 0;
+  transition: opacity 180ms ease;
+  z-index: -1;
+}
+
+.library-result:hover::after,
+.library-result:focus-visible::after,
+.library-result:focus-within::after {
+  opacity: 1;
+}
+
+.library-result.active-scan-card::before {
+  opacity: 0.92;
+  box-shadow: 0 0 18px rgba(246, 197, 66, 0.35);
 }
 
 .toast-shell {
@@ -594,9 +673,14 @@ textarea {
   animation: lightbox-sweep 4.8s ease-in-out infinite;
 }
 
-.lightbox-shell > * {
+.lightbox-shell > :not(.lightbox-close) {
   position: relative;
   z-index: 1;
+}
+
+.lightbox-close {
+  position: absolute;
+  z-index: 20;
 }
 
 .lightbox-card-stage {
@@ -618,6 +702,15 @@ textarea {
   }
   100% {
     transform: translateX(320%);
+  }
+}
+
+@keyframes cockpit-grid-drift {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 44px 44px, -44px 44px;
   }
 }
 
