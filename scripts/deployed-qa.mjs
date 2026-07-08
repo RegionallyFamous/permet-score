@@ -172,13 +172,47 @@ await assertHomeMetadata();
 await assertTextAsset("/robots.txt", [
   "User-Agent: *",
   "Allow: /",
+  "Disallow: /api/",
+  "User-Agent: OAI-SearchBot",
+  "User-Agent: PerplexityBot",
   `Sitemap: ${expectedCanonical}/sitemap.xml`,
 ]);
-await assertTextAsset("/sitemap.xml", [`<loc>${expectedCanonical}/</loc>`]);
+await assertTextAsset("/sitemap.xml", [
+  `<loc>${expectedCanonical}/</loc>`,
+  `<loc>${expectedCanonical}/guide</loc>`,
+  `<loc>${expectedCanonical}/cards</loc>`,
+  `<loc>${expectedCanonical}/cards/eb01</loc>`,
+]);
+await assertTextAsset("/guide", [
+  "Gundam Card Game deck builder guide",
+  "Common questions",
+  "FAQPage",
+]);
+await assertTextAsset("/cards", [
+  "Gundam Card Game card library",
+  "Crawlable Card Reference",
+  "CollectionPage",
+]);
+await assertTextAsset("/cards/eb01", [
+  "EB01 Gundam Card Game cards",
+  "Set Card Reference",
+  "Gundam Astray Red Frame Custom",
+  "CollectionPage",
+]);
 await assertTextAsset("/llms.txt", [
   "# Permet Link",
   `Canonical URL: ${expectedCanonical}/`,
+  `${expectedCanonical}/guide`,
+  `${expectedCanonical}/cards`,
+  `${expectedCanonical}/cards/{set}`,
+  `${expectedCanonical}/llms-full.txt`,
   "TCGplayer print lists",
+]);
+await assertTextAsset("/llms-full.txt", [
+  "# Permet Link Full AI Context",
+  `${expectedCanonical}/cards/eb01`,
+  "## Card Index Format",
+  "number | name | color | type",
 ]);
 await assertJsonAsset("/manifest.webmanifest", (manifest) => {
   if (manifest.name !== "Permet Link") {

@@ -10,7 +10,7 @@ import "./globals.css";
 const siteUrl = "https://permetlink.com";
 const siteName = "Permet Link";
 const siteDescription =
-  "Build Gundam Card Game decks, tune alt-art printings, track collection ownership, draw opening hands, and share decklists.";
+  "Build Gundam Card Game decks, tune alt-art printings, track collection ownership, and share decklists with clean links.";
 const socialImage = "/permet-link-logo.png";
 const socialImageUrl = `${siteUrl}${socialImage}`;
 
@@ -33,10 +33,12 @@ export const metadata: Metadata = {
     "Gundam deck builder",
     "Gundam TCG",
     "Gundam Card Game decklist",
+    "Gundam card database",
+    "Gundam card library",
     "deck list",
     "deck builder",
     "alt art",
-    "opening hand simulator",
+    "deck sharing",
     "TCGplayer",
   ],
   category: "games",
@@ -72,6 +74,17 @@ export const metadata: Metadata = {
     title: siteName,
     statusBarStyle: "black-translucent",
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -96,6 +109,7 @@ const structuredData = [
     applicationCategory: "GameApplication",
     operatingSystem: "Any",
     inLanguage: "en-US",
+    isAccessibleForFree: true,
     image: socialImageUrl,
     offers: {
       "@type": "Offer",

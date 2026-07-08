@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import NextImage from "next/image";
+import Link from "next/link";
 import {
   type SyntheticEvent,
   useCallback,
@@ -4081,6 +4082,26 @@ export function DeckBuilder({
                 <p className="mobile-deck-title-chip mt-1 truncate rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 px-2 py-1 font-display text-sm font-black uppercase text-[#f7f7f2]/76">
                   {deck.name}
                 </p>
+                <nav
+                  aria-label="Permet Link reference pages"
+                  className="mt-1 hidden flex-wrap items-center gap-2 font-display text-[0.7rem] font-black uppercase text-[#d9ecff]/68 md:flex"
+                >
+                  <Link href="/guide" className="hover:text-[#fff2bd]">
+                    Guide
+                  </Link>
+                  <span aria-hidden="true" className="text-[#a7b5c9]/28">
+                    /
+                  </span>
+                  <Link href="/cards" className="hover:text-[#fff2bd]">
+                    Cards
+                  </Link>
+                  <span aria-hidden="true" className="text-[#a7b5c9]/28">
+                    /
+                  </span>
+                  <Link href="/llms.txt" className="hover:text-[#fff2bd]">
+                    AI Index
+                  </Link>
+                </nav>
               </div>
             </div>
 
@@ -5474,6 +5495,12 @@ function MobileActionSheet({
     if (!open) return undefined;
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", handleEscape);
     window.setTimeout(() => {
       const closeButton = sheetRef.current?.querySelector<HTMLButtonElement>(
         'button[title="Close more deck actions"]',
@@ -5487,8 +5514,9 @@ function MobileActionSheet({
         previousFocusRef.current.focus();
       }
       previousFocusRef.current = null;
+      document.removeEventListener("keydown", handleEscape);
     };
-  }, [open]);
+  }, [onClose, open]);
 
   if (!open) return null;
 

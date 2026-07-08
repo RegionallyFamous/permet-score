@@ -1,17 +1,24 @@
 const body = `# Permet Link
 
-Permet Link is a fast, local-first deck builder for the Gundam Card Game. It helps players build main and resource decks, tune selected alt-art printings, track private collection ownership in the browser, draw opening hands, export deck images, and generate shareable decklist URLs.
+Permet Link is a fast, local-first deck builder for the Gundam Card Game. It helps players build main and resource decks, tune selected alt-art printings, track private collection ownership in the browser, export deck images, and generate shareable decklist URLs.
 
 Canonical URL: https://permetlink.com/
 Sitemap: https://permetlink.com/sitemap.xml
 Robots: https://permetlink.com/robots.txt
 Manifest: https://permetlink.com/manifest.webmanifest
+Guide: https://permetlink.com/guide
+Card Library: https://permetlink.com/cards
+Full AI Context: https://permetlink.com/llms-full.txt
 
 ## Primary Routes
 
 - https://permetlink.com/ - interactive Gundam Card Game deck builder.
+- https://permetlink.com/guide - crawlable guide, FAQ, and app explanation.
+- https://permetlink.com/cards - crawlable card library index.
+- https://permetlink.com/cards/{set} - crawlable per-set card libraries such as /cards/eb01 and /cards/st01.
 - https://permetlink.com/decks/{id} - public shared deck preview when a user generates a share URL.
 - https://permetlink.com/manifest.webmanifest - installable web app manifest.
+- https://permetlink.com/llms-full.txt - expanded AI-readable site and card index.
 
 ## App Capabilities
 
