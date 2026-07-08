@@ -93,6 +93,26 @@ async function assertDeck404() {
   assertIncludes(text, "Open Builder", "shared deck 404");
 }
 
+async function assertCronProtected() {
+  const response = await fetchWithTimeout(absolute("/api/cron/maintenance"));
+  if (response.status !== 401) {
+    throw new Error(`GET /api/cron/maintenance returned ${response.status}, expected 401`);
+  }
+}
+
+async function assertImageOptimizer() {
+  const response = await fetchWithTimeout(
+    absolute("/_next/image?url=%2Fpermet-link-logo-header.webp&w=640&q=75"),
+  );
+  if (response.status !== 200) {
+    throw new Error(`Next image optimizer returned ${response.status}, expected 200`);
+  }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.startsWith("image/")) {
+    throw new Error(`Next image optimizer returned ${contentType || "no content-type"}`);
+  }
+}
+
 async function assertShareCanary() {
   const deck = {
     name: `Deployed QA ${Date.now()}`,
@@ -169,6 +189,8 @@ await assertJsonAsset("/manifest.webmanifest", (manifest) => {
   }
 });
 await assertDeck404();
+await assertCronProtected();
+await assertImageOptimizer();
 const shareCanaryId = writeCanaryEnabled ? await assertShareCanary() : null;
 await assertRedirects();
 

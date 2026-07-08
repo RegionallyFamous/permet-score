@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadSharedDeck } from "../../../share-store";
 
 export const runtime = "nodejs";
+export const maxDuration = 10;
 
 type RouteContext = {
   params: Promise<{

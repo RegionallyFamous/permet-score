@@ -11,6 +11,7 @@ import {
 } from "../../share-store";
 
 export const runtime = "nodejs";
+export const maxDuration = 10;
 
 const MAX_SHARE_BODY_BYTES = 64 * 1024;
 const SHARE_RATE_LIMIT_MAX = 180;

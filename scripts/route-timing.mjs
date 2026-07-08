@@ -54,6 +54,10 @@ async function time(label, run, expectedStatuses = [200]) {
 
 const home = await time("GET /", () => fetch(baseUrl));
 const rows = [home];
+const cronPath = isLocalBase
+  ? "/api/cron/maintenance?dryRun=1"
+  : "/api/cron/maintenance";
+const cronExpectedStatuses = isLocalBase ? [200] : [401];
 
 if (writesAllowed) {
   const saveStart = performance.now();
@@ -80,6 +84,7 @@ if (writesAllowed) {
     { label: "POST /api/decks", min: saveElapsed, median: saveElapsed, max: saveElapsed },
     load,
     sharedPage,
+    await time(`GET ${cronPath}`, () => fetch(new URL(cronPath, baseUrl)), cronExpectedStatuses),
   );
 } else {
   console.log(
@@ -92,6 +97,7 @@ if (writesAllowed) {
     await time("GET /decks/routeprobe", () =>
       fetch(new URL("/decks/routeprobe", baseUrl)),
     [404]),
+    await time(`GET ${cronPath}`, () => fetch(new URL(cronPath, baseUrl)), cronExpectedStatuses),
   );
 }
 

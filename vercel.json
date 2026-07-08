@@ -2,5 +2,25 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "devCommand": "npm run dev"
+  "devCommand": "npm run dev",
+  "crons": [
+    {
+      "path": "/api/cron/maintenance",
+      "schedule": "17 9 * * *"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(?:\\.env|\\.git|.*\\.(?:bak|old|sql|sqlite|sqlite3|log))",
+      "mitigate": {
+        "action": "deny"
+      }
+    },
+    {
+      "src": "/(?:wp-admin|wp-login\\.php|xmlrpc\\.php|phpmyadmin|cgi-bin|vendor)(?:/.*)?",
+      "mitigate": {
+        "action": "deny"
+      }
+    }
+  ]
 }

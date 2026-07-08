@@ -1,7 +1,7 @@
 # Permet Link
 
-A fast local-first Gundam Card Game deck builder, collection tracker, alt-art
-planner, and opening-hand simulator.
+A fast local-first Gundam Card Game deck builder, collection tracker, and
+alt-art planner.
 
 ## Run
 
@@ -28,9 +28,10 @@ npm run analyze
 
 `qa:visual` captures mobile, tablet, desktop, and wide screenshots and checks
 for horizontal overflow. `qa:routes` times the home page, share API, shared deck
-API, and shared deck page. `perf:lighthouse` expects the app to already be
-running on `http://localhost:3000`, ideally with `npm run build && npm run start`.
-`analyze` uses the Turbopack analyzer built into current Next.js.
+API, shared deck page, and cron maintenance route. `perf:lighthouse` expects the
+app to already be running on `http://localhost:3000`, ideally with
+`npm run build && npm run start`. `analyze` uses the Turbopack analyzer built
+into current Next.js.
 
 ## MCP Site Inspector
 
@@ -114,3 +115,13 @@ The canonical domain is `https://permetlink.com`. Vercel should point
 `permetlink.com` at the project and redirect `www.permetlink.com` to the
 canonical host after DNS is configured. Legacy hosts can also be redirected to
 the canonical host in `next.config.ts`.
+
+`vercel.json` also configures a daily production cron at
+`/api/cron/maintenance` and a small WAF deny list for common scanner paths.
+The maintenance route prunes old QA share links and returns data freshness
+health. It rejects public production traffic unless Vercel cron headers are
+present, or `CRON_SECRET` is configured and sent as a bearer token.
+
+Card art and logo assets use Next/Vercel Image Optimization for modern formats,
+responsive sizing, and CDN caching. Enable Skew Protection in Vercel project
+settings or with `vercel project protection enable --skew`.

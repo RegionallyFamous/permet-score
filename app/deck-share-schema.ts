@@ -2,8 +2,8 @@ import {
   DECK_VALIDATION_CARDS,
   type DeckValidationCard,
   type ValidationCardType,
-} from "./deck-validation-data";
-import { SHARED_DECK_NAME } from "./deck-names";
+} from "./deck-validation-data.ts";
+import { SHARED_DECK_NAME } from "./deck-names.ts";
 
 export type QuantityMap = Record<string, number>;
 export type ArtChoiceMap = Record<string, string>;

@@ -17,6 +17,24 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "product-images.tcgplayer.com",
+      },
+      {
+        protocol: "https",
+        hostname: "tcgplayer-cdn.tcgplayer.com",
+      },
+      {
+        protocol: "https",
+        hostname: "www.gundam-gcg.com",
+      },
+    ],
+  },
   outputFileTracingExcludes: {
     "/*": [".local/**/*", "design-assets/**/*", "qa-screenshots/**/*"],
   },

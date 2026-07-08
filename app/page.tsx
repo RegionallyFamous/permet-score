@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
 import {
   Activity,
   AlertTriangle,
@@ -837,26 +835,8 @@ function cardImagePath(card: GundamCard, variant?: CardArtVariant, size = 1500) 
   return selectedVariant.image;
 }
 
-function cardImageSrcSet(
-  card: GundamCard,
-  variant?: CardArtVariant,
-  sizes: readonly number[] = [640, 1000, 1500],
-) {
-  const selectedVariant = variant ?? cardArtVariants(card)[0];
-  if (selectedVariant.image.startsWith("/")) {
-    return undefined;
-  }
-
-  const print = tcgplayerImagePrint(card, selectedVariant);
-  if (!print?.productId || print.imageUrl || !hasDirectTcgplayerProduct(print)) {
-    return undefined;
-  }
-  const productId = print.productId;
-  const candidateSizes = [...new Set(sizes.map((size) => Math.max(size, 320)))];
-
-  return candidateSizes
-    .map((size) => `${tcgplayerProductImageUrl(productId, size)} ${size}w`)
-    .join(", ");
+function optimizedCanvasImagePath(src: string, width = 640) {
+  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`;
 }
 
 function getFocusableElements(container: HTMLElement | null) {
@@ -978,7 +958,6 @@ function CardImage({
   card,
   artVariant,
   imageSize,
-  srcSetSizes = [320, 480, 640],
   sizes,
   alt,
   className,
@@ -987,44 +966,25 @@ function CardImage({
   card: GundamCard;
   artVariant?: CardArtVariant;
   imageSize: number;
-  srcSetSizes?: readonly number[];
   sizes: string;
   alt: string;
   className: string;
   eager?: boolean;
 }) {
   const src = cardImagePath(card, artVariant, imageSize);
-  const localImage = src.startsWith("/");
-
-  if (localImage) {
-    return (
-      <NextImage
-        src={src}
-        width={600}
-        height={838}
-        sizes={sizes}
-        alt={alt}
-        className={className}
-        decoding="async"
-        loading={eager ? "eager" : "lazy"}
-        fetchPriority={eager ? "high" : undefined}
-        preload={eager}
-        onError={handleCardImageError}
-      />
-    );
-  }
 
   return (
-    <img
+    <NextImage
       src={src}
-      srcSet={cardImageSrcSet(card, artVariant, srcSetSizes)}
+      width={600}
+      height={838}
       sizes={sizes}
       alt={alt}
       className={className}
       decoding="async"
       loading={eager ? "eager" : "lazy"}
       fetchPriority={eager ? "high" : undefined}
-      referrerPolicy="no-referrer"
+      preload={eager}
       onError={handleCardImageError}
     />
   );
@@ -3519,7 +3479,6 @@ export function DeckBuilder({
               drawPlaceholder();
               finish();
             }, imageTimeoutMs);
-            image.crossOrigin = "anonymous";
             image.onload = () => {
               context.drawImage(image, x, y, cardWidth, cardHeight);
               context.fillStyle = "rgba(0,0,0,0.72)";
@@ -3541,7 +3500,7 @@ export function DeckBuilder({
               drawPlaceholder();
               finish();
             };
-            image.src = cardImagePath(row.card, row.variant, 640);
+            image.src = optimizedCanvasImagePath(cardImagePath(row.card, row.variant, 640), 640);
           }),
       ),
     );
@@ -4090,13 +4049,14 @@ export function DeckBuilder({
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="brand-status-cluster flex min-w-0 flex-wrap items-center gap-2 xl:flex-nowrap">
               <div className="brand-logo-lockup flex w-32 shrink-0 items-center sm:w-52 xl:w-56 2xl:w-72">
-                <img
+                <NextImage
                   src="/permet-link-logo-header.webp"
                   alt="Permet Link"
                   width={960}
                   height={384}
                   decoding="async"
                   fetchPriority="high"
+                  preload
                   className="h-auto w-full object-contain object-left"
                 />
               </div>
@@ -4948,7 +4908,6 @@ function SharedDeckBanner({
                 key={card.number}
                 card={card}
                 imageSize={600}
-                srcSetSizes={[320, 480, 640]}
                 sizes="3.5rem"
                 alt=""
                 className="card-image-surface preview-card h-20 w-14 rounded-sm border border-[#f7f7f2]/20 object-contain object-top shadow-xl shadow-black/40"
@@ -5077,13 +5036,14 @@ function BootOverlay({
       <div className="boot-grid" aria-hidden="true" />
       <div className="boot-shell">
         <div className="boot-logo-frame">
-          <img
+          <NextImage
             src="/permet-link-logo-header.webp"
             alt=""
             width={960}
             height={384}
             decoding="async"
             fetchPriority="high"
+            preload
           />
           <span className="boot-logo-scan" aria-hidden="true" />
         </div>
@@ -6095,7 +6055,6 @@ function CardLightbox({
                 card={card}
                 artVariant={artVariant}
                 imageSize={2000}
-                srcSetSizes={[640, 1000, 1500]}
                 sizes="(min-width: 1024px) 58vw, 94vw"
                 alt={`${card.name} ${artDisplayLabel(artVariant)} card`}
                 className="card-image-surface relative z-10 mx-auto max-h-[58vh] max-w-full object-contain object-top lg:max-h-[66vh]"
@@ -6141,7 +6100,6 @@ function CardLightbox({
                         card={card}
                         artVariant={variant}
                         imageSize={600}
-                        srcSetSizes={[320, 480, 640]}
                         sizes="4.5rem"
                         alt=""
                         className="card-image-surface aspect-[5/7] w-full object-contain object-top"
@@ -6921,7 +6879,6 @@ function LibraryCard({
             card={card}
             artVariant={artVariant}
             imageSize={1000}
-            srcSetSizes={[320, 480, 640, 1000]}
             sizes="(min-width: 760px) 34vw, (min-width: 420px) 37vw, (min-width: 380px) 7.5rem, 6.75rem"
             alt={`${card.name} card`}
             className="library-card-image card-image-surface h-full w-full object-contain object-top transition duration-200"
@@ -7181,7 +7138,6 @@ function InspectorPanel({
               card={card}
               artVariant={artVariant}
               imageSize={1000}
-              srcSetSizes={[320, 480, 640]}
               sizes="(min-width: 1536px) 11rem, (min-width: 1280px) 9.5rem, (min-width: 640px) 10rem, 8.6rem"
               alt={`${card.name} card`}
               className="card-image-surface h-full w-full object-contain object-top"
@@ -7490,7 +7446,6 @@ function CardThumb({
       card={card}
       artVariant={artVariant}
       imageSize={size === "deck" ? 1000 : 600}
-      srcSetSizes={size === "deck" ? [320, 480, 640, 1000] : [320, 480, 640]}
       sizes={size === "deck" ? "(min-width: 1280px) 11rem, 35vw" : "3rem"}
       alt={`${card.name} card`}
       className="card-image-surface h-full w-full object-contain object-top"
