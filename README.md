@@ -91,6 +91,13 @@ second, audits the generated snapshot, and commits updates back to `main`.
 When Vercel is connected to the GitHub repo, those commits trigger production
 deploys automatically.
 
+The strict data audit treats card counts, print counts, product-link coverage,
+market-price coverage, parser review items, and explicit sync errors as launch
+gates. The TCGplayer catalog discovery queue is reported as a warning by default
+so a backlog of follow-up discovery jobs does not block newly synced card data
+from being committed. Set `FAIL_ON_TCGPLAYER_SYNC_QUEUE=1` in CI to make that
+queue cap fatal again.
+
 ## Share Links
 
 Use the Share button in the app to save the deck through the backend and copy a

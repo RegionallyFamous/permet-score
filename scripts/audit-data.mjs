@@ -23,6 +23,9 @@ const minDirectProductPrints = Number(
 const minMarketPriceCount = Number(process.env.MIN_GUNDAM_MARKET_PRICE_COUNT ?? 1000);
 const minCardsWithPrints = Number(process.env.MIN_GUNDAM_CARDS_WITH_PRINTS ?? 750);
 const maxQueueLength = Number(process.env.MAX_TCGPLAYER_SYNC_QUEUE_LENGTH ?? 1000);
+const failOnCatalogQueue =
+  process.env.FAIL_ON_TCGPLAYER_SYNC_QUEUE === "1" ||
+  process.env.FAIL_ON_TCGPLAYER_SYNC_QUEUE === "true";
 const legacyBridgePrefix = ["JA", "NIE"].join("");
 const maxSyncAgeHours = Number(
   process.env.TCGPLAYER_MAX_SYNC_HOURS ??
@@ -309,9 +312,14 @@ if (marketSyncReport) {
     errors.push("TCGplayer catalog discovery reported an error status.");
   }
   if (typeof queueLength === "number" && queueLength > maxQueueLength) {
-    errors.push(
-      `TCGplayer catalog discovery queue has ${queueLength} pending job(s); expected <= ${maxQueueLength}.`,
-    );
+    const message = `TCGplayer catalog discovery queue has ${queueLength} pending job(s); expected <= ${maxQueueLength}.`;
+    if (strict && failOnCatalogQueue) {
+      errors.push(message);
+    } else {
+      warnings.push(
+        `${message} Direct product, price, and card-count gates still decide launch safety; queued discovery jobs can drain in later syncs.`,
+      );
+    }
   }
   if (marketSyncReport.releaseAudit?.status && marketSyncReport.releaseAudit.status !== "ok") {
     warnings.push(
@@ -399,6 +407,7 @@ const summary = {
   officialRulesSyncAgeHours:
     officialSyncAgeHours === null ? null : Math.round(officialSyncAgeHours * 10) / 10,
   maxOfficialSyncAgeHours,
+  failOnCatalogQueue,
   officialRulesReviewCount: officialSyncReport?.reviewCount ?? null,
   marketReleaseAuditStatus: marketSyncReport?.releaseAudit?.status ?? null,
   marketCatalogDiscoveryStatus: marketSyncReport?.catalogDiscovery?.status ?? null,
