@@ -836,8 +836,42 @@ function cardImagePath(card: GundamCard, variant?: CardArtVariant, size = 1500) 
   return selectedVariant.image;
 }
 
+function localCardImagePath(card: GundamCard, variant?: CardArtVariant) {
+  const selectedVariant = variant ?? cardArtVariants(card)[0];
+  const localVariant = CARD_ARTS_BY_NUMBER[card.number]?.find(
+    (candidate) =>
+      candidate.id === selectedVariant.id ||
+      candidate.officialId === selectedVariant.officialId,
+  );
+
+  if (localVariant?.image.startsWith("/")) {
+    return localVariant.image;
+  }
+
+  if (selectedVariant.image.startsWith("/")) {
+    return selectedVariant.image;
+  }
+
+  if (CURATED_CARD_NUMBERS.has(card.number) && selectedVariant.id === "standard") {
+    return `/card-images/${card.number}.webp`;
+  }
+
+  return null;
+}
+
 function optimizedCanvasImagePath(src: string, width = 640) {
   return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`;
+}
+
+function canvasImagePaths(card: GundamCard, variant?: CardArtVariant, width = 640) {
+  const localPath = localCardImagePath(card, variant);
+  const displayPath = cardImagePath(card, variant, width);
+  const displayCanvasPath = displayPath.startsWith("/")
+    ? displayPath
+    : optimizedCanvasImagePath(displayPath, width);
+  return Array.from(
+    new Set([localPath, displayCanvasPath, CARD_IMAGE_FALLBACK].filter(Boolean)),
+  ) as string[];
 }
 
 function getFocusableElements(container: HTMLElement | null) {
@@ -3455,14 +3489,23 @@ export function DeckBuilder({
           new Promise<void>((resolve) => {
             const image = new Image();
             let settled = false;
+            let timeout: number | undefined;
+            let sourceIndex = 0;
+            const sources = canvasImagePaths(row.card, row.variant, 640);
             const column = index % columns;
             const rowIndex = Math.floor(index / columns);
             const x = 42 + column * (cardWidth + gap);
             const y = headerHeight + rowIndex * (cardHeight + 72 + gap);
+            const clearLoadTimer = () => {
+              if (timeout !== undefined) {
+                window.clearTimeout(timeout);
+                timeout = undefined;
+              }
+            };
             const finish = () => {
               if (settled) return;
               settled = true;
-              window.clearTimeout(timeout);
+              clearLoadTimer();
               resolve();
             };
             const drawPlaceholder = () => {
@@ -3476,11 +3519,22 @@ export function DeckBuilder({
               context.fillText("IMAGE", x + 18, y + 90);
               context.fillText("PENDING", x + 18, y + 112);
             };
-            const timeout = window.setTimeout(() => {
-              drawPlaceholder();
-              finish();
-            }, imageTimeoutMs);
+            const loadNextSource = () => {
+              if (settled) return;
+              clearLoadTimer();
+              const source = sources[sourceIndex];
+              sourceIndex += 1;
+              if (!source) {
+                drawPlaceholder();
+                finish();
+                return;
+              }
+
+              timeout = window.setTimeout(loadNextSource, imageTimeoutMs);
+              image.src = source;
+            };
             image.onload = () => {
+              if (settled) return;
               context.drawImage(image, x, y, cardWidth, cardHeight);
               context.fillStyle = "rgba(0,0,0,0.72)";
               context.fillRect(x, y + cardHeight - 38, cardWidth, 38);
@@ -3497,11 +3551,8 @@ export function DeckBuilder({
               context.fillText(row.card.name.slice(0, 24), x, y + cardHeight + 44);
               finish();
             };
-            image.onerror = () => {
-              drawPlaceholder();
-              finish();
-            };
-            image.src = optimizedCanvasImagePath(cardImagePath(row.card, row.variant, 640), 640);
+            image.onerror = loadNextSource;
+            loadNextSource();
           }),
       ),
     );
