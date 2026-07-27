@@ -1,4 +1,5 @@
 import {
+  cardSlug,
   groupedCards,
   setSlug,
 } from "../cards/card-reference";
@@ -56,6 +57,7 @@ Guide: https://permetlink.com/guide
 Card Library: https://permetlink.com/cards
 Sitemap: https://permetlink.com/sitemap.xml
 Robots: https://permetlink.com/robots.txt
+Status: https://permetlink.com/status
 
 ## Summary
 
@@ -81,12 +83,24 @@ Permet Link is an unofficial, fan-made Gundam Card Game deck builder. It helps p
 - /guide - human-readable guide, FAQ, and app explanation.
 - /cards - crawlable card library index.
 - /cards/{set} - crawlable per-set card lists with rules text and deck-building fields.
+- /cards/{card-number} - crawlable individual card pages with full rules text, stats, printings, and TCGplayer links.
+- /status - data sync, card coverage, market coverage, and deployment status.
 - /llms.txt - concise AI index.
 - /llms-full.txt - this expanded AI reference.
 
 ## Card Set Pages
 
 ${setRows()}
+
+## Individual Card URL Pattern
+
+Every indexed card has a canonical detail page at:
+
+https://permetlink.com/cards/{lowercase-card-number}
+
+Examples:
+- https://permetlink.com/cards/${cardSlug(CARD_POOL[0]?.number ?? "st01-001")}
+- https://permetlink.com/cards/gd05-001
 
 ## Card Index Format
 

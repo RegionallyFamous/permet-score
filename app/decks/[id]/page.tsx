@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { CARD_BY_NUMBER } from "../../card-pool";
+import type { CardColor } from "../../card-data";
+import type { SharedDeckState } from "../../deck-share-schema";
 import { DeckBuilder } from "../../page";
 import { loadSharedDeck } from "../../share-store";
 
@@ -12,8 +15,33 @@ type SharedDeckPageProps = {
 
 export const revalidate = 300;
 
+const MAIN_TARGET = 50;
+const RESOURCE_TARGET = 10;
+
 function isValidShareId(id: string) {
   return /^[A-Za-z0-9_-]{8,48}$/.test(id);
+}
+
+function totalCards(quantities: Record<string, number>) {
+  return Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0);
+}
+
+function sharedDeckColors(deck: SharedDeckState) {
+  return Array.from(
+    new Set(
+      Object.keys(deck.main)
+        .map((number) => CARD_BY_NUMBER.get(number)?.color)
+        .filter((color): color is CardColor => Boolean(color && color !== "-")),
+    ),
+  );
+}
+
+function sharedDeckDescription(deck: SharedDeckState) {
+  const mainTotal = totalCards(deck.main);
+  const resourceTotal = totalCards(deck.resource);
+  const colors = sharedDeckColors(deck);
+  const colorText = colors.length ? colors.join(" / ") : "colorless";
+  return `${mainTotal}/${MAIN_TARGET} main, ${resourceTotal}/${RESOURCE_TARGET} resource, ${colorText} Gundam Card Game decklist with selected printings and TCGplayer links.`;
 }
 
 const loadValidSharedDeck = cache(async (id: string) => {
@@ -29,9 +57,8 @@ export async function generateMetadata({
   const { id } = await params;
   const deck = await loadValidSharedDeck(id);
   const path = `/decks/${id}`;
-  const title = deck.name;
-  const description =
-    "Shared Gundam Card Game decklist with selected printings and TCGplayer links.";
+  const title = `${deck.name} Decklist`;
+  const description = sharedDeckDescription(deck);
 
   return {
     title,

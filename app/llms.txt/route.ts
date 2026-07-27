@@ -8,6 +8,7 @@ Robots: https://permetlink.com/robots.txt
 Manifest: https://permetlink.com/manifest.webmanifest
 Guide: https://permetlink.com/guide
 Card Library: https://permetlink.com/cards
+Status: https://permetlink.com/status
 Full AI Context: https://permetlink.com/llms-full.txt
 
 ## Primary Routes
@@ -16,6 +17,8 @@ Full AI Context: https://permetlink.com/llms-full.txt
 - https://permetlink.com/guide - crawlable guide, FAQ, and app explanation.
 - https://permetlink.com/cards - crawlable card library index.
 - https://permetlink.com/cards/{set} - crawlable per-set card libraries such as /cards/eb01 and /cards/st01.
+- https://permetlink.com/cards/{card-number} - crawlable individual card pages such as /cards/gd05-001.
+- https://permetlink.com/status - data sync, card coverage, and deployment status.
 - https://permetlink.com/decks/{id} - public shared deck preview when a user generates a share URL.
 - https://permetlink.com/manifest.webmanifest - installable web app manifest.
 - https://permetlink.com/llms-full.txt - expanded AI-readable site and card index.

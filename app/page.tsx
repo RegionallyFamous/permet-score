@@ -148,6 +148,10 @@ type SynergyNotice = {
   detail: string;
 };
 
+type DeckInsight = SynergyNotice & {
+  action?: string;
+};
+
 type FeedbackPulse = {
   id: number;
   keys: string[];
@@ -157,6 +161,32 @@ type FeedbackPulse = {
 type ShareCache = {
   snapshot: string;
   url: string;
+};
+
+type DeckTemplate = {
+  id: string;
+  name: string;
+  faction: string;
+  colors: CardColor[];
+  description: string;
+  deck: DeckState;
+};
+
+type CommandItem = {
+  id: string;
+  label: string;
+  detail: string;
+  keywords: string;
+  run: () => void;
+};
+
+type DeckMetrics = {
+  mainTotal: number;
+  resourceTotal: number;
+  colors: CardColor[];
+  typeCounts: Record<(typeof MAIN_TYPES)[number], number>;
+  averageCost: number;
+  uniqueMain: number;
 };
 
 const STORAGE_KEY = "gundam-deck-builder-v1";
@@ -245,6 +275,100 @@ const starterDeck: DeckState = {
   },
   collection: {},
 };
+
+const starter16Quantities = [4, 3, 4, 4, 4, 3, 3, 2, 1, 4, 3, 3, 2, 4, 3, 3];
+const starter15Quantities = [4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+
+function numberedMainDeck(prefix: string, quantities: readonly number[]) {
+  return Object.fromEntries(
+    quantities
+      .map((quantity, index) => [
+        `${prefix}-${String(index + 1).padStart(3, "0")}`,
+        quantity,
+      ] as const)
+      .filter(([number]) => CARD_BY_NUMBER.has(number)),
+  );
+}
+
+function templateDeck(
+  name: string,
+  prefix: string,
+  resourceNumber: string,
+  quantities: readonly number[],
+): DeckState {
+  return {
+    name,
+    main: numberedMainDeck(prefix, quantities),
+    resource: {
+      [resourceNumber]: 10,
+    },
+    art: {},
+    prints: {
+      main: {},
+      resource: {},
+    },
+    collection: {},
+  };
+}
+
+const deckTemplates: DeckTemplate[] = [
+  {
+    id: "heroic-beginnings",
+    name: "Heroic Beginnings",
+    faction: "White Base",
+    colors: ["Blue"],
+    description: "A clean starter shell built around the original White Base team.",
+    deck: starterDeck,
+  },
+  {
+    id: "operation-meteor",
+    name: "Operation Meteor",
+    faction: "Wing / OZ",
+    colors: ["Green", "Blue"],
+    description: "A Gundam Wing shell with Operation Meteor pressure and OZ support.",
+    deck: templateDeck("Operation Meteor Shell", "ST02", "R-004", starter16Quantities),
+  },
+  {
+    id: "neo-zeon",
+    name: "Neo Zeon Raid",
+    faction: "Neo Zeon / Zeon",
+    colors: ["Red", "Green"],
+    description: "A red-green Zeon shell for aggressive units and linked pilots.",
+    deck: templateDeck("Neo Zeon Raid Shell", "ST03", "R-003", starter16Quantities),
+  },
+  {
+    id: "seed-duel",
+    name: "SEED Duel",
+    faction: "Earth Alliance / ZAFT",
+    colors: ["White", "Red"],
+    description: "A SEED starter shell split between Strike lines and ZAFT pressure.",
+    deck: templateDeck("SEED Duel Shell", "ST04", "R-007", starter16Quantities),
+  },
+  {
+    id: "tekkadan",
+    name: "Tekkadan Frame",
+    faction: "Tekkadan / Gjallarhorn",
+    colors: ["Purple", "White"],
+    description: "A Barbatos-forward shell with pilots, commands, and warship support.",
+    deck: templateDeck("Tekkadan Frame Shell", "ST05", "R-017", starter15Quantities),
+  },
+  {
+    id: "celestial-being",
+    name: "Celestial Being",
+    faction: "CB",
+    colors: ["Purple", "Green"],
+    description: "A Gundam 00 shell with GN Drive units and multi-pilot links.",
+    deck: templateDeck("Celestial Being Shell", "ST07", "R-023", starter15Quantities),
+  },
+  {
+    id: "g-generation",
+    name: "G Generation",
+    faction: "G Generation",
+    colors: ["Blue", "White"],
+    description: "A development-heavy ST10 shell for G Generation synergies.",
+    deck: templateDeck("G Generation Shell", "ST10", "R-001", starter16Quantities),
+  },
+];
 
 function sameDeckQuantities(
   current: Record<string, number>,
@@ -1318,7 +1442,7 @@ function issueDetailText(notice: Notice) {
 }
 
 function panelClass(extra = "") {
-  return `gcg-panel rounded-sm shadow-sm shadow-black/10 ${extra}`;
+  return `gcg-panel min-w-0 max-w-full rounded-sm shadow-sm shadow-black/10 ${extra}`;
 }
 
 function buildDeckList(deck: DeckState) {
@@ -1772,21 +1896,6 @@ function tokenizedQueryRank(card: GundamCard, tokens: string[]) {
   return Math.min(...tokens.map((token) => queryMatchRank(card, token)));
 }
 
-function artChoiceSignature(art: ArtChoiceMap) {
-  return JSON.stringify(Object.entries(art).sort(([a], [b]) => a.localeCompare(b)));
-}
-
-function collectionSignature(collection: CollectionMap) {
-  return JSON.stringify(
-    Object.entries(collection)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([number, quantities]) => [
-        number,
-        Object.entries(quantities).sort(([a], [b]) => a.localeCompare(b)),
-      ]),
-  );
-}
-
 function normalizeLinkName(value: string) {
   return value
     .replace(/[[\]().]/g, " ")
@@ -1835,6 +1944,261 @@ function analyzeSynergy(entries: DeckEntry[]): SynergyNotice[] {
   });
 
   return notices.slice(0, 8);
+}
+
+function countTextMatches(entries: DeckEntry[], pattern: RegExp) {
+  return entries.reduce(
+    (sum, entry) => sum + (pattern.test(entry.card.text) ? entry.quantity : 0),
+    0,
+  );
+}
+
+function averageCost(entries: DeckEntry[]) {
+  let totalCost = 0;
+  let totalQuantity = 0;
+  entries.forEach((entry) => {
+    const cost = parseCost(entry.card);
+    if (cost === null) return;
+    totalCost += cost * entry.quantity;
+    totalQuantity += entry.quantity;
+  });
+  return totalQuantity ? totalCost / totalQuantity : 0;
+}
+
+function topSources(entries: DeckEntry[]) {
+  const counts = new Map<string, number>();
+  entries.forEach((entry) => {
+    if (!entry.card.source || entry.card.source === "-") return;
+    counts.set(entry.card.source, (counts.get(entry.card.source) ?? 0) + entry.quantity);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+}
+
+function analyzeDeckIntelligence({
+  mainEntries,
+  resourceEntries,
+  typeCounts,
+  mainTotal,
+  resourceTotal,
+  deckColors,
+}: {
+  mainEntries: DeckEntry[];
+  resourceEntries: DeckEntry[];
+  typeCounts: Record<CardType, number>;
+  mainTotal: number;
+  resourceTotal: number;
+  deckColors: readonly CardColor[];
+}): DeckInsight[] {
+  const insights: DeckInsight[] = [];
+  const units = typeCounts.UNIT;
+  const pilots = typeCounts.PILOT;
+  const commands = typeCounts.COMMAND;
+  const bases = typeCounts.BASE;
+  const avgCost = averageCost(mainEntries);
+  const highCost = mainEntries
+    .filter((entry) => (parseCost(entry.card) ?? 0) >= 5)
+    .reduce((sum, entry) => sum + entry.quantity, 0);
+  const lowCost = mainEntries
+    .filter((entry) => {
+      const cost = parseCost(entry.card);
+      return cost !== null && cost <= 2;
+    })
+    .reduce((sum, entry) => sum + entry.quantity, 0);
+  const linkPayoffs = countTextMatches(mainEntries, /\blink|paired|pair\b/i);
+  const drawCards = countTextMatches(mainEntries, /\bdraw\b/i);
+  const removalCards = countTextMatches(mainEntries, /\bdamage|rest|destroy|exile\b/i);
+  const sourceNames = topSources(mainEntries).map(([source]) => source);
+  const resourceSources = new Set(
+    resourceEntries.map((entry) => entry.card.source).filter((source) => source && source !== "-"),
+  );
+  const supportedSources = sourceNames.filter((source) => resourceSources.has(source));
+
+  if (mainTotal !== MAIN_TARGET) {
+    insights.push({
+      tone: "bad",
+      label: "Main deck size",
+      detail: `${mainTotal}/${MAIN_TARGET}`,
+      action: mainTotal < MAIN_TARGET ? "Add main cards" : "Trim main cards",
+    });
+  }
+
+  if (resourceTotal !== RESOURCE_TARGET) {
+    insights.push({
+      tone: "bad",
+      label: "Resource deck",
+      detail: `${resourceTotal}/${RESOURCE_TARGET}`,
+      action: resourceTotal < RESOURCE_TARGET ? "Add resources" : "Trim resources",
+    });
+  }
+
+  if (deckColors.length > MAX_MAIN_COLORS) {
+    insights.push({
+      tone: "bad",
+      label: "Color identity",
+      detail: `${deckColors.length} colors exceeds ${MAX_MAIN_COLORS}`,
+      action: "Cut a color",
+    });
+  } else if (deckColors.length === 0) {
+    insights.push({
+      tone: "warn",
+      label: "Color identity",
+      detail: "No main color yet",
+      action: "Choose a core color",
+    });
+  } else {
+    insights.push({
+      tone: "good",
+      label: "Color identity",
+      detail: deckColors.join(" / "),
+    });
+  }
+
+  if (units > 0 && pilots === 0) {
+    insights.push({
+      tone: "warn",
+      label: "Pilot support",
+      detail: `${units} units but no pilots`,
+      action: "Add linked pilots",
+    });
+  } else if (units >= 20 && pilots < 6) {
+    insights.push({
+      tone: "warn",
+      label: "Pilot support",
+      detail: `${pilots} pilots for ${units} units`,
+      action: "Add 2-3 pilots",
+    });
+  } else if (pilots > units / 2 && units > 0) {
+    insights.push({
+      tone: "warn",
+      label: "Pilot density",
+      detail: `${pilots} pilots for ${units} units`,
+      action: "Add more units",
+    });
+  }
+
+  if (commands < 6 && mainTotal >= 35) {
+    insights.push({
+      tone: "warn",
+      label: "Command suite",
+      detail: `${commands} commands looks light`,
+      action: "Add interaction",
+    });
+  } else if (commands > 13) {
+    insights.push({
+      tone: "warn",
+      label: "Command suite",
+      detail: `${commands} commands may crowd units`,
+      action: "Check threats",
+    });
+  }
+
+  if (bases < 3 && mainTotal >= 35) {
+    insights.push({
+      tone: "warn",
+      label: "Base count",
+      detail: `${bases} bases may be low`,
+      action: "Add support bases",
+    });
+  }
+
+  if (highCost > 14) {
+    insights.push({
+      tone: "warn",
+      label: "Top heavy",
+      detail: `${highCost} cards cost 5+`,
+      action: "Lower the curve",
+    });
+  } else if (mainTotal >= 45 && lowCost < 8) {
+    insights.push({
+      tone: "warn",
+      label: "Early game",
+      detail: `${lowCost} cards cost 1-2`,
+      action: "Add cheap plays",
+    });
+  } else if (mainTotal > 0) {
+    insights.push({
+      tone: "good",
+      label: "Average cost",
+      detail: avgCost.toFixed(1),
+    });
+  }
+
+  if (linkPayoffs >= 10 && pilots < 6) {
+    insights.push({
+      tone: "warn",
+      label: "Link payoffs",
+      detail: `${linkPayoffs} link/pair cards, ${pilots} pilots`,
+      action: "Raise pilot count",
+    });
+  }
+
+  if (drawCards < 4 && mainTotal >= 45) {
+    insights.push({
+      tone: "warn",
+      label: "Card flow",
+      detail: `${drawCards} draw effects found`,
+      action: "Find draw/filtering",
+    });
+  }
+
+  if (removalCards < 8 && mainTotal >= 45) {
+    insights.push({
+      tone: "warn",
+      label: "Interaction",
+      detail: `${removalCards} removal/rest effects`,
+      action: "Add answers",
+    });
+  }
+
+  if (resourceTotal > 0 && sourceNames.length > 0) {
+    insights.push({
+      tone: supportedSources.length ? "good" : "warn",
+      label: "Resource support",
+      detail: supportedSources.length
+        ? `${supportedSources.length}/${sourceNames.length} top sources covered`
+        : "Top sources not represented",
+      action: supportedSources.length ? undefined : "Review resources",
+    });
+  }
+
+  if (!insights.some((insight) => insight.tone === "bad" || insight.tone === "warn")) {
+    insights.push({
+      tone: "good",
+      label: "Sortie profile",
+      detail: "Balanced and ready to test",
+    });
+  }
+
+  return insights.slice(0, 10);
+}
+
+function deckMetricsForState(deck: DeckState): DeckMetrics {
+  const mainEntries = deckEntries(deck.main);
+  return {
+    mainTotal: totalCards(deck.main),
+    resourceTotal: totalCards(deck.resource),
+    colors: mainColorsForQuantities(deck.main),
+    typeCounts: countByType(mainEntries),
+    averageCost: averageCost(mainEntries),
+    uniqueMain: mainEntries.length,
+  };
+}
+
+function templateOverlap(currentDeck: DeckState, templateDeck: DeckState) {
+  const templateCards = Object.keys(templateDeck.main);
+  if (!templateCards.length) return 0;
+  const matched = templateCards.filter((number) => (currentDeck.main[number] ?? 0) > 0);
+  return Math.round((matched.length / templateCards.length) * 100);
+}
+
+function deckMetricDelta(current: number, target: number) {
+  const delta = current - target;
+  if (delta === 0) return "Even";
+  return delta > 0 ? `+${delta}` : `${delta}`;
+}
+
+function templateDeckPreviewCards(template: DeckTemplate) {
+  return deckEntries(template.deck.main).slice(0, 4).map((entry) => entry.card);
 }
 
 function clonePrints(prints: DeckPrints): DeckPrints {
@@ -2127,6 +2491,11 @@ export function DeckBuilder({
     useState<(typeof libraryPageSizeOptions)[number]>(LIBRARY_PAGE_SIZE);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [templatePanelOpen, setTemplatePanelOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [compareTemplateId, setCompareTemplateId] = useState(
+    deckTemplates[0]?.id ?? "heroic-beginnings",
+  );
   const [mobileTabsEnabled, setMobileTabsEnabled] = useState(false);
   const [compactFiltersEnabled, setCompactFiltersEnabled] = useState(false);
   const [bootState, setBootState] = useState<"active" | "exit" | "hidden">("active");
@@ -2143,13 +2512,7 @@ export function DeckBuilder({
   const feedbackPulseIdRef = useRef(0);
   const shareCacheRef = useRef<ShareCache | null>(null);
   const undoDeckRef = useRef<DeckState | null>(null);
-  const bootStartedAtRef = useRef(
-    typeof performance !== "undefined" ? performance.now() : 0,
-  );
-  const deckFilterRef = useRef<{
-    art: ArtChoiceMap;
-    collection: CollectionMap;
-  }>({ art: {}, collection: {} });
+  const bootStartedAtRef = useRef(0);
   const deckRef = useRef(deck);
   const mainTotalRef = useRef(0);
   const resourceTotalRef = useRef(0);
@@ -2160,7 +2523,12 @@ export function DeckBuilder({
 
   const advancedFiltersModalOpen = advancedFiltersOpen && compactFiltersEnabled;
   const isDialogOpen = Boolean(
-    fallbackPanel || lightbox || mobileActionsOpen || advancedFiltersModalOpen,
+    fallbackPanel ||
+      lightbox ||
+      mobileActionsOpen ||
+      templatePanelOpen ||
+      commandOpen ||
+      advancedFiltersModalOpen,
   );
   const sharedPreviewLocked = Boolean(sharedDeckId && sharedStatus === "ready");
   const sharedPreviewEditReason = "Clone this shared deck before editing";
@@ -2175,6 +2543,8 @@ export function DeckBuilder({
 
   useEffect(() => {
     document.documentElement.dataset.permetHydrated = "true";
+    bootStartedAtRef.current =
+      typeof performance !== "undefined" ? performance.now() : 0;
     return () => {
       delete document.documentElement.dataset.permetHydrated;
     };
@@ -2412,9 +2782,6 @@ export function DeckBuilder({
     () => totalCards(deck.resource),
     [deck.resource],
   );
-  deckRef.current = deck;
-  mainTotalRef.current = mainTotal;
-  resourceTotalRef.current = resourceTotal;
   const deckList = useMemo(() => buildDeckList(deck), [deck]);
   const costSummary = useMemo(() => summarizeDeckCosts(deck), [deck]);
   const tcgListEntries = useMemo(() => getTcgListEntries(deck), [deck]);
@@ -2442,20 +2809,15 @@ export function DeckBuilder({
     () => ["All", ...Array.from(new Set(CARD_POOL.map((card) => card.set)))],
     [],
   );
-  const deckArtSignature = useMemo(() => artChoiceSignature(deck.art), [deck.art]);
-  const deckCollectionSignature = useMemo(
-    () => collectionSignature(deck.collection),
-    [deck.collection],
-  );
-  deckFilterRef.current = {
-    art: deck.art,
-    collection: deck.collection,
-  };
+  useEffect(() => {
+    deckRef.current = deck;
+    mainTotalRef.current = mainTotal;
+    resourceTotalRef.current = resourceTotal;
+  }, [deck, mainTotal, resourceTotal]);
 
   const filteredCards = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
     const tokens = queryTokens(normalizedQuery);
-    const filterDeck = deckFilterRef.current;
 
     const nextCards = CARD_POOL.filter((card) => {
       const matchesQuery = cardMatchesQueryTokens(card, tokens);
@@ -2468,8 +2830,8 @@ export function DeckBuilder({
         buildStatusFilter,
       );
       const matchesCollection = cardMatchesCollectionFilter(
-        filterDeck.collection,
-        filterDeck.art,
+        deck.collection,
+        deck.art,
         card,
         collectionFilter,
         budgetLimit,
@@ -2495,14 +2857,13 @@ export function DeckBuilder({
       if (readyDelta !== 0) return readyDelta;
       return a.name.localeCompare(b.name);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- deck signatures intentionally invalidate this memo; deckFilterRef holds the latest art/collection objects.
   }, [
     artFilter,
     buildStatusFilter,
     budgetLimit,
     collectionFilter,
-    deckArtSignature,
-    deckCollectionSignature,
+    deck.art,
+    deck.collection,
     colorFilter,
     deferredQuery,
     setFilter,
@@ -2582,89 +2943,6 @@ export function DeckBuilder({
   );
   const typeCounts = useMemo(() => countByType(mainEntries), [mainEntries]);
   const isStarterTemplate = useMemo(() => isStarterDeckState(deck), [deck]);
-
-  useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      if (isDialogOpen || isTypingTarget(event.target)) return;
-
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        void copyShareUrl();
-        return;
-      }
-
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-
-      const selected = selectedCard;
-      const selectedZone: Zone | null =
-        selected && MAIN_TYPES.includes(selected.type)
-          ? "main"
-          : selected && RESOURCE_TYPES.includes(selected.type)
-            ? "resource"
-            : null;
-
-      if (event.key === "/") {
-        event.preventDefault();
-        setMobileView("library");
-        searchInputRef.current?.focus();
-        return;
-      }
-
-      if (event.key.toLowerCase() === "j" || event.key.toLowerCase() === "k") {
-        if (!filteredCards.length) return;
-        event.preventDefault();
-        const direction = event.key.toLowerCase() === "j" ? 1 : -1;
-        const currentIndex = Math.max(
-          0,
-          filteredCards.findIndex((card) => card.number === selectedNumber),
-        );
-        const nextIndex = Math.max(
-          0,
-          Math.min(filteredCards.length - 1, currentIndex + direction),
-        );
-        setSelectedNumber(filteredCards[nextIndex].number);
-        setLibraryPage(Math.floor(nextIndex / libraryPageSize));
-        return;
-      }
-
-      if ((event.key === "+" || event.key === "=") && selected && selectedZone) {
-        event.preventDefault();
-        adjustCard(selectedZone, selected.number, 1);
-        return;
-      }
-
-      if (event.key === "-" && selected && selectedZone) {
-        event.preventDefault();
-        adjustCard(selectedZone, selected.number, -1);
-        return;
-      }
-
-      if (event.key === "[" && selected) {
-        event.preventDefault();
-        stepCardArt(selected.number, -1);
-        return;
-      }
-
-      if (event.key === "]" && selected) {
-        event.preventDefault();
-        stepCardArt(selected.number, 1);
-        return;
-      }
-    };
-
-    window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    deck,
-    filteredCards,
-    isDialogOpen,
-    libraryPageSize,
-    mainTotal,
-    resourceTotal,
-    selectedCard,
-    selectedNumber,
-  ]);
 
   const deckColors = useMemo(() => mainColorsForQuantities(deck.main), [deck.main]);
   const compositionNotices = useMemo<SynergyNotice[]>(() => {
@@ -2800,6 +3078,33 @@ export function DeckBuilder({
     collectionFilter !== "All",
     budgetLimit !== DEFAULT_BUDGET_LIMIT,
   ].filter(Boolean).length;
+  const deckInsights = useMemo(
+    () =>
+      analyzeDeckIntelligence({
+        mainEntries,
+        resourceEntries,
+        typeCounts,
+        mainTotal,
+        resourceTotal,
+        deckColors,
+      }),
+    [deckColors, mainEntries, mainTotal, resourceEntries, resourceTotal, typeCounts],
+  );
+  const compareTemplate =
+    deckTemplates.find((template) => template.id === compareTemplateId) ??
+    deckTemplates[0]!;
+  const currentDeckMetrics = useMemo(() => deckMetricsForState(deck), [deck]);
+  const compareTemplateMetrics = useMemo(
+    () => deckMetricsForState(compareTemplate.deck),
+    [compareTemplate],
+  );
+  const closestTemplate = useMemo(
+    () =>
+      [...deckTemplates].sort(
+        (a, b) => templateOverlap(deck, b.deck) - templateOverlap(deck, a.deck),
+      )[0],
+    [deck],
+  );
 
   function triggerFeedback(keys: string | string[], message: string) {
     const id = feedbackPulseIdRef.current + 1;
@@ -2899,6 +3204,39 @@ export function DeckBuilder({
       "New deck started",
       "Previous deck is saved for a quick undo.",
     );
+  }
+
+  function openTemplatePanel() {
+    rememberFallbackReturnFocus();
+    setTemplatePanelOpen(true);
+  }
+
+  function loadDeckTemplate(template: DeckTemplate) {
+    if (sharedPreviewLocked) {
+      blockSharedPreviewEdit();
+      return;
+    }
+    setCompareTemplateId(template.id);
+    setTemplatePanelOpen(false);
+    clearLibraryFilters();
+    replaceDeckWithUndo(
+      () => template.deck,
+      `${template.name} loaded`,
+      `${template.faction} shell loaded. Previous deck is saved for undo.`,
+    );
+  }
+
+  function filterLibraryToSetCode(setCode: string) {
+    const setName = CARD_POOL.find((card) => card.number.startsWith(`${setCode}-`))?.set;
+    if (!setName) {
+      showToast("warn", "Set not found", `${setCode} is not in the local card index yet.`);
+      return;
+    }
+    setQuery("");
+    setSetFilter(setName);
+    setBuildStatusFilter("All");
+    setLibraryPage(0);
+    changeMobileView("library", { focusPanel: true });
   }
 
   function blockSharedPreviewEdit() {
@@ -4050,6 +4388,170 @@ export function DeckBuilder({
     });
   }
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (isDialogOpen || isTypingTarget(event.target)) return;
+
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen(true);
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void copyShareUrl();
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const selected = selectedCard;
+      const selectedZone: Zone | null =
+        selected && MAIN_TYPES.includes(selected.type)
+          ? "main"
+          : selected && RESOURCE_TYPES.includes(selected.type)
+            ? "resource"
+            : null;
+
+      if (event.key === "/") {
+        event.preventDefault();
+        setMobileView("library");
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "j" || event.key.toLowerCase() === "k") {
+        if (!filteredCards.length) return;
+        event.preventDefault();
+        const direction = event.key.toLowerCase() === "j" ? 1 : -1;
+        const currentIndex = Math.max(
+          0,
+          filteredCards.findIndex((card) => card.number === selectedNumber),
+        );
+        const nextIndex = Math.max(
+          0,
+          Math.min(filteredCards.length - 1, currentIndex + direction),
+        );
+        setSelectedNumber(filteredCards[nextIndex].number);
+        setLibraryPage(Math.floor(nextIndex / libraryPageSize));
+        return;
+      }
+
+      if ((event.key === "+" || event.key === "=") && selected && selectedZone) {
+        event.preventDefault();
+        adjustCard(selectedZone, selected.number, 1);
+        return;
+      }
+
+      if (event.key === "-" && selected && selectedZone) {
+        event.preventDefault();
+        adjustCard(selectedZone, selected.number, -1);
+        return;
+      }
+
+      if (event.key === "[" && selected) {
+        event.preventDefault();
+        stepCardArt(selected.number, -1);
+        return;
+      }
+
+      if (event.key === "]" && selected) {
+        event.preventDefault();
+        stepCardArt(selected.number, 1);
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    deck,
+    filteredCards,
+    isDialogOpen,
+    libraryPageSize,
+    mainTotal,
+    resourceTotal,
+    selectedCard,
+    selectedNumber,
+  ]);
+
+  const commandItems: CommandItem[] = [
+    {
+      id: "templates",
+      label: "Open archetype templates",
+      detail: "Load starter shells or compare against known shapes.",
+      keywords: "templates archetype starter sample shell",
+      run: openTemplatePanel,
+    },
+    {
+      id: "search-cards",
+      label: "Search card library",
+      detail: `${CARD_POOL.length} cards indexed.`,
+      keywords: "search find cards library browse",
+      run: () => {
+        changeMobileView("library");
+        window.requestAnimationFrame(() => searchInputRef.current?.focus());
+      },
+    },
+    {
+      id: "share-deck",
+      label: "Create short share link",
+      detail: "Save this deck and copy a clean URL.",
+      keywords: "share link save url decklist",
+      run: () => void copyShareUrl(),
+    },
+    {
+      id: "tcg-list",
+      label: "Open TCG print list",
+      detail: `${tcgListEntries.length} open print rows.`,
+      keywords: "tcg buy list open prints price",
+      run: openTcgList,
+    },
+    {
+      id: "mark-owned",
+      label: "Mark deck prints owned",
+      detail: "Set collection counts to selected deck printings.",
+      keywords: "owned collection binder have",
+      run: markDeckOwned,
+    },
+    {
+      id: "latest-gd05",
+      label: "Browse GD05 cards",
+      detail: "Jump to the latest GD05 card index.",
+      keywords: "gd05 newest latest freedom ascension cards",
+      run: () => filterLibraryToSetCode("GD05"),
+    },
+    {
+      id: "stats",
+      label: "Show deck intelligence",
+      detail: `${deckInsights.filter((insight) => insight.tone !== "good").length} active notes.`,
+      keywords: "stats intelligence legality synergy compare",
+      run: () => changeMobileView("stats", { focusPanel: true }),
+    },
+    {
+      id: "deck",
+      label: "Show deck list",
+      detail: `${mainTotal}/${MAIN_TARGET} main · ${resourceTotal}/${RESOURCE_TARGET} resource.`,
+      keywords: "deck main resource list cards",
+      run: () => changeMobileView("deck", { focusPanel: true }),
+    },
+    {
+      id: "new-deck",
+      label: "Start a new deck",
+      detail: "Clear the builder with undo available.",
+      keywords: "new reset clear deck",
+      run: startNewDeck,
+    },
+    ...deckTemplates.slice(0, 6).map((template) => ({
+      id: `template-${template.id}`,
+      label: `Load ${template.name}`,
+      detail: template.faction,
+      keywords: `${template.name} ${template.faction} ${template.colors.join(" ")} template archetype`,
+      run: () => loadDeckTemplate(template),
+    })),
+  ];
+
   return (
     <main className="app-shell min-h-screen bg-[#05060a] text-[#f7f7f2]">
       <div
@@ -4149,6 +4651,12 @@ export function DeckBuilder({
                   <span aria-hidden="true" className="text-[#a7b5c9]/28">
                     /
                   </span>
+                  <Link href="/status" className="hover:text-[#fff2bd]">
+                    Status
+                  </Link>
+                  <span aria-hidden="true" className="text-[#a7b5c9]/28">
+                    /
+                  </span>
                   <Link href="/llms.txt" className="hover:text-[#fff2bd]">
                     AI Index
                   </Link>
@@ -4232,6 +4740,25 @@ export function DeckBuilder({
                       >
                         <ShieldCheck size={16} />
                       </ToolbarButton>
+                    <ToolbarButton
+                      label="Templates"
+                      title={sharedPreviewLocked ? sharedPreviewEditReason : "Open archetype templates"}
+                      ariaLabel="Open archetype templates"
+                      onClick={openTemplatePanel}
+                      disabled={sharedPreviewLocked}
+                      showDesktopLabel
+                    >
+                      <Layers size={16} />
+                    </ToolbarButton>
+                    <ToolbarButton
+                      label="Command"
+                      title="Open command palette"
+                      ariaLabel="Open command palette"
+                      onClick={() => setCommandOpen(true)}
+                      showDesktopLabel
+                    >
+                      <Search size={16} />
+                    </ToolbarButton>
                     <ToolbarButton
                       label="New"
                       title={sharedPreviewLocked ? sharedPreviewEditReason : "Start a new deck"}
@@ -4364,6 +4891,9 @@ export function DeckBuilder({
 	            onSample={loadSampleDeck}
 	            onImport={() => importInputRef.current?.click()}
 	            onBrowse={browseLibraryFromStart}
+                onTemplates={openTemplatePanel}
+                templates={deckTemplates.slice(0, 3)}
+                onLoadTemplate={loadDeckTemplate}
 	          />
         )}
 
@@ -4700,8 +5230,26 @@ export function DeckBuilder({
                 <>
               <CollectionPanel
                 summary={costSummary}
+                buyEntries={tcgListEntries}
                 onMarkOwned={markDeckOwned}
+                onOpenPrints={openTcgList}
                 readOnly={sharedPreviewLocked}
+              />
+
+              <DeckIntelligencePanel
+                insights={deckInsights}
+                colors={deckColors}
+                closestTemplate={closestTemplate}
+                onOpenTemplates={openTemplatePanel}
+              />
+
+              <DeckComparePanel
+                templates={deckTemplates}
+                selectedTemplate={compareTemplate}
+                currentMetrics={currentDeckMetrics}
+                templateMetrics={compareTemplateMetrics}
+                overlap={templateOverlap(deck, compareTemplate.deck)}
+                onTemplateChange={setCompareTemplateId}
               />
 
               <LegalityPanel notices={notices} onFixNotice={focusLegalityFix} />
@@ -4809,6 +5357,8 @@ export function DeckBuilder({
           setDeck((current) => ({ ...current, name }));
         }}
         onSample={() => runMobileAction(loadSampleDeck)}
+        onTemplates={() => runMobileAction(openTemplatePanel)}
+        onCommand={() => runMobileAction(() => setCommandOpen(true))}
         onNew={() => runMobileAction(startNewDeck)}
         onUndo={() => runMobileAction(restoreUndoDeck)}
         onArtDown={() => runMobileAction(() => stepDeckArt(-1))}
@@ -4844,6 +5394,19 @@ export function DeckBuilder({
         onVariantChange={(artVariant) =>
           setLightbox((current) => (current ? { ...current, artVariant } : current))
         }
+      />
+      <TemplatePanel
+        open={templatePanelOpen}
+        templates={deckTemplates}
+        currentDeck={deck}
+        readOnly={sharedPreviewLocked}
+        onLoadTemplate={loadDeckTemplate}
+        onClose={() => setTemplatePanelOpen(false)}
+      />
+      <CommandPalette
+        open={commandOpen}
+        items={commandItems}
+        onClose={() => setCommandOpen(false)}
       />
     </main>
   );
@@ -5146,15 +5709,21 @@ function StartBuildPanel({
   onSample,
   onImport,
   onBrowse,
+  onTemplates,
+  templates,
+  onLoadTemplate,
 }: {
   onSample: () => void;
   onImport: () => void;
   onBrowse: () => void;
+  onTemplates: () => void;
+  templates: readonly DeckTemplate[];
+  onLoadTemplate: (template: DeckTemplate) => void;
 }) {
   return (
     <section
       className={panelClass(
-        "start-build-panel hero-surface grid gap-3 overflow-hidden p-3 sm:grid-cols-[1fr_auto]",
+        "start-build-panel hero-surface grid gap-4 overflow-hidden p-3 lg:grid-cols-[minmax(18rem,0.72fr)_1fr]",
       )}
       style={{
         backgroundImage: `linear-gradient(90deg, rgba(5,6,10,0.92), rgba(5,6,10,0.74)), url(${HUD_TEXTURE_IMAGE})`,
@@ -5173,34 +5742,331 @@ function StartBuildPanel({
         <p className="mt-1 max-w-2xl text-base font-bold leading-6 text-[#f7f7f2]/68">
           No deck loaded.
         </p>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex">
+          <button
+            type="button"
+            className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/38 bg-[#f6c542]/12 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
+            onClick={onTemplates}
+          >
+            <Layers size={15} />
+            Templates
+          </button>
+          <button
+            type="button"
+            className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/34 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
+            onClick={onBrowse}
+          >
+            <LayoutGrid size={15} />
+            Open Library
+          </button>
+          <button
+            type="button"
+            className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 px-3 font-display text-sm font-black uppercase text-[#f7f7f2]"
+            onClick={onImport}
+          >
+            <Upload size={15} />
+            Import
+          </button>
+          <button
+            type="button"
+            className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 px-3 font-display text-sm font-black uppercase text-[#f7f7f2]"
+            onClick={onSample}
+          >
+            <ShieldCheck size={15} />
+            Sample
+          </button>
+        </div>
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:min-w-[24rem]">
-        <button
-          type="button"
-          className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#8bdcff]/34 bg-[#1167d8]/12 px-3 font-display text-sm font-black uppercase text-[#d9ecff]"
-          onClick={onBrowse}
-        >
-          <LayoutGrid size={15} />
-	          Open Library
-	        </button>
-        <button
-          type="button"
-          className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#f6c542]/38 bg-[#f6c542]/12 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
-          onClick={onSample}
-        >
-          <ShieldCheck size={15} />
-          Sample
-        </button>
-        <button
-          type="button"
-          className="interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 px-3 font-display text-sm font-black uppercase text-[#f7f7f2]"
-          onClick={onImport}
-        >
-          <Upload size={15} />
-          Import
-        </button>
+      <div className="grid gap-2 md:grid-cols-3">
+        {templates.map((template) => (
+          <button
+            key={template.id}
+            type="button"
+            className="interactive-row grid min-h-32 content-between rounded-sm border border-[#8bdcff]/22 bg-[#07111d]/76 p-3 text-left shadow-xl shadow-black/24 hover:border-[#f6c542]/44 hover:bg-[#0b1724]/86"
+            onClick={() => onLoadTemplate(template)}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-display text-lg font-black uppercase leading-none text-[#f7f7f2]">
+                  {template.name}
+                </div>
+                <div className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/58">
+                  {template.faction}
+                </div>
+              </div>
+              <DeckColorRail colors={template.colors} compact />
+            </div>
+            <div className="mt-3 text-sm font-semibold leading-5 text-[#f7f7f2]/68">
+              {template.description}
+            </div>
+          </button>
+        ))}
       </div>
     </section>
+  );
+}
+
+function TemplatePanel({
+  open,
+  templates,
+  currentDeck,
+  readOnly,
+  onLoadTemplate,
+  onClose,
+}: {
+  open: boolean;
+  templates: readonly DeckTemplate[];
+  currentDeck: DeckState;
+  readOnly: boolean;
+  onLoadTemplate: (template: DeckTemplate) => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    window.setTimeout(() => closeButtonRef.current?.focus(), 0);
+
+    return () => {
+      if (previousFocusRef.current && document.contains(previousFocusRef.current)) {
+        previousFocusRef.current.focus();
+      }
+      previousFocusRef.current = null;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[72] bg-[#020305]/84 px-3 py-4 backdrop-blur-xl sm:px-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="template-panel-title"
+      onClick={onClose}
+      onKeyDown={(event) => trapDialogFocus(event, dialogRef.current, onClose)}
+    >
+      <section
+        ref={dialogRef}
+        className="mx-auto grid max-h-full w-full max-w-6xl gap-3 overflow-y-auto rounded-sm border border-[#8bdcff]/28 bg-[#05070c]/96 p-3 shadow-2xl shadow-black/70 sm:p-4"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-[#a7b5c9]/18 pb-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[#f6c542]">
+              <Layers size={18} />
+              <h2
+                id="template-panel-title"
+                className="font-display text-2xl font-black uppercase text-[#f7f7f2]"
+              >
+                Archetype Templates
+              </h2>
+            </div>
+            <p className="mt-1 text-base font-semibold text-[#f7f7f2]/62">
+              Fast shells for testing, tuning, and comparing deck shape.
+            </p>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="interactive-control grid size-11 shrink-0 place-items-center rounded-sm border border-[#a7b5c9]/24 bg-[#f7f7f2]/8 text-[#f7f7f2]"
+            onClick={onClose}
+            aria-label="Close archetype templates"
+            title="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {readOnly && (
+          <div className="rounded-sm border border-[#f6c542]/30 bg-[#f6c542]/10 px-3 py-2 font-display text-sm font-black uppercase text-[#fff2bd]">
+            Shared preview · clone to load templates
+          </div>
+        )}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {templates.map((template) => {
+            const metrics = deckMetricsForState(template.deck);
+            const overlap = templateOverlap(currentDeck, template.deck);
+            const previewCards = templateDeckPreviewCards(template);
+            return (
+              <article
+                key={template.id}
+                className="interactive-row grid gap-3 rounded-sm border border-[#a7b5c9]/18 bg-[#07111d]/72 p-3 shadow-xl shadow-black/26"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-display text-2xl font-black uppercase leading-none text-[#f7f7f2]">
+                      {template.name}
+                    </h3>
+                    <p className="mt-1 truncate text-sm font-bold text-[#f7f7f2]/58">
+                      {template.faction}
+                    </p>
+                  </div>
+                  <DeckColorRail colors={template.colors} compact />
+                </div>
+                <p className="text-sm font-semibold leading-5 text-[#f7f7f2]/68">
+                  {template.description}
+                </p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {previewCards.map((card) => (
+                    <CardImage
+                      key={card.number}
+                      card={card}
+                      imageSize={360}
+                      sizes="5rem"
+                      alt=""
+                      className="card-image-surface aspect-[5/7] w-full rounded-sm border border-[#f7f7f2]/12 bg-black object-contain object-top"
+                    />
+                  ))}
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  <Spec label="Main" value={`${metrics.mainTotal}`} compact />
+                  <Spec label="Res" value={`${metrics.resourceTotal}`} compact />
+                  <Spec label="Units" value={`${metrics.typeCounts.UNIT}`} compact />
+                  <Spec label="Match" value={`${overlap}%`} compact />
+                </div>
+                <button
+                  type="button"
+                  className={`interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
+                    readOnly
+                      ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/32"
+                      : "border-[#f6c542]/38 bg-[#f6c542]/12 text-[#fff2bd] hover:bg-[#f6c542]/18"
+                  }`}
+                  onClick={() => onLoadTemplate(template)}
+                  disabled={readOnly}
+                >
+                  <ShieldCheck size={16} />
+                  Load Shell
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CommandPalette({
+  open,
+  items,
+  onClose,
+}: {
+  open: boolean;
+  items: readonly CommandItem[];
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  const filteredItems = useMemo(() => {
+    const tokens = queryTokens(query.toLowerCase());
+    if (!tokens.length) return items.slice(0, 10);
+    return items
+      .filter((item) => {
+        const haystack = `${item.label} ${item.detail} ${item.keywords}`.toLowerCase();
+        return tokens.every((token) => haystack.includes(token));
+      })
+      .slice(0, 10);
+  }, [items, query]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+
+    return () => {
+      if (previousFocusRef.current && document.contains(previousFocusRef.current)) {
+        previousFocusRef.current.focus();
+      }
+      previousFocusRef.current = null;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  const runItem = (item: CommandItem) => {
+    onClose();
+    item.run();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[74] bg-[#020305]/78 px-3 py-6 backdrop-blur-xl sm:px-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="command-palette-title"
+      onClick={onClose}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && filteredItems[0]) {
+          event.preventDefault();
+          runItem(filteredItems[0]);
+          return;
+        }
+        trapDialogFocus(event, dialogRef.current, onClose);
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="mx-auto grid w-full max-w-2xl gap-2 rounded-sm border border-[#8bdcff]/30 bg-[#05070c]/98 p-2 shadow-2xl shadow-black/70"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="command-palette-title" className="sr-only">
+          Command palette
+        </h2>
+        <label className="relative block">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8bdcff]"
+            size={18}
+          />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search commands"
+            className="control-field h-14 w-full rounded-sm border border-[#a7b5c9]/22 bg-[#f7f7f2]/8 pl-10 pr-12 font-display text-xl font-black uppercase text-[#f7f7f2] outline-none placeholder:text-[#f7f7f2]/36 focus:border-[#f6c542] focus:ring-4 focus:ring-[#f6c542]/15"
+          />
+          <button
+            type="button"
+            className="interactive-control absolute right-1 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-sm border border-[#a7b5c9]/18 bg-black/36 text-[#f7f7f2]"
+            onClick={onClose}
+            aria-label="Close command palette"
+            title="Close"
+          >
+            <X size={17} />
+          </button>
+        </label>
+        <div className="grid gap-1">
+          {filteredItems.length ? (
+            filteredItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="interactive-row grid gap-0.5 rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/[0.055] px-3 py-2 text-left hover:border-[#f6c542]/36 hover:bg-[#f6c542]/10"
+                onClick={() => runItem(item)}
+              >
+                <span className="font-display text-lg font-black uppercase text-[#f7f7f2]">
+                  {item.label}
+                </span>
+                <span className="text-sm font-semibold text-[#f7f7f2]/58">
+                  {item.detail}
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="rounded-sm border border-[#a7b5c9]/16 bg-[#f7f7f2]/[0.055] p-4 text-center text-base font-bold text-[#f7f7f2]/62">
+              No commands found.
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -5363,6 +6229,148 @@ function CompositionPanel({
   );
 }
 
+function DeckIntelligencePanel({
+  insights,
+  colors,
+  closestTemplate,
+  onOpenTemplates,
+}: {
+  insights: DeckInsight[];
+  colors: readonly CardColor[];
+  closestTemplate?: DeckTemplate;
+  onOpenTemplates: () => void;
+}) {
+  const problemCount = insights.filter((insight) => insight.tone !== "good").length;
+
+  return (
+    <section className={panelClass()}>
+      <PanelTitle icon={<Activity size={18} />} title="Deck Intelligence" />
+      <div className="grid gap-2 p-3">
+        <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-sm border border-[#8bdcff]/18 bg-[#1167d8]/10 p-2">
+          <div className="min-w-0">
+            <div className="font-display text-base font-black uppercase text-[#f7f7f2]">
+              Sortie Readout
+            </div>
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+              <DeckColorRail colors={colors} compact />
+              <span className="text-sm font-bold text-[#f7f7f2]/58">
+                {problemCount ? `${problemCount} active notes` : "No major notes"}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="interactive-control inline-flex h-11 items-center justify-center rounded-sm border border-[#f6c542]/32 bg-[#f6c542]/10 px-3 font-display text-sm font-black uppercase text-[#fff2bd]"
+            onClick={onOpenTemplates}
+          >
+            Templates
+          </button>
+        </div>
+        {closestTemplate && (
+          <div className="rounded-sm border border-[#a7b5c9]/16 bg-black/24 p-2 text-sm font-bold text-[#f7f7f2]/64">
+            Closest shell:{" "}
+            <span className="font-black text-[#fff2bd]">{closestTemplate.name}</span>
+          </div>
+        )}
+        <div className="grid gap-2">
+          {insights.map((insight) => (
+            <div
+              key={`${insight.label}-${insight.detail}`}
+              className={`interactive-row rounded-sm border p-2 ${noticeClass(insight.tone)}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-base font-black">{insight.label}</div>
+                  <div className="text-sm font-bold opacity-75">{insight.detail}</div>
+                </div>
+                {insight.action && (
+                  <span className="shrink-0 rounded-sm border border-current/25 bg-black/18 px-2 py-1 text-right font-display text-xs font-black uppercase">
+                    {insight.action}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DeckComparePanel({
+  templates,
+  selectedTemplate,
+  currentMetrics,
+  templateMetrics,
+  overlap,
+  onTemplateChange,
+}: {
+  templates: readonly DeckTemplate[];
+  selectedTemplate: DeckTemplate;
+  currentMetrics: DeckMetrics;
+  templateMetrics: DeckMetrics;
+  overlap: number;
+  onTemplateChange: (templateId: string) => void;
+}) {
+  const rows = [
+    ["Main", currentMetrics.mainTotal, templateMetrics.mainTotal],
+    ["Resource", currentMetrics.resourceTotal, templateMetrics.resourceTotal],
+    ["Units", currentMetrics.typeCounts.UNIT, templateMetrics.typeCounts.UNIT],
+    ["Pilots", currentMetrics.typeCounts.PILOT, templateMetrics.typeCounts.PILOT],
+    ["Commands", currentMetrics.typeCounts.COMMAND, templateMetrics.typeCounts.COMMAND],
+    ["Bases", currentMetrics.typeCounts.BASE, templateMetrics.typeCounts.BASE],
+  ] as const;
+
+  return (
+    <section className={panelClass()}>
+      <PanelTitle icon={<BarChart3 size={18} />} title="Compare" />
+      <div className="grid gap-3 p-3">
+        <SelectFilter
+          label="Compare Shell"
+          value={selectedTemplate.id}
+          values={templates.map((template) => template.id)}
+          getOptionLabel={(id) =>
+            templates.find((template) => template.id === id)?.name ?? id
+          }
+          onChange={onTemplateChange}
+        />
+        <div className="grid grid-cols-3 gap-2">
+          <Spec label="Overlap" value={`${overlap}%`} compact />
+          <Spec
+            label="Avg Cost"
+            value={currentMetrics.averageCost.toFixed(1)}
+            compact
+          />
+          <Spec label="Unique" value={`${currentMetrics.uniqueMain}`} compact />
+        </div>
+        <div className="grid gap-1.5">
+          {rows.map(([label, current, target]) => (
+            <div
+              key={label}
+              className="grid grid-cols-[minmax(5rem,1fr)_3.5rem_3.5rem_3.5rem] items-center gap-2 rounded-sm border border-[#a7b5c9]/14 bg-[#f7f7f2]/[0.045] px-2 py-1.5 text-sm font-bold text-[#f7f7f2]/70"
+            >
+              <span className="font-display font-black uppercase text-[#f7f7f2]">
+                {label}
+              </span>
+              <span className="text-right">{current}</span>
+              <span className="text-right text-[#f7f7f2]/42">{target}</span>
+              <span
+                className={`rounded-sm border px-1.5 py-0.5 text-center font-display font-black uppercase ${
+                  current === target
+                    ? "border-[#28d17c]/26 bg-[#28d17c]/10 text-[#d9ffe9]"
+                    : "border-[#f6c542]/26 bg-[#f6c542]/10 text-[#fff2bd]"
+                }`}
+              >
+                {deckMetricDelta(current, target)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function MobileCockpitNav({
   activeView,
   tabsEnabled,
@@ -5508,6 +6516,8 @@ function MobileActionSheet({
   canUndo,
   onDeckNameChange,
   onSample,
+  onTemplates,
+  onCommand,
   onNew,
   onUndo,
   onArtDown,
@@ -5528,6 +6538,8 @@ function MobileActionSheet({
   canUndo: boolean;
   onDeckNameChange: (name: string) => void;
   onSample: () => void;
+  onTemplates: () => void;
+  onCommand: () => void;
   onNew: () => void;
   onUndo: () => void;
   onArtDown: () => void;
@@ -5630,6 +6642,25 @@ function MobileActionSheet({
             <Undo2 size={16} />
           </ToolbarButton>
         )}
+        <ToolbarButton
+          label="Templates"
+          title={readOnly ? readOnlyReason : "Open archetype templates"}
+          ariaLabel="Open archetype templates"
+          onClick={onTemplates}
+          disabled={readOnly}
+          className="w-full"
+        >
+          <Layers size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Command"
+          title="Open command palette"
+          ariaLabel="Open command palette"
+          onClick={onCommand}
+          className="w-full"
+        >
+          <Search size={16} />
+        </ToolbarButton>
         <ToolbarButton
           label="Sample"
           title={readOnly ? readOnlyReason : "Load sample deck"}
@@ -6250,13 +7281,21 @@ function CardLightbox({
 
 function CollectionPanel({
   summary,
+  buyEntries,
   onMarkOwned,
+  onOpenPrints,
   readOnly = false,
 }: {
   summary: CostSummary;
+  buyEntries: readonly TcgListEntry[];
   onMarkOwned: () => void;
+  onOpenPrints: () => void;
   readOnly?: boolean;
 }) {
+  const openEntries = buyEntries
+    .filter((entry) => entry.openQuantity > 0)
+    .slice(0, 4);
+
   return (
     <section className={panelClass()}>
       <PanelTitle icon={<WalletCards size={18} />} title="Collection" />
@@ -6271,7 +7310,7 @@ function CollectionPanel({
           className={`interactive-control inline-flex h-11 items-center justify-center gap-2 rounded-sm border font-display text-base font-black uppercase ${
             readOnly
               ? "cursor-not-allowed border-[#f7f7f2]/8 bg-[#f7f7f2]/[0.035] text-[#f7f7f2]/40"
-              : "border-[#28d17c]/35 bg-[#28d17c]/12 text-[#d9ffe9] hover:bg-[#28d17c]/18"
+            : "border-[#28d17c]/35 bg-[#28d17c]/12 text-[#d9ffe9] hover:bg-[#28d17c]/18"
           }`}
           onClick={onMarkOwned}
           disabled={readOnly}
@@ -6280,6 +7319,49 @@ function CollectionPanel({
           <WalletCards size={16} />
           Mark Deck Prints Owned
         </button>
+        <div className="grid gap-1.5 rounded-sm border border-[#a7b5c9]/16 bg-black/24 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-display text-base font-black uppercase text-[#f7f7f2]">
+              Open Prints
+            </div>
+            <button
+              type="button"
+              className="interactive-control inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-[#f6c542]/34 bg-[#f6c542]/10 px-2 font-display text-sm font-black uppercase text-[#fff2bd] disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={onOpenPrints}
+              disabled={!openEntries.length}
+            >
+              <ShoppingCart size={14} />
+              TCG
+            </button>
+          </div>
+          {openEntries.length ? (
+            openEntries.map((entry) => (
+              <div
+                key={`${entry.card.number}-${entry.variant.id}`}
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-sm border border-[#a7b5c9]/12 bg-[#f7f7f2]/[0.04] p-1.5"
+              >
+                <span className="rounded-sm border border-[#f6c542]/26 bg-[#f6c542]/10 px-1.5 py-0.5 font-display text-sm font-black text-[#fff2bd]">
+                  {entry.openQuantity}x
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black text-[#f7f7f2]">
+                    {entry.card.name}
+                  </div>
+                  <div className="truncate text-xs font-bold text-[#f7f7f2]/50">
+                    {printDisplayId(entry.variant)}
+                  </div>
+                </div>
+                <span className="font-display text-sm font-black text-[#d9ecff]">
+                  {formatMoney(entry.totalCost)}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-sm border border-[#28d17c]/20 bg-[#28d17c]/10 p-2 text-sm font-bold text-[#d9ffe9]">
+              Every selected deck print is covered.
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -7347,21 +8429,35 @@ function InspectorPanel({
             </a>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] gap-1.5">
+        <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(4.25rem,1fr))] gap-2">
           {artVariants.map((variant) => (
             <button
               type="button"
               key={variant.id}
-              className={`art-print-dot interactive-control h-3 rounded-sm border ${
-                variant.id === artVariant.id ? "bg-[#f6c542]" : "bg-[#f7f7f2]/16"
+              className={`interactive-control grid gap-1 rounded-sm border bg-black/40 p-1 text-left ${
+                variant.id === artVariant.id
+                  ? "border-[#f6c542]/68 shadow-lg shadow-[#f6c542]/10"
+                  : "border-[#a7b5c9]/18 hover:border-[#8bdcff]/40"
               }`}
               data-pulse={variant.id === artVariant.id ? artPulseId : undefined}
               onClick={() => onSetAllPrints(variant.id)}
               disabled={readOnly}
               aria-pressed={variant.id === artVariant.id}
               aria-label={`Set selected card to ${artDisplayLabel(variant)}`}
-              title={artDisplayLabel(variant)}
-            />
+              title={`${artDisplayLabel(variant)} · ${formatPrintMoney(card, variant)}`}
+            >
+              <CardImage
+                card={card}
+                artVariant={variant}
+                imageSize={360}
+                sizes="5rem"
+                alt=""
+                className="card-image-surface aspect-[5/7] w-full rounded-sm border border-[#f7f7f2]/10 bg-black object-contain object-top"
+              />
+              <span className="truncate text-center font-display text-xs font-black uppercase text-[#f7f7f2]">
+                {printDisplayId(variant)}
+              </span>
+            </button>
           ))}
         </div>
         {printControlRows.length > 0 && (
