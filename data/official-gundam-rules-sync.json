@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-30T11:21:32.477Z",
+  "updatedAt": "2026-07-31T11:35:48.943Z",
   "source": "Official GUNDAM CARD GAME card search",
   "sourceUrl": "https://www.gundam-gcg.com/en/cards/",
   "packageCount": 21,
@@ -109,8 +109,8 @@
     {
       "id": "616701",
       "name": "Other Product Card",
-      "cardPrints": 54,
-      "uniqueCards": 54
+      "cardPrints": 64,
+      "uniqueCards": 64
     },
     {
       "id": "616000",
@@ -127,13 +127,13 @@
     {
       "id": "616901",
       "name": "Promotion card",
-      "cardPrints": 179,
-      "uniqueCards": 137
+      "cardPrints": 208,
+      "uniqueCards": 157
     }
   ],
-  "officialCardCount": 1055,
-  "officialPrintCount": 1777,
-  "deckReadyCards": 986,
+  "officialCardCount": 1075,
+  "officialPrintCount": 1816,
+  "deckReadyCards": 999,
   "marketCardsWithoutOfficialRules": [],
   "officialCardsWithoutMarketProducts": [
     "EXBP-001",
@@ -148,9 +148,15 @@
     "EXBP-010",
     "EXBP-011",
     "EXBP-019",
+    "EXBP-020",
+    "EXBP-021",
+    "EXBP-022",
+    "EXBP-023",
+    "EXBP-024",
     "EXBP-025",
     "EXBP-026",
     "EXBP-027",
+    "EXBP-031",
     "EXR-003",
     "EXR-004",
     "EXR-005",
@@ -173,6 +179,7 @@
     "EXRP-011",
     "EXRP-012",
     "EXRP-013",
+    "EXRP-014",
     "GD05-001",
     "GD05-002",
     "GD05-003",
@@ -347,6 +354,18 @@
     "RP-042",
     "RP-043",
     "RP-044",
+    "RP-045",
+    "RP-046",
+    "RP-047",
+    "RP-048",
+    "RP-049",
+    "RP-050",
+    "RP-051",
+    "RP-052",
+    "RP-053",
+    "RP-054",
+    "RP-055",
+    "RP-056",
     "RP-057",
     "RP-058",
     "RP-059",
@@ -356,6 +375,7 @@
     "RP-063",
     "RP-064",
     "RP-065",
+    "RP-067",
     "T-001",
     "T-002",
     "T-003",
