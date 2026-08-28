@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-27T12:48:18.092Z",
+  "updatedAt": "2026-08-28T13:11:20.013Z",
   "source": "Official GUNDAM CARD GAME card search",
   "sourceUrl": "https://www.gundam-gcg.com/en/cards/",
   "packageCount": 21,
@@ -127,12 +127,12 @@
     {
       "id": "616901",
       "name": "Promotion card",
-      "cardPrints": 208,
-      "uniqueCards": 157
+      "cardPrints": 238,
+      "uniqueCards": 182
     }
   ],
-  "officialCardCount": 1075,
-  "officialPrintCount": 1816,
+  "officialCardCount": 1082,
+  "officialPrintCount": 1846,
   "deckReadyCards": 999,
   "marketCardsWithoutOfficialRules": [],
   "officialCardsWithoutMarketProducts": [
@@ -156,7 +156,12 @@
     "EXBP-025",
     "EXBP-026",
     "EXBP-027",
+    "EXBP-028",
+    "EXBP-029",
+    "EXBP-030",
     "EXBP-031",
+    "EXBP-032",
+    "EXBP-034",
     "EXR-003",
     "EXR-004",
     "EXR-005",
@@ -180,6 +185,8 @@
     "EXRP-012",
     "EXRP-013",
     "EXRP-014",
+    "EXRP-015",
+    "EXRP-019",
     "GD05-001",
     "GD05-002",
     "GD05-003",
