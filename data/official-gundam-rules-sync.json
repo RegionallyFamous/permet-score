@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-23T09:29:36.414Z",
+  "updatedAt": "2026-09-25T09:30:45.314Z",
   "source": "Official GUNDAM CARD GAME card search",
   "sourceUrl": "https://www.gundam-gcg.com/en/cards/",
   "packageCount": 25,
@@ -97,25 +97,25 @@
     {
       "id": "616011",
       "name": "Aquatic Assault [ST11]",
-      "cardPrints": 17,
+      "cardPrints": 33,
       "uniqueCards": 17
     },
     {
       "id": "616012",
       "name": "Raging Onslaught [ST12]",
-      "cardPrints": 16,
+      "cardPrints": 32,
       "uniqueCards": 16
     },
     {
       "id": "616013",
       "name": "Silent Barrage [ST13]",
-      "cardPrints": 17,
+      "cardPrints": 33,
       "uniqueCards": 17
     },
     {
       "id": "616014",
       "name": "Heavy Dominion [ST14]",
-      "cardPrints": 16,
+      "cardPrints": 32,
       "uniqueCards": 16
     },
     {
@@ -151,13 +151,13 @@
     {
       "id": "616901",
       "name": "Promotion card",
-      "cardPrints": 238,
-      "uniqueCards": 182
+      "cardPrints": 273,
+      "uniqueCards": 204
     }
   ],
-  "officialCardCount": 1148,
-  "officialPrintCount": 1912,
-  "deckReadyCards": 1063,
+  "officialCardCount": 1152,
+  "officialPrintCount": 2011,
+  "deckReadyCards": 1064,
   "marketCardsWithoutOfficialRules": [],
   "officialCardsWithoutMarketProducts": [
     "EXBP-001",
@@ -186,6 +186,7 @@
     "EXBP-031",
     "EXBP-032",
     "EXBP-034",
+    "EXBP-035",
     "EXR-003",
     "EXR-004",
     "EXR-005",
@@ -210,7 +211,9 @@
     "EXRP-013",
     "EXRP-014",
     "EXRP-015",
+    "EXRP-017",
     "EXRP-019",
+    "EXRP-020",
     "GD05-001",
     "GD05-002",
     "GD05-003",
@@ -407,6 +410,7 @@
     "RP-064",
     "RP-065",
     "RP-067",
+    "RP-068",
     "ST11-001",
     "ST11-002",
     "ST11-003",
