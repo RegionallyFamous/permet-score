@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-29T09:23:52.973Z",
+  "updatedAt": "2026-10-30T09:23:36.920Z",
   "source": "Official GUNDAM CARD GAME card search",
   "sourceUrl": "https://www.gundam-gcg.com/en/cards/",
   "packageCount": 26,
@@ -37,8 +37,8 @@
     {
       "id": "616106",
       "name": "Stardust Trails [GD06]",
-      "cardPrints": 138,
-      "uniqueCards": 138
+      "cardPrints": 189,
+      "uniqueCards": 143
     },
     {
       "id": "616001",
@@ -157,12 +157,12 @@
     {
       "id": "616901",
       "name": "Promotion card",
-      "cardPrints": 273,
-      "uniqueCards": 204
+      "cardPrints": 278,
+      "uniqueCards": 209
     }
   ],
   "officialCardCount": 1290,
-  "officialPrintCount": 2149,
+  "officialPrintCount": 2205,
   "deckReadyCards": 1194,
   "marketCardsWithoutOfficialRules": [],
   "officialCardsWithoutMarketProducts": [
