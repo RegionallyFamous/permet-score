@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-26T09:23:06.264Z",
+  "updatedAt": "2026-11-27T09:23:00.591Z",
   "source": "Official GUNDAM CARD GAME card search",
   "sourceUrl": "https://www.gundam-gcg.com/en/cards/",
   "packageCount": 26,
@@ -157,13 +157,13 @@
     {
       "id": "616901",
       "name": "Promotion card",
-      "cardPrints": 278,
-      "uniqueCards": 209
+      "cardPrints": 292,
+      "uniqueCards": 222
     }
   ],
-  "officialCardCount": 1290,
-  "officialPrintCount": 2205,
-  "deckReadyCards": 1194,
+  "officialCardCount": 1300,
+  "officialPrintCount": 2219,
+  "deckReadyCards": 1204,
   "marketCardsWithoutOfficialRules": [],
   "officialCardsWithoutMarketProducts": [
     "EXBP-001",
@@ -547,6 +547,16 @@
     "RP-065",
     "RP-067",
     "RP-068",
+    "RP-069",
+    "RP-070",
+    "RP-071",
+    "RP-072",
+    "RP-073",
+    "RP-074",
+    "RP-075",
+    "RP-076",
+    "RP-077",
+    "RP-078",
     "ST11-001",
     "ST11-002",
     "ST11-003",
